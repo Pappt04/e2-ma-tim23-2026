@@ -15,7 +15,7 @@ enum class KorakPhase { RoundIntro, PlayerTurn, OpponentChance, RoundEnd, GameOv
 data class KorakPoKorakState(
     val currentRound: Int = 1,
     val phase: KorakPhase = KorakPhase.RoundIntro,
-    val currentStep: Int = 1,          // 1–7, hardest first
+    val currentStep: Int = 1,
     val revealedClues: List<String> = emptyList(),
     val targetAnswer: String = "",
     val timeLeft: Int = 10,
@@ -64,7 +64,6 @@ class KorakPoKorakViewModel : ViewModel() {
 
     private var timerJob: Job? = null
 
-    // Called from RoundIntro when the player taps "Start Round".
     fun beginRound() {
         val question = questions[_state.value.currentRound - 1]
         _state.update {
@@ -97,7 +96,6 @@ class KorakPoKorakViewModel : ViewModel() {
         finishRound(points, scoredByOpponent = s.phase == KorakPhase.OpponentChance)
     }
 
-    // Transition from RoundEnd to Round 2 intro.
     fun prepareNextRound() {
         _state.update {
             it.copy(
@@ -111,7 +109,6 @@ class KorakPoKorakViewModel : ViewModel() {
         }
     }
 
-    // ── Timer ──────────────────────────────────────────────────────────────────
 
     private fun startTimer() {
         timerJob?.cancel()
@@ -141,7 +138,6 @@ class KorakPoKorakViewModel : ViewModel() {
                     }
                     startTimer()
                 } else {
-                    // All 7 clues exhausted → opponent chance
                     _state.update {
                         it.copy(
                             phase = KorakPhase.OpponentChance,
@@ -165,8 +161,8 @@ class KorakPoKorakViewModel : ViewModel() {
         val (newP1, newP2) = when {
             !scoredByOpponent && activeIsP1  -> s.player1Points + points to s.player2Points
             !scoredByOpponent && !activeIsP1 -> s.player1Points to s.player2Points + points
-            scoredByOpponent && activeIsP1   -> s.player1Points to s.player2Points + points // P2 steals round 1
-            else                             -> s.player1Points + points to s.player2Points  // P1 steals round 2
+            scoredByOpponent && activeIsP1   -> s.player1Points to s.player2Points + points
+            else                             -> s.player1Points + points to s.player2Points
         }
 
         _state.update {

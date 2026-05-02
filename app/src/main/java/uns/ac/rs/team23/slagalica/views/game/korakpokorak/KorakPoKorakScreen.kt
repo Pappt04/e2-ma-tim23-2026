@@ -75,7 +75,6 @@ fun KorakPoKorakScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
-            // Timer bar — visible only during active play
             if (state.phase == KorakPhase.PlayerTurn || state.phase == KorakPhase.OpponentChance) {
                 LinearProgressIndicator(
                     progress = { state.timeLeft / 10f },
