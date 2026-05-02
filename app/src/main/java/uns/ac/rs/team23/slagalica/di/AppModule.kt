@@ -6,6 +6,7 @@ import org.koin.dsl.module
 import uns.ac.rs.team23.slagalica.data.SessionStore
 import uns.ac.rs.team23.slagalica.services.AuthService
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
+import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.LobbyViewModel
 
 val AppModule = module {
@@ -16,4 +17,5 @@ val AppModule = module {
     // ViewModels
     viewModel { AuthViewModel(get()) }
     viewModelOf(::LobbyViewModel)
+    viewModelOf(::KorakPoKorakViewModel)
 }

@@ -34,6 +34,7 @@ fun GameScreen(
     playerName: String,
     opponentName: String,
     onForfeit: () -> Unit,
+    onNavigateToKorakPoKorak: () -> Unit = {},
 ) {
     var showForfeitDialog by remember { mutableStateOf(false) }
 
@@ -81,10 +82,11 @@ fun GameScreen(
                 fontWeight = FontWeight.SemiBold,
             )
 
-            GAME_LIST.forEach { game ->
+            gameList(onNavigateToKorakPoKorak).forEach { game ->
                 OutlinedButton(
-                    onClick = { /* TODO: navigate to individual game */ },
+                    onClick = { if (game.route != null) game.route.invoke() },
                     modifier = Modifier.fillMaxWidth(),
+                    enabled = game.route != null,
                 ) {
                     Column(modifier = Modifier.padding(vertical = 4.dp)) {
                         Text(game.name, fontWeight = FontWeight.SemiBold)
@@ -96,13 +98,14 @@ fun GameScreen(
     }
 }
 
-private data class GameInfo(val name: String, val description: String)
+private data class GameInfo(val name: String, val description: String, val route: (() -> Unit)? = null)
 
-private val GAME_LIST = listOf(
+@Composable
+private fun gameList(onNavigateToKorakPoKorak: () -> Unit) = listOf(
     GameInfo("Ko zna zna", "5 questions · 25s · up to 50 pts"),
     GameInfo("Spojnice", "2 rounds · 60s · up to 20 pts"),
     GameInfo("Asocijacije", "2 rounds · 4min · up to 60 pts"),
     GameInfo("Skočko", "2 rounds · 60s · up to 40 pts"),
-    GameInfo("Korak po korak", "2 rounds · 140s · up to 40 pts"),
+    GameInfo("Korak po korak", "2 rounds · 140s · up to 40 pts", onNavigateToKorakPoKorak),
     GameInfo("Moj broj", "2 rounds · 2min · up to 20 pts"),
 )
