@@ -30,48 +30,66 @@ fun RoundEndContent(
     onNext: () -> Unit,
 ) {
     Box(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Column(
+        LazyColumn(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Text(
-                text = "Round 1 Complete",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-            )
+            item {
 
-            ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Correct answer:", style = MaterialTheme.typography.labelMedium)
-                    Text(
-                        text = state.roundCorrectAnswer,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.primary,
-                    )
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    ScoreRow(player1Name, state.player1Points, player2Name, state.player2Points)
-                }
+                Text(
+                    text = "Round 1 Complete",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                )
             }
 
-            // Show all clues
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                state.revealedClues.forEachIndexed { i, clue ->
-                    item {
+            item {
+                ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(20.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text("Correct answer:", style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            text = state.roundCorrectAnswer,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
+                        ScoreRow(player1Name, state.player1Points, player2Name, state.player2Points)
+                    }
+                }
+
+            }
+
+            item {
+
+                // Show all clues
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    state.revealedClues.forEachIndexed { i, clue ->
                         ClueCard(stepNumber = i + 1, clue = clue, highlight = false)
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            item {
 
-            Button(
-                onClick = onNext,
-                modifier = Modifier.fillMaxWidth(0.7f),
-            ) { Text("Start Round 2") }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            item {
+
+                Button(
+                    onClick = onNext,
+                    modifier = Modifier.fillMaxWidth(0.7f),
+                ) { Text("Start Round 2") }
+            }
         }
     }
 }
