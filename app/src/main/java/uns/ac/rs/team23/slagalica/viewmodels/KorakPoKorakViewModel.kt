@@ -136,7 +136,6 @@ class KorakPoKorakViewModel : ViewModel() {
                             currentStep = nextStep,
                             revealedClues = clues,
                             timeLeft = 10,
-                            currentAnswer = "",
                             showWrongFeedback = false,
                         )
                     }
@@ -147,7 +146,6 @@ class KorakPoKorakViewModel : ViewModel() {
                         it.copy(
                             phase = KorakPhase.OpponentChance,
                             timeLeft = 10,
-                            currentAnswer = "",
                             showWrongFeedback = false,
                         )
                     }
