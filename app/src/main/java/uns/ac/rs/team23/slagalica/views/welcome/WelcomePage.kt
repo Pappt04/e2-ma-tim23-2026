@@ -85,6 +85,19 @@ fun WelcomePage(
             ) {
                 Text("Continue as Guest")
             }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            TextButton(
+                onClick = viewModel::devLogin,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    text = "[DEV] Quick Login",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

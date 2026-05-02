@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun HomeScreen(
     username: String,
+    onNavigateToPlay: () -> Unit,
     onLogout: () -> Unit,
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -62,14 +63,21 @@ fun HomeScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-
                 HorizontalDivider()
-
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Home, contentDescription = null) },
                     label = { Text("Home") },
                     selected = true,
                     onClick = { scope.launch { drawerState.close() } },
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
+                    label = { Text("Play") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToPlay()
+                    },
                 )
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Person, contentDescription = null) },
@@ -90,15 +98,6 @@ fun HomeScreen(
                     },
                 )
                 NavigationDrawerItem(
-                    icon = { Icon(Icons.Default.PlayArrow, contentDescription = null) },
-                    label = { Text("Play") },
-                    selected = false,
-                    onClick = {
-                        scope.launch { drawerState.close() }
-                        // TODO: start matchmaking
-                    },
-                )
-                NavigationDrawerItem(
                     icon = { Icon(Icons.Default.Settings, contentDescription = null) },
                     label = { Text("Settings") },
                     selected = false,
@@ -107,10 +106,8 @@ fun HomeScreen(
                         // TODO: navigate to settings
                     },
                 )
-
                 Spacer(modifier = Modifier.weight(1f))
                 HorizontalDivider()
-
                 NavigationDrawerItem(
                     icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null) },
                     label = { Text("Log out") },
@@ -156,7 +153,7 @@ fun HomeScreen(
                 )
                 Spacer(modifier = Modifier.height(32.dp))
                 Button(
-                    onClick = { /* TODO: start matchmaking */ },
+                    onClick = onNavigateToPlay,
                     modifier = Modifier.fillMaxWidth(0.7f),
                 ) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null)
