@@ -20,7 +20,24 @@ sealed class AuthState {
     ) : AuthState()
 }
 
+sealed class UserSession {
+    data object NotLoggedIn : UserSession()
+    data object Guest : UserSession()
+    data class LoggedIn(val username: String, val email: String) : UserSession()
+}
+
 class AuthViewModel : ViewModel() {
+
+    private val _userSession = MutableStateFlow<UserSession>(UserSession.NotLoggedIn)
+    val userSession: StateFlow<UserSession> = _userSession.asStateFlow()
+
+    fun loginAsGuest() {
+        _userSession.value = UserSession.Guest
+    }
+
+    fun logout() {
+        _userSession.value = UserSession.NotLoggedIn
+    }
     var loginEmailOrUsername by mutableStateOf("")
         private set
     var loginPassword by mutableStateOf("")
@@ -77,6 +94,10 @@ class AuthViewModel : ViewModel() {
             return
         }
         // TODO: connect to AuthService / Firebase
+        _userSession.value = UserSession.LoggedIn(
+            username = loginEmailOrUsername,
+            email = if (loginEmailOrUsername.contains("@")) loginEmailOrUsername else "",
+        )
         _loginState.value = AuthState.Success
     }
 
