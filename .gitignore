@@ -32,3 +32,7 @@ google-services.json
 
 # Android Profiling
 *.hprof
+/.editorconfig
+/.kotlin-language-server.json
+/gradle/gradle-daemon-jvm.properties
+/kls_database.db
