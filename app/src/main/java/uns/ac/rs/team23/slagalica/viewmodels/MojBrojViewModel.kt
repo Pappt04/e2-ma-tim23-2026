@@ -9,27 +9,41 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uns.ac.rs.team23.slagalica.utils.ExpressionEvaluator
 import kotlin.math.abs
 import kotlin.random.Random
-import uns.ac.rs.team23.slagalica.utils.ExpressionEvaluator
 
 enum class MojBrojPhase {
-    RoundIntro, TargetCountdown, NumbersCountdown,
-    Player1Input, Player2Input, RoundEnd, GameOver
+    RoundIntro,
+    TargetCountdown,
+    NumbersCountdown,
+    Player1Input,
+    Player2Input,
+    RoundEnd,
+    GameOver,
 }
 
 sealed class ExprToken {
-    data class Num(val value: Int, val sourceIndex: Int) : ExprToken()
-    data class Op(val symbol: String) : ExprToken()
+    data class Num(
+        val value: Int,
+        val sourceIndex: Int,
+    ) : ExprToken()
+
+    data class Op(
+        val symbol: String,
+    ) : ExprToken()
+
     data object OpenParen : ExprToken()
+
     data object CloseParen : ExprToken()
 
-    fun display(): String = when (this) {
-        is Num -> value.toString()
-        is Op -> symbol
-        OpenParen -> "("
-        CloseParen -> ")"
-    }
+    fun display(): String =
+        when (this) {
+            is Num -> value.toString()
+            is Op -> symbol
+            OpenParen -> "("
+            CloseParen -> ")"
+        }
 }
 
 data class MojBrojState(
@@ -50,7 +64,6 @@ data class MojBrojState(
 )
 
 class MojBrojViewModel : ViewModel() {
-
     private val _state = MutableStateFlow(MojBrojState())
     val state: StateFlow<MojBrojState> = _state.asStateFlow()
     private var timerJob: Job? = null
@@ -73,6 +86,7 @@ class MojBrojViewModel : ViewModel() {
                 }
                 startSetupTimer()
             }
+
             MojBrojPhase.NumbersCountdown -> {
                 timerJob?.cancel()
                 _state.update {
@@ -86,6 +100,7 @@ class MojBrojViewModel : ViewModel() {
                 }
                 startPlayTimer()
             }
+
             else -> {}
         }
     }
@@ -113,8 +128,12 @@ class MojBrojViewModel : ViewModel() {
         val s = _state.value
         if (s.phase != MojBrojPhase.Player1Input && s.phase != MojBrojPhase.Player2Input) return
         timerJob?.cancel()
-        val exprString = if (s.tokens.isEmpty()) "(no entry)"
-                         else s.tokens.joinToString(" ") { it.display() }
+        val exprString =
+            if (s.tokens.isEmpty()) {
+                "(no entry)"
+            } else {
+                s.tokens.joinToString(" ") { it.display() }
+            }
         val result = if (s.tokens.isEmpty()) null else ExpressionEvaluator.evaluate(s.tokens)
 
         when (s.phase) {
@@ -131,6 +150,7 @@ class MojBrojViewModel : ViewModel() {
                 }
                 startPlayTimer()
             }
+
             MojBrojPhase.Player2Input -> {
                 _state.update {
                     it.copy(
@@ -140,6 +160,7 @@ class MojBrojViewModel : ViewModel() {
                 }
                 resolveRound()
             }
+
             else -> {}
         }
     }
@@ -163,24 +184,26 @@ class MojBrojViewModel : ViewModel() {
 
     private fun startSetupTimer() {
         timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            for (i in 4 downTo 0) {
-                delay(1000)
-                _state.update { it.copy(setupSecondsLeft = i) }
+        timerJob =
+            viewModelScope.launch {
+                for (i in 4 downTo 0) {
+                    delay(1000)
+                    _state.update { it.copy(setupSecondsLeft = i) }
+                }
+                onStopPressed()
             }
-            onStopPressed()
-        }
     }
 
     private fun startPlayTimer() {
         timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            for (i in 59 downTo 0) {
-                delay(1000)
-                _state.update { it.copy(playSecondsLeft = i) }
+        timerJob =
+            viewModelScope.launch {
+                for (i in 59 downTo 0) {
+                    delay(1000)
+                    _state.update { it.copy(playSecondsLeft = i) }
+                }
+                submitExpression()
             }
-            submitExpression()
-        }
     }
 
     private fun drawNumbers(): List<Int> {
@@ -200,20 +223,23 @@ class MojBrojViewModel : ViewModel() {
         val activeDiff = activeResult?.let { abs(it - target) }
         val opponentDiff = opponentResult?.let { abs(it - target) }
 
-        val (activeDelta, opponentDelta) = when {
-            activeDiff == 0 -> 10 to 0
-            opponentDiff == 0 -> 0 to 10
-            activeDiff == null && opponentDiff == null -> 0 to 0
-            activeDiff == null -> 0 to 5
-            opponentDiff == null -> 5 to 0
-            activeDiff <= opponentDiff -> 5 to 0
-            else -> 0 to 5
-        }
+        val (activeDelta, opponentDelta) =
+            when {
+                activeDiff == 0 -> 10 to 0
+                opponentDiff == 0 -> 0 to 10
+                activeDiff == null && opponentDiff == null -> 0 to 0
+                activeDiff == null -> 0 to 5
+                opponentDiff == null -> 5 to 0
+                activeDiff <= opponentDiff -> 5 to 0
+                else -> 0 to 5
+            }
 
-        val (newP1, newP2) = if (activeIsP1)
-            (s.player1Points + activeDelta) to (s.player2Points + opponentDelta)
-        else
-            (s.player1Points + opponentDelta) to (s.player2Points + activeDelta)
+        val (newP1, newP2) =
+            if (activeIsP1) {
+                (s.player1Points + activeDelta) to (s.player2Points + opponentDelta)
+            } else {
+                (s.player1Points + opponentDelta) to (s.player2Points + activeDelta)
+            }
 
         _state.update {
             it.copy(

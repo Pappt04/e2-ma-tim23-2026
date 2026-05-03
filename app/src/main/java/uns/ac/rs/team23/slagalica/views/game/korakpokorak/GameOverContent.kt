@@ -21,7 +21,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakState
 
-
 @Composable
 fun GameOverContent(
     state: KorakPoKorakState,
@@ -56,11 +55,12 @@ fun GameOverContent(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
                     ScoreRow(player1Name, state.player1Points, player2Name, state.player2Points)
                     HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                    val winner = when {
-                        state.player1Points > state.player2Points -> "$player1Name wins!"
-                        state.player2Points > state.player1Points -> "$player2Name wins!"
-                        else -> "It's a draw!"
-                    }
+                    val winner =
+                        when {
+                            state.player1Points > state.player2Points -> "$player1Name wins!"
+                            state.player2Points > state.player1Points -> "$player2Name wins!"
+                            else -> "It's a draw!"
+                        }
                     Text(
                         text = winner,
                         style = MaterialTheme.typography.titleMedium,
@@ -80,3 +80,4 @@ fun GameOverContent(
         }
     }
 }
+

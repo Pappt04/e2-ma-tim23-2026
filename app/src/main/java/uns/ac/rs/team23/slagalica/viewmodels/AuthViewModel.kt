@@ -11,19 +11,30 @@ import uns.ac.rs.team23.slagalica.data.SessionStore
 
 sealed class AuthState {
     data object Idle : AuthState()
+
     data object Loading : AuthState()
+
     data object Success : AuthState()
-    data class Error(val message: String) : AuthState()
+
+    data class Error(
+        val message: String,
+    ) : AuthState()
 }
 
 sealed class UserSession {
     data object NotLoggedIn : UserSession()
+
     data object Guest : UserSession()
-    data class LoggedIn(val username: String, val email: String) : UserSession()
+
+    data class LoggedIn(
+        val username: String,
+        val email: String,
+    ) : UserSession()
 }
 
-class AuthViewModel(private val sessionStore: SessionStore) : ViewModel() {
-
+class AuthViewModel(
+    private val sessionStore: SessionStore,
+) : ViewModel() {
     private val _userSession = MutableStateFlow<UserSession>(UserSession.NotLoggedIn)
     val userSession: StateFlow<UserSession> = _userSession.asStateFlow()
 
@@ -52,13 +63,33 @@ class AuthViewModel(private val sessionStore: SessionStore) : ViewModel() {
     private val _registerState = MutableStateFlow<AuthState>(AuthState.Idle)
     val registerState: StateFlow<AuthState> = _registerState.asStateFlow()
 
-    fun onLoginEmailOrUsernameChange(v: String) { loginEmailOrUsername = v }
-    fun onLoginPasswordChange(v: String) { loginPassword = v }
-    fun onRegisterEmailChange(v: String) { registerEmail = v }
-    fun onRegisterUsernameChange(v: String) { registerUsername = v }
-    fun onRegisterRegionChange(v: String) { registerRegion = v }
-    fun onRegisterPasswordChange(v: String) { registerPassword = v }
-    fun onRegisterConfirmPasswordChange(v: String) { registerConfirmPassword = v }
+    fun onLoginEmailOrUsernameChange(v: String) {
+        loginEmailOrUsername = v
+    }
+
+    fun onLoginPasswordChange(v: String) {
+        loginPassword = v
+    }
+
+    fun onRegisterEmailChange(v: String) {
+        registerEmail = v
+    }
+
+    fun onRegisterUsernameChange(v: String) {
+        registerUsername = v
+    }
+
+    fun onRegisterRegionChange(v: String) {
+        registerRegion = v
+    }
+
+    fun onRegisterPasswordChange(v: String) {
+        registerPassword = v
+    }
+
+    fun onRegisterConfirmPasswordChange(v: String) {
+        registerConfirmPassword = v
+    }
 
     fun loginAsGuest() {
         val session = UserSession.Guest
@@ -84,10 +115,11 @@ class AuthViewModel(private val sessionStore: SessionStore) : ViewModel() {
             return
         }
         // TODO: connect to AuthService / Firebase
-        val session = UserSession.LoggedIn(
-            username = loginEmailOrUsername,
-            email = if (loginEmailOrUsername.contains("@")) loginEmailOrUsername else "",
-        )
+        val session =
+            UserSession.LoggedIn(
+                username = loginEmailOrUsername,
+                email = if (loginEmailOrUsername.contains("@")) loginEmailOrUsername else "",
+            )
         sessionStore.save(session)
         _userSession.value = session
         _loginState.value = AuthState.Success
@@ -108,6 +140,11 @@ class AuthViewModel(private val sessionStore: SessionStore) : ViewModel() {
         _registerState.value = AuthState.Success
     }
 
-    fun clearLoginState() { _loginState.value = AuthState.Idle }
-    fun clearRegisterState() { _registerState.value = AuthState.Idle }
+    fun clearLoginState() {
+        _loginState.value = AuthState.Idle
+    }
+
+    fun clearRegisterState() {
+        _registerState.value = AuthState.Idle
+    }
 }

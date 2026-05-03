@@ -21,13 +21,21 @@ import uns.ac.rs.team23.slagalica.views.lobby.LobbyScreen
 import uns.ac.rs.team23.slagalica.views.welcome.RegisterPage
 import uns.ac.rs.team23.slagalica.views.welcome.WelcomePage
 
-sealed class Screen(val route: String) {
+sealed class Screen(
+    val route: String,
+) {
     data object Login : Screen("login")
+
     data object Register : Screen("register")
+
     data object Home : Screen("home")
+
     data object Lobby : Screen("lobby")
+
     data object Game : Screen("game")
+
     data object KorakPoKorak : Screen("korak_po_korak")
+
     data object MojBroj : Screen("moj_broj")
 }
 
@@ -49,6 +57,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                     }
                 }
             }
+
             UserSession.NotLoggedIn -> {
                 if (current !in AUTH_ROUTES) {
                     navController.navigate(Screen.Login.route) {

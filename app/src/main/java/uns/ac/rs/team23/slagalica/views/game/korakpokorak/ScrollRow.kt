@@ -12,7 +12,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 
 @Composable
-fun ScoreRow(p1Name: String, p1Pts: Int, p2Name: String, p2Pts: Int) {
+fun ScoreRow(
+    p1Name: String,
+    p1Pts: Int,
+    p2Name: String,
+    p2Pts: Int,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -28,3 +33,4 @@ fun ScoreRow(p1Name: String, p1Pts: Int, p2Name: String, p2Pts: Int) {
         }
     }
 }
+

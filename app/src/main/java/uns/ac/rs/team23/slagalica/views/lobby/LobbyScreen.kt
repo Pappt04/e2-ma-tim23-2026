@@ -72,42 +72,53 @@ fun LobbyScreen(
         },
     ) { innerPadding ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(24.dp),
             contentAlignment = Alignment.Center,
         ) {
             when (val s = state) {
-                is LobbyState.Searching -> SearchingContent()
+                is LobbyState.Searching -> {
+                    SearchingContent()
+                }
 
-                is LobbyState.OpponentFound -> ReadyContent(
-                    currentUsername = currentUsername,
-                    opponentName = s.opponentName,
-                    playerReady = false,
-                    opponentReady = false,
-                    onReady = viewModel::clickReady,
-                )
+                is LobbyState.OpponentFound -> {
+                    ReadyContent(
+                        currentUsername = currentUsername,
+                        opponentName = s.opponentName,
+                        playerReady = false,
+                        opponentReady = false,
+                        onReady = viewModel::clickReady,
+                    )
+                }
 
-                is LobbyState.YouAreReady -> ReadyContent(
-                    currentUsername = currentUsername,
-                    opponentName = s.opponentName,
-                    playerReady = true,
-                    opponentReady = false,
-                    onReady = {},
-                )
+                is LobbyState.YouAreReady -> {
+                    ReadyContent(
+                        currentUsername = currentUsername,
+                        opponentName = s.opponentName,
+                        playerReady = true,
+                        opponentReady = false,
+                        onReady = {},
+                    )
+                }
 
-                is LobbyState.Countdown -> CountdownContent(
-                    currentUsername = currentUsername,
-                    opponentName = s.opponentName,
-                    seconds = s.seconds,
-                )
+                is LobbyState.Countdown -> {
+                    CountdownContent(
+                        currentUsername = currentUsername,
+                        opponentName = s.opponentName,
+                        seconds = s.seconds,
+                    )
+                }
 
-                LobbyState.Starting -> CountdownContent(
-                    currentUsername = currentUsername,
-                    opponentName = "",
-                    seconds = 0,
-                )
+                LobbyState.Starting -> {
+                    CountdownContent(
+                        currentUsername = currentUsername,
+                        opponentName = "",
+                        seconds = 0,
+                    )
+                }
             }
         }
     }
@@ -235,17 +246,19 @@ private fun PlayerCard(
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(12.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
         ) {
             Box(
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape)
-                    .background(avatarColor),
+                modifier =
+                    Modifier
+                        .size(56.dp)
+                        .clip(CircleShape)
+                        .background(avatarColor),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
@@ -271,8 +284,12 @@ private fun PlayerCard(
             Text(
                 text = if (isReady) "Ready" else "Waiting...",
                 style = MaterialTheme.typography.bodySmall,
-                color = if (isReady) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.onSurfaceVariant,
+                color =
+                    if (isReady) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
             )
         }
     }

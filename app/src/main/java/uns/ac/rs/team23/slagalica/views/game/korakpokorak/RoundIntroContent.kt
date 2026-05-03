@@ -18,7 +18,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
-
 @Composable
 fun RoundIntroContent(
     round: Int,
@@ -60,3 +59,4 @@ fun RoundIntroContent(
         }
     }
 }
+

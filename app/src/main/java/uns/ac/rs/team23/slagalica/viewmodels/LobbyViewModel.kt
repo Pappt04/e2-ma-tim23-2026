@@ -11,9 +11,20 @@ import kotlin.random.Random
 
 sealed class LobbyState {
     data object Searching : LobbyState()
-    data class OpponentFound(val opponentName: String) : LobbyState()
-    data class YouAreReady(val opponentName: String) : LobbyState()
-    data class Countdown(val opponentName: String, val seconds: Int) : LobbyState()
+
+    data class OpponentFound(
+        val opponentName: String,
+    ) : LobbyState()
+
+    data class YouAreReady(
+        val opponentName: String,
+    ) : LobbyState()
+
+    data class Countdown(
+        val opponentName: String,
+        val seconds: Int,
+    ) : LobbyState()
+
     data object Starting : LobbyState()
 }
 

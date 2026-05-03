@@ -24,7 +24,6 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakState
 
-
 @Composable
 fun ActiveTurnContent(
     state: KorakPoKorakState,
@@ -36,16 +35,18 @@ fun ActiveTurnContent(
     val scrollState = rememberScrollState()
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding(),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .imePadding(),
     ) {
         // Scrollable clue area
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(scrollState)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             // Phase header
@@ -112,3 +113,4 @@ fun ActiveTurnContent(
         }
     }
 }
+

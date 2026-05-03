@@ -21,7 +21,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakState
 
-
 @Composable
 fun RoundEndContent(
     state: KorakPoKorakState,
@@ -30,9 +29,10 @@ fun RoundEndContent(
     onNext: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
         LazyColumn(
@@ -40,7 +40,6 @@ fun RoundEndContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-
                 Text(
                     text = "Round 1 Complete",
                     style = MaterialTheme.typography.headlineMedium,
@@ -52,7 +51,7 @@ fun RoundEndContent(
                 ElevatedCard(modifier = Modifier.fillMaxWidth()) {
                     Column(
                         modifier = Modifier.padding(20.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text("Correct answer:", style = MaterialTheme.typography.labelMedium)
                         Text(
@@ -65,11 +64,9 @@ fun RoundEndContent(
                         ScoreRow(player1Name, state.player1Points, player2Name, state.player2Points)
                     }
                 }
-
             }
 
             item {
-
                 // Show all clues
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     state.revealedClues.forEachIndexed { i, clue ->
@@ -79,12 +76,10 @@ fun RoundEndContent(
             }
 
             item {
-
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
             item {
-
                 Button(
                     onClick = onNext,
                     modifier = Modifier.fillMaxWidth(0.7f),
@@ -93,3 +88,4 @@ fun RoundEndContent(
         }
     }
 }
+
