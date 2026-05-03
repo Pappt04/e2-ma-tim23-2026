@@ -45,7 +45,7 @@ fun KorakPoKorakScreen(
                     Column {
                         Text("Korak po korak", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            text = "Round ${state.currentRound}/2  ·  $player1Name: ${state.player1Points}  $player2Name: ${state.player2Points}",
+                            text = "Round ${state.currentRound}/2 - $player1Name: ${state.player1Points} $player2Name: ${state.player2Points}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
