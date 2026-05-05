@@ -20,6 +20,7 @@ import uns.ac.rs.team23.slagalica.views.game.mojbroj.MojBrojScreen
 import uns.ac.rs.team23.slagalica.views.lobby.LobbyScreen
 import uns.ac.rs.team23.slagalica.views.welcome.RegisterPage
 import uns.ac.rs.team23.slagalica.views.welcome.WelcomePage
+import uns.ac.rs.team23.slagalica.views.NotificationsScreen
 
 sealed class Screen(
     val route: String,
@@ -29,6 +30,7 @@ sealed class Screen(
     data object Register : Screen("register")
 
     data object Home : Screen("home")
+    data object Notifications : Screen("notifications")
 
     data object Lobby : Screen("lobby")
 
@@ -92,6 +94,15 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 username = if (session is UserSession.LoggedIn) session.username else "Guest",
                 onNavigateToPlay = { navController.navigate(Screen.Lobby.route) },
                 onLogout = authViewModel::logout,
+                onNavigateToNotifications = {
+                    navController.navigate(Screen.Notifications.route)
+                },
+            )
+        }
+
+        composable(Screen.Notifications.route) {
+            NotificationsScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
         composable(Screen.Lobby.route) {
