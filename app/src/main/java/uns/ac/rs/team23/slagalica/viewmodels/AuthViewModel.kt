@@ -7,6 +7,7 @@ import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import uns.ac.rs.team23.slagalica.data.SessionStore
 
 sealed class AuthState {
     data object Idle : AuthState()
@@ -22,27 +23,29 @@ sealed class AuthState {
 
 sealed class UserSession {
     data object NotLoggedIn : UserSession()
+
     data object Guest : UserSession()
-    data class LoggedIn(val username: String, val email: String) : UserSession()
+
+    data class LoggedIn(
+        val username: String,
+        val email: String,
+    ) : UserSession()
 }
 
-class AuthViewModel : ViewModel() {
-
+class AuthViewModel(
+    private val sessionStore: SessionStore,
+) : ViewModel() {
     private val _userSession = MutableStateFlow<UserSession>(UserSession.NotLoggedIn)
     val userSession: StateFlow<UserSession> = _userSession.asStateFlow()
 
-    fun loginAsGuest() {
-        _userSession.value = UserSession.Guest
+    init {
+        _userSession.value = sessionStore.restore()
     }
 
-    fun logout() {
-        _userSession.value = UserSession.NotLoggedIn
-    }
     var loginEmailOrUsername by mutableStateOf("")
         private set
     var loginPassword by mutableStateOf("")
         private set
-
     var registerEmail by mutableStateOf("")
         private set
     var registerUsername by mutableStateOf("")
@@ -88,16 +91,37 @@ class AuthViewModel : ViewModel() {
         registerConfirmPassword = v
     }
 
+    fun loginAsGuest() {
+        val session = UserSession.Guest
+        sessionStore.save(session)
+        _userSession.value = session
+    }
+
+    fun logout() {
+        sessionStore.save(UserSession.NotLoggedIn)
+        _userSession.value = UserSession.NotLoggedIn
+    }
+
+    /** Dev-only: bypass auth for local testing. */
+    fun devLogin() {
+        val session = UserSession.LoggedIn(username = "DevUser", email = "dev@test.com")
+        sessionStore.save(session)
+        _userSession.value = session
+    }
+
     fun login() {
         if (loginEmailOrUsername.isBlank() || loginPassword.isBlank()) {
             _loginState.value = AuthState.Error("Please fill all fields")
             return
         }
         // TODO: connect to AuthService / Firebase
-        _userSession.value = UserSession.LoggedIn(
-            username = loginEmailOrUsername,
-            email = if (loginEmailOrUsername.contains("@")) loginEmailOrUsername else "",
-        )
+        val session =
+            UserSession.LoggedIn(
+                username = loginEmailOrUsername,
+                email = if (loginEmailOrUsername.contains("@")) loginEmailOrUsername else "",
+            )
+        sessionStore.save(session)
+        _userSession.value = session
         _loginState.value = AuthState.Success
     }
 
@@ -112,7 +136,7 @@ class AuthViewModel : ViewModel() {
             _registerState.value = AuthState.Error("Passwords do not match")
             return
         }
-        // TODO: connect to AuthService / Firebase
+        // TODO: connect to AuthService / Firebase (send email verification)
         _registerState.value = AuthState.Success
     }
 
