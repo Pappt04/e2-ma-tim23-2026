@@ -35,12 +35,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Notifications
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     username: String,
     onLogout: () -> Unit,
+    onNavigateToNotifications: () -> Unit,
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -87,6 +89,15 @@ fun HomeScreen(
                     onClick = {
                         scope.launch { drawerState.close() }
                         // TODO: navigate to leaderboard
+                    },
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                    label = { Text("Notifikacije") },
+                    selected = false,
+                    onClick = {
+                        scope.launch { drawerState.close() }
+                        onNavigateToNotifications()
                     },
                 )
                 NavigationDrawerItem(
