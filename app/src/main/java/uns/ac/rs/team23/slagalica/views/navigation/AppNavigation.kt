@@ -16,11 +16,13 @@ import uns.ac.rs.team23.slagalica.viewmodels.UserSession
 import uns.ac.rs.team23.slagalica.views.HomeScreen
 import uns.ac.rs.team23.slagalica.views.welcome.RegisterPage
 import uns.ac.rs.team23.slagalica.views.welcome.WelcomePage
+import uns.ac.rs.team23.slagalica.views.NotificationsScreen
 
 sealed class Screen(val route: String) {
     data object Login : Screen("login")
     data object Register : Screen("register")
     data object Home : Screen("home")
+    data object Notifications : Screen("notifications")
 }
 
 @Composable
@@ -71,6 +73,15 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             HomeScreen(
                 username = if (session is UserSession.LoggedIn) session.username else "Guest",
                 onLogout = authViewModel::logout,
+                onNavigateToNotifications = {
+                    navController.navigate(Screen.Notifications.route)
+                },
+            )
+        }
+
+        composable(Screen.Notifications.route) {
+            NotificationsScreen(
+                onNavigateBack = { navController.popBackStack() }
             )
         }
     }
