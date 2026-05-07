@@ -11,6 +11,7 @@ import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.LobbyViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.SkockoViewModel
+import uns.ac.rs.team23.slagalica.viewmodels.AsocijacijeViewModel
 
 val AppModule =
     module {
@@ -27,4 +28,5 @@ val AppModule =
         viewModelOf(::KorakPoKorakViewModel)
         viewModelOf(::MojBrojViewModel)
         viewModelOf(::SkockoViewModel)
+        viewModelOf(::AsocijacijeViewModel)
     }
