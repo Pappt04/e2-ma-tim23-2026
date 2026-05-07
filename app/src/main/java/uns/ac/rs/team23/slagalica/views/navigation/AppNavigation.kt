@@ -22,6 +22,7 @@ import uns.ac.rs.team23.slagalica.views.welcome.RegisterPage
 import uns.ac.rs.team23.slagalica.views.welcome.WelcomePage
 import uns.ac.rs.team23.slagalica.views.NotificationsScreen
 import uns.ac.rs.team23.slagalica.views.game.skocko.SkockoScreen
+import uns.ac.rs.team23.slagalica.views.game.asocijacije.AsocijacijeScreen
 
 sealed class Screen(
     val route: String,
@@ -42,6 +43,8 @@ sealed class Screen(
     data object MojBroj : Screen("moj_broj")
 
     data object Skocko : Screen("skocko")
+
+    data object Asocijacije : Screen("asocijacije")
 }
 
 private val AUTH_ROUTES = setOf(Screen.Login.route, Screen.Register.route)
@@ -126,7 +129,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             GameScreen(
                 playerName = username,
-                opponentName = "Opponent",
+                opponentName = "Protivnik",
                 onForfeit = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
@@ -141,6 +144,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onNavigateToSkocko = {
                     navController.navigate(Screen.Skocko.route)
                 },
+                onNavigateToAsocijacije = { navController.navigate(Screen.Asocijacije.route) },
             )
         }
         composable(Screen.KorakPoKorak.route) {
@@ -148,7 +152,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             KorakPoKorakScreen(
                 player1Name = username,
-                player2Name = "Opponent",
+                player2Name = "Protivnik",
                 onFinish = { navController.popBackStack() },
             )
         }
@@ -157,7 +161,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             MojBrojScreen(
                 player1Name = username,
-                player2Name = "Opponent",
+                player2Name = "Protivnik",
                 onFinish = { navController.popBackStack() },
             )
         }
@@ -166,7 +170,16 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             SkockoScreen(
                 player1Name = username,
-                player2Name = "Opponent",
+                player2Name = "Protivnik",
+                onFinish = { navController.popBackStack() },
+            )
+        }
+        composable(Screen.Asocijacije.route) {
+            val session = userSession
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
+            AsocijacijeScreen(
+                player1Name = username,
+                player2Name = "Protivnik",
                 onFinish = { navController.popBackStack() },
             )
         }

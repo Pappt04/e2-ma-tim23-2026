@@ -3,6 +3,7 @@ package uns.ac.rs.team23.slagalica.views.game.skocko
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,11 +18,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.R
 import uns.ac.rs.team23.slagalica.viewmodels.*
 import androidx.compose.runtime.Composable
 
@@ -157,7 +160,7 @@ fun SkockoScreen(
                         onAddSymbol = viewModel::addSymbol,
                         onRemoveAt  = viewModel::removeSymbolAt,
                         onSubmit    = viewModel::submitAttempt,
-                        onSkip      = viewModel::skipOpponentSteal,
+                        onConfirmRoundEnd = viewModel::confirmRoundEnd,
                     )
                 }
                 SkockoPhase.ROUND_END -> RoundEndContent(
@@ -198,9 +201,7 @@ private fun RoundIntroContent(round: Int, activeName: String, onStart: () -> Uni
             )
             Text(
                 text = "Pogodi kombinaciju 4 simbola u 6 pokušaja.\n" +
-                        "Simboli: Skočko, Kvadrat, Krug, Srce, Trougao, Zvezda\n\n" +
-                        "🟢 = tačan simbol, tačna pozicija\n" +
-                        "🟡 = tačan simbol, pogrešna pozicija",
+                        "Simboli: Pik, Karo, Tref, Srce, Zvezda, Skočko",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
@@ -221,7 +222,7 @@ private fun GameContent(
     onAddSymbol: (SkockoSymbol) -> Unit,
     onRemoveAt: (Int) -> Unit,
     onSubmit: () -> Unit,
-    onSkip: () -> Unit,
+    onConfirmRoundEnd: () -> Unit,
 ) {
     val listState = rememberLazyListState()
     val mainAttempts = state.attempts.filter { !it.isOpponentAttempt }
@@ -237,8 +238,8 @@ private fun GameContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                text = if (isSteal) "⚡ Krađa: $activeName (1 pokušaj)"
-                else "🎮 Na potezu: $activeName  " +
+                text = if (isSteal) "Krađa: $activeName (1 pokušaj)"
+                else "Na potezu: $activeName  " +
                         "(pokušaj ${mainAttempts.size + 1}/6)",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.bodyMedium,
@@ -251,59 +252,65 @@ private fun GameContent(
         Row(modifier = Modifier.weight(1f).padding(8.dp)) {
 
             // ── Levo: tabela pokušaja ──────────────────────────────────────
-            LazyColumn(
-                state = listState,
+            Column(
                 modifier = Modifier.weight(0.72f),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                // Prethodni pokušaji
-                items(mainAttempts) { attempt ->
-                    AttemptRow(attempt = attempt, isOpponent = false)
-                }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    // Prethodni pokušaji
+                    items(mainAttempts) { attempt ->
+                        AttemptRow(attempt = attempt, isOpponent = false)
+                    }
 
-                // Trenutni unos (ako nije steal faza)
-                if (!isSteal) {
-                    item {
-                        CurrentInputRow(
-                            input = state.currentInput,
-                            onRemoveAt = onRemoveAt,
-                            isActive = true,
-                        )
+                    // Trenutni unos (ako nije steal faza)
+                    if (!isSteal) {
+                        item {
+                            CurrentInputRow(
+                                input = state.currentInput,
+                                onRemoveAt = onRemoveAt,
+                                isActive = true,
+                                inputLocked = state.awaitingRoundEndConfirm,
+                            )
+                        }
+                    }
+
+                    // Prazni redovi
+                    items(emptyRows) {
+                        EmptyAttemptRow()
                     }
                 }
 
-                // Prazni redovi
-                items(emptyRows) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+
+                Text(
+                    text = "Krađa",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error,
+                )
+                when {
+                    isSteal -> CurrentInputRow(
+                        input = state.currentInput,
+                        onRemoveAt = onRemoveAt,
+                        isActive = true,
+                        inputLocked = state.awaitingRoundEndConfirm,
+                    )
+                    opponentAttempt != null -> AttemptRow(attempt = opponentAttempt, isOpponent = true)
+                    else -> EmptyAttemptRow()
+                }
+
+                Text(
+                    text = "Konačno rešenje",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (state.showSolution) {
+                    SolutionRow(solution = state.solution)
+                } else {
                     EmptyAttemptRow()
-                }
-
-                // Pokušaj protivnika (krađa)
-                if (isSteal) {
-                    item {
-                        Text(
-                            text = "— Krađa protivnika —",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                        CurrentInputRow(
-                            input = state.currentInput,
-                            onRemoveAt = onRemoveAt,
-                            isActive = true,
-                        )
-                    }
-                }
-
-                opponentAttempt?.let { att ->
-                    item {
-                        Text(
-                            text = "— Krađa protivnika —",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                        AttemptRow(attempt = att, isOpponent = true)
-                    }
                 }
             }
 
@@ -325,7 +332,7 @@ private fun GameContent(
                 SkockoSymbol.values().forEach { symbol ->
                     SymbolButton(
                         symbol = symbol,
-                        enabled = state.currentInput.size < 4,
+                        enabled = state.currentInput.any { it == null } && !state.awaitingRoundEndConfirm,
                         onClick = { onAddSymbol(symbol) },
                     )
                 }
@@ -335,20 +342,13 @@ private fun GameContent(
         // ── Dno: OK dugme ─────────────────────────────────────────────────
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
             Button(
-                onClick = onSubmit,
-                enabled = state.currentInput.size == 4,
+                onClick = {
+                    if (state.awaitingRoundEndConfirm) onConfirmRoundEnd() else onSubmit()
+                },
+                enabled = if (state.awaitingRoundEndConfirm) true else state.currentInput.none { it == null },
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) {
-                Text("OK — Potvrdi pokušaj", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            }
-            if (isSteal) {
-                Spacer(Modifier.height(6.dp))
-                OutlinedButton(
-                    onClick = onSkip,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Preskoči krađu (pas)")
-                }
+                Text("OK", fontWeight = FontWeight.Bold, fontSize = 16.sp)
             }
         }
     }
@@ -481,9 +481,10 @@ private fun AttemptRow(attempt: SkockoAttempt, isOpponent: Boolean) {
 
 @Composable
 private fun CurrentInputRow(
-    input: List<SkockoSymbol>,
+    input: List<SkockoSymbol?>,
     onRemoveAt: (Int) -> Unit,
     isActive: Boolean,
+    inputLocked: Boolean,
 ) {
     Row(
         modifier = Modifier
@@ -498,11 +499,13 @@ private fun CurrentInputRow(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         repeat(4) { i ->
-            val sym = input.getOrNull(i)
+            val sym = input[i]
             if (sym != null) {
                 SymbolCell(
                     symbol = sym,
-                    modifier = Modifier.clickable(enabled = isActive) { onRemoveAt(i) },
+                    modifier = Modifier.clickable(
+                        enabled = isActive && !inputLocked
+                    ) { onRemoveAt(i) },
                 )
             } else {
                 // Prazno polje
@@ -518,15 +521,6 @@ private fun CurrentInputRow(
                         ),
                 )
             }
-        }
-        // Hint za brisanje
-        if (input.isNotEmpty() && isActive) {
-            Text(
-                text = "✕",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 2.dp),
-            )
         }
     }
 }
@@ -564,12 +558,7 @@ private fun SymbolCell(
             .clip(RoundedCornerShape(8.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = symbol.label,
-            color = Color(symbol.hexColor),
-            fontWeight = FontWeight.Bold,
-            fontSize = if (symbol.label.length > 2) 14.sp else 18.sp,
-        )
+        SymbolContent(symbol = symbol, compact = false)
     }
 }
 
@@ -590,16 +579,41 @@ private fun SymbolButton(
             contentColor = Color(symbol.hexColor),
             disabledContentColor = Color(symbol.hexColor).copy(alpha = 0.35f),
         ),
-        contentPadding = PaddingValues(8.dp),
+        contentPadding = PaddingValues(4.dp),
         shape = RoundedCornerShape(10.dp),
     ) {
+        SymbolContent(symbol = symbol, compact = true)
+    }
+}
+
+@Composable
+private fun SymbolContent(symbol: SkockoSymbol, compact: Boolean) {
+    if (symbol == SkockoSymbol.SKOCKO) {
+        Image(
+            painter = painterResource(id = R.drawable.ic_launcher_foreground),
+            contentDescription = "Skočko",
+            modifier = Modifier.size(if (compact) 16.dp else 24.dp),
+        )
+    } else {
         Text(
             text = symbol.label,
             color = Color(symbol.hexColor),
             fontWeight = FontWeight.Bold,
-            fontSize = 22.sp,
+            fontSize = if (compact) 15.sp else 18.sp,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun SolutionRow(solution: List<SkockoSymbol>) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        solution.forEach { symbol ->
+            SymbolCell(symbol)
+        }
     }
 }
 
