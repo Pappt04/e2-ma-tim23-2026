@@ -35,6 +35,7 @@ fun GameScreen(
     opponentName: String,
     onForfeit: () -> Unit,
     onNavigateToKoZnaZna: () -> Unit = {},
+    onNavigateToSpojnice: () -> Unit = {},
     onNavigateToKorakPoKorak: () -> Unit = {},
     onNavigateToMojBroj: () -> Unit = {},
     onNavigateToSkocko: () -> Unit = {},
@@ -90,6 +91,7 @@ fun GameScreen(
 
             gameList(
                 onNavigateToKoZnaZna,
+                onNavigateToSpojnice,
                 onNavigateToKorakPoKorak,
                 onNavigateToMojBroj,
                 onNavigateToSkocko,
@@ -119,13 +121,14 @@ private data class GameInfo(
 @Composable
 private fun gameList(
     onNavigateToKoZnaZna: () -> Unit,
+    onNavigateToSpojnice: () -> Unit,
     onNavigateToKorakPoKorak: () -> Unit,
     onNavigateToMojBroj: () -> Unit,
     onNavigateToSkocko: () -> Unit,
     onNavigateToAsocijacije: () -> Unit,
 ) = listOf(
-    GameInfo("Ko zna zna", "1 rounds · 25s · up to 50 pts", onNavigateToKoZnaZna),
-    GameInfo("Spojnice", "2 rounds · 60s · up to 20 pts"),
+    GameInfo("Ko zna zna", "1 round · 25s · up to 50 pts", onNavigateToKoZnaZna),
+    GameInfo("Spojnice", "2 rounds · 60s · up to 20 pts", onNavigateToSpojnice),
     GameInfo("Asocijacije", "2 rounds · 4min · up to 60 pts", onNavigateToAsocijacije),
     GameInfo("Skočko", "2 rounds · 60s · up to 40 pts", onNavigateToSkocko),
     GameInfo("Korak po korak", "2 rounds · 140s · up to 40 pts", onNavigateToKorakPoKorak),

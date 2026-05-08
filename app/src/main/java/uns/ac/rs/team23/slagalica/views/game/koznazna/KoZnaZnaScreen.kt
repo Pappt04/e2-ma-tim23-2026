@@ -7,12 +7,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -55,7 +53,7 @@ fun KoZnaZnaScreen(
                     Column {
                         Text("Ko zna zna", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            text = "$player1Name: ${state.player1Points}   $player2Name: ${state.player2Points}",
+                            text = "$player1Name: ${state.player1Points}   $player2Name (sim): ${state.player2Points}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -80,8 +78,6 @@ fun KoZnaZnaScreen(
                 )
                 KoZnaZnaPhase.PLAYING -> PlayingContent(
                     state = state,
-                    player1Name = player1Name,
-                    player2Name = player2Name,
                     onAnswer = viewModel::submitPlayer1Answer,
                 )
                 KoZnaZnaPhase.ROUND_END -> RoundEndContent(
@@ -137,8 +133,6 @@ private fun IntroContent(onStart: () -> Unit) {
 @Composable
 private fun PlayingContent(
     state: KoZnaZnaState,
-    player1Name: String,
-    player2Name: String,
     onAnswer: (Int) -> Unit,
 ) {
     val question = state.questions[state.currentQuestionIndex]
@@ -181,26 +175,16 @@ private fun PlayingContent(
             }
         }
 
-        Card {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Text("Live Status", fontWeight = FontWeight.Bold)
-                Text("$player1Name answer: ${answerLabel(state.player1SelectedIndex)}")
-                Text("$player2Name answer: ${answerLabel(state.player2SelectedIndex)}")
-                Text(
-                    text = state.infoMessage,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
+        if (state.infoMessage.isNotBlank()) {
+            Text(
+                text = state.infoMessage,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         Spacer(modifier = Modifier.weight(1f))
         Text(
-            text = "You answer as $player1Name. Opponent answers automatically for GUI demo.",
+            text = "Answer within 5 seconds per question. Opponent score in the title bar is simulated (you never see their picks).",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -250,8 +234,8 @@ private fun RoundEndContent(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("$player1Name: ${state.player1Points} pts", style = MaterialTheme.typography.titleMedium)
-                Text("$player2Name: ${state.player2Points} pts", style = MaterialTheme.typography.titleMedium)
+                Text("Your score: ${state.player1Points} pts", style = MaterialTheme.typography.titleMedium)
+                Text("Opponent (simulated total): ${state.player2Points} pts", style = MaterialTheme.typography.titleMedium)
                 HorizontalDivider()
                 Text("Result: $result", fontWeight = FontWeight.Bold)
                 Text(
@@ -269,8 +253,4 @@ private fun RoundEndContent(
             Text("Back to Games")
         }
     }
-}
-
-private fun answerLabel(answer: Int?): String {
-    return answer?.let { "Option ${it + 1}" } ?: "No answer yet"
 }

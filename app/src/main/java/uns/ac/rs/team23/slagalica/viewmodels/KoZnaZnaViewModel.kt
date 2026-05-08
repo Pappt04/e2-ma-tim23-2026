@@ -68,7 +68,7 @@ class KoZnaZnaViewModel : ViewModel() {
                 player2SelectedIndex = null,
                 player1AnswerSecond = null,
                 player2AnswerSecond = null,
-                infoMessage = "Question 1 started",
+                infoMessage = "",
             )
         }
         startTickLoop()
@@ -159,33 +159,42 @@ class KoZnaZnaViewModel : ViewModel() {
 
         var p1Delta = 0
         var p2Delta = 0
-        val message = when {
+        when {
             p1Correct && p2Correct -> {
                 val p1Time = s.player1AnswerSecond ?: Int.MAX_VALUE
                 val p2Time = s.player2AnswerSecond ?: Int.MAX_VALUE
-                if (p1Time <= p2Time) {
-                    p1Delta = 10
-                    "Both correct. ${"You"} were faster: +10"
-                } else {
-                    p2Delta = 10
-                    "Both correct. Opponent was faster: +10"
-                }
+                if (p1Time <= p2Time) p1Delta = 10 else p2Delta = 10
             }
             p1Correct -> {
                 p1Delta = 10
-                "You answered correctly: +10"
+                if (p2Answered && !p2Correct) p2Delta -= 5
             }
             p2Correct -> {
                 p2Delta = 10
-                "Opponent answered correctly: +10"
+                if (p1Answered && !p1Correct) p1Delta -= 5
             }
             p1Answered || p2Answered -> {
                 if (p1Answered && !p1Correct) p1Delta -= 5
                 if (p2Answered && !p2Correct) p2Delta -= 5
-                "Wrong answers: -5 for each wrong answer"
             }
-            else -> "No answers. Moving to next question"
         }
+
+        // Only messages shown to player 1 (no opponent answer details).
+        val message =
+            when {
+                p1Correct && p2Correct ->
+                    if (p1Delta == 10) {
+                        "Correct! +10 points"
+                    } else {
+                        "Correct, but you were not the fastest. +0 points"
+                    }
+                p1Correct -> "Correct! +10 points"
+                p2Correct && p1Answered && !p1Correct -> "Wrong answer. -5 points"
+                p2Correct && !p1Answered -> "No points this question."
+                p1Answered && !p1Correct -> "Wrong answer. -5 points"
+                !p1Answered && !p2Answered -> "No answer in time. No change to your score."
+                else -> "No change to your score."
+            }
 
         val nextIndex = s.currentQuestionIndex + 1
         val finished = nextIndex >= s.questions.size || s.roundSecondsLeft <= 0
@@ -221,7 +230,7 @@ class KoZnaZnaViewModel : ViewModel() {
                     player2SelectedIndex = null,
                     player1AnswerSecond = null,
                     player2AnswerSecond = null,
-                    infoMessage = "Question ${nextIndex + 1} started",
+                    infoMessage = "",
                 )
             }
         }

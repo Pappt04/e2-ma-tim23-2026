@@ -13,6 +13,7 @@ import uns.ac.rs.team23.slagalica.viewmodels.MojBrojViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.SkockoViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.AsocijacijeViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaViewModel
+import uns.ac.rs.team23.slagalica.viewmodels.SpojniceViewModel
 
 val AppModule =
     module {
@@ -31,4 +32,5 @@ val AppModule =
         viewModelOf(::SkockoViewModel)
         viewModelOf(::AsocijacijeViewModel)
         viewModelOf(::KoZnaZnaViewModel)
+        viewModelOf(::SpojniceViewModel)
     }
