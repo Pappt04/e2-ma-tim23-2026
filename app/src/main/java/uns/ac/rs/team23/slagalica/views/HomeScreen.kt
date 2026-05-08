@@ -44,6 +44,7 @@ fun HomeScreen(
     onNavigateToPlay: () -> Unit,
     onLogout: () -> Unit,
     onNavigateToNotifications: () -> Unit,
+    onNavigateToProfile: () -> Unit,
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -87,7 +88,7 @@ fun HomeScreen(
                     selected = false,
                     onClick = {
                         scope.launch { drawerState.close() }
-                        // TODO: navigate to profile
+                        onNavigateToProfile()
                     },
                 )
                 NavigationDrawerItem(
