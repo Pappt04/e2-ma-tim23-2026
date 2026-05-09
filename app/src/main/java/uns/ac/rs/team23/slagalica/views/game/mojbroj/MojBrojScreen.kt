@@ -485,5 +485,5 @@ private fun playTimerColor(secondsLeft: Int, phase: MojBrojPhase): Color = when 
         MaterialTheme.colorScheme.primary
     secondsLeft >= 30 -> MaterialTheme.colorScheme.primary
     secondsLeft >= 15 -> MaterialTheme.colorScheme.tertiary
-    else -> MaterialTheme.colorScheme.error
+    else -> MaterialTheme.colorScheme.secondary
 }

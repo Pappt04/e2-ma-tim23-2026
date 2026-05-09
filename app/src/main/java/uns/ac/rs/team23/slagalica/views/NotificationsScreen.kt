@@ -250,7 +250,7 @@ private fun EmptyNotificationsPlaceholder(filter: NotificationFilter) {
 private fun NotificationType.color() = when (this) {
     NotificationType.CHAT    -> MaterialTheme.colorScheme.tertiary
     NotificationType.RANKING -> MaterialTheme.colorScheme.secondary
-    NotificationType.REWARD  -> MaterialTheme.colorScheme.error
+    NotificationType.REWARD  -> MaterialTheme.colorScheme.primary
     NotificationType.OTHER   -> MaterialTheme.colorScheme.primary
 }
 

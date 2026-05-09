@@ -79,7 +79,7 @@ fun AsocijacijeScreen(
                 },
                 actions = {
                     if (state.phase == AsocijacijePhase.PLAYING) {
-                        val timerColor = if (state.secondsLeft <= 15) Color(0xFFFF5252)
+                        val timerColor = if (state.secondsLeft <= 15) MaterialTheme.colorScheme.primary
                         else Color.White
                         Text(
                             text = "${state.secondsLeft}s",
@@ -102,7 +102,7 @@ fun AsocijacijeScreen(
                 LinearProgressIndicator(
                     progress = { state.secondsLeft / 120f },
                     modifier = Modifier.fillMaxWidth(),
-                    color = if (state.secondsLeft <= 15) Color(0xFFFF5252) else Color(0xFF42A5F5),
+                    color = if (state.secondsLeft <= 15) MaterialTheme.colorScheme.primary else Color(0xFF42A5F5),
                     trackColor = Color.White.copy(alpha = 0.2f),
                 )
             }
@@ -512,14 +512,14 @@ private fun GameOverContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    "Kraj igre!",
-                    style = MaterialTheme.typography.displaySmall,
+                    text = "Kraj igre!",
+                    style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
                     text = if (winner != null) "🏆 Pobednik: $winner" else "🤝 Nerešeno!",
                     style = MaterialTheme.typography.titleLarge,
-                    color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
                 )
                 HorizontalDivider()
@@ -548,10 +548,9 @@ private fun ScoreColumn(name: String, points: Int) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(name, style = MaterialTheme.typography.labelMedium)
         Text(
-            "$points",
-            style = MaterialTheme.typography.displaySmall,
+            text = "$points",
+            style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary,
         )
         Text("bodova", style = MaterialTheme.typography.labelSmall)
     }

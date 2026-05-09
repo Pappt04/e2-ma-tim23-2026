@@ -95,7 +95,7 @@ fun SkockoScreen(
     val state by viewModel.state.collectAsState()
 
     Scaffold(
-        containerColor = Color(0xFF1976D2),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
             TopAppBar(
                 title = {
@@ -124,7 +124,7 @@ fun SkockoScreen(
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             color = if (state.secondsLeft <= 10)
-                                MaterialTheme.colorScheme.error
+                                MaterialTheme.colorScheme.secondary
                             else MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(end = 16.dp),
                         )
@@ -233,7 +233,7 @@ private fun GameContent(
 
         // Naslov aktivnog igrača
         Surface(
-            color = if (isSteal) MaterialTheme.colorScheme.errorContainer
+            color = if (isSteal) MaterialTheme.colorScheme.secondaryContainer
             else MaterialTheme.colorScheme.primaryContainer,
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -244,7 +244,7 @@ private fun GameContent(
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isSteal) MaterialTheme.colorScheme.onErrorContainer
+                color = if (isSteal) MaterialTheme.colorScheme.onSecondaryContainer
                 else MaterialTheme.colorScheme.onPrimaryContainer,
             )
         }
@@ -289,7 +289,7 @@ private fun GameContent(
                 Text(
                     text = "Krađa",
                     style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.error,
+                    color = MaterialTheme.colorScheme.secondary,
                 )
                 when {
                     isSteal -> CurrentInputRow(
@@ -472,7 +472,7 @@ private fun AttemptRow(attempt: SkockoAttempt, isOpponent: Boolean) {
             Text(
                 text = "K",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.error,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 2.dp),
             )
         }
@@ -640,7 +640,6 @@ private fun ScoreCard(p1Name: String, p1Pts: Int, p2Name: String, p2Pts: Int) {
                     text = "$p1Pts pts",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
                 )
             }
             Text(
@@ -654,7 +653,6 @@ private fun ScoreCard(p1Name: String, p1Pts: Int, p2Name: String, p2Pts: Int) {
                     text = "$p2Pts pts",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary,
                 )
             }
         }

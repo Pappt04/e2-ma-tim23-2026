@@ -226,7 +226,12 @@ private fun RoundEndContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("Round Finished", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+        Text(
+            text = "Round Finished",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
             Column(
                 modifier = Modifier
@@ -234,10 +239,26 @@ private fun RoundEndContent(
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text("Your score: ${state.player1Points} pts", style = MaterialTheme.typography.titleMedium)
-                Text("Opponent (simulated total): ${state.player2Points} pts", style = MaterialTheme.typography.titleMedium)
+                Text("Your score", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = "${state.player1Points} pts",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
+                Text("Opponent (simulated total)", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = "${state.player2Points} pts",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
                 HorizontalDivider()
-                Text("Result: $result", fontWeight = FontWeight.Bold)
+                Text(
+                    text = "Result: $result",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 Text(
                     text = "Score limits: max 50, min -25",
                     style = MaterialTheme.typography.bodySmall,
