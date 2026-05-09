@@ -85,6 +85,12 @@ fun WelcomePage(
             ) {
                 Text("Continue as Guest")
             }
+            Text(
+                text = "Guests can play matches only. Register to use profile, statistics, competitions, and leaderboard.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 8.dp),
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 

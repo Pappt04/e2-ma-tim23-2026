@@ -3,10 +3,13 @@ package uns.ac.rs.team23.slagalica.views.navigation
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -106,6 +109,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val session = userSession
             HomeScreen(
                 username = if (session is UserSession.LoggedIn) session.username else "Guest",
+                isRegistered = session is UserSession.LoggedIn,
                 onNavigateToPlay = { navController.navigate(Screen.Lobby.route) },
                 onLogout = authViewModel::logout,
                 onNavigateToNotifications = {
@@ -118,26 +122,73 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.Profile.route) {
             val session = userSession
-            ProfileScreen(
-                username = if (session is UserSession.LoggedIn) session.username else "Guest",
-                email = if (session is UserSession.LoggedIn) session.email else "guest@local",
-                onNavigateBack = { navController.popBackStack() },
-                onNavigateToStatistics = {
-                    navController.navigate(Screen.ProfileStatistics.route)
-                },
-                onLogout = authViewModel::logout,
-            )
+            LaunchedEffect(session) {
+                if (session !is UserSession.LoggedIn) {
+                    val popped = navController.popBackStack(Screen.Home.route, inclusive = false)
+                    if (!popped) {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            }
+            if (session is UserSession.LoggedIn) {
+                ProfileScreen(
+                    username = session.username,
+                    email = session.email,
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToStatistics = {
+                        navController.navigate(Screen.ProfileStatistics.route)
+                    },
+                    onLogout = authViewModel::logout,
+                )
+            } else {
+                Box(Modifier.fillMaxSize())
+            }
         }
         composable(Screen.ProfileStatistics.route) {
-            ProfileStatisticsScreen(
-                onNavigateBack = { navController.popBackStack() },
-            )
+            val session = userSession
+            LaunchedEffect(session) {
+                if (session !is UserSession.LoggedIn) {
+                    val popped = navController.popBackStack(Screen.Home.route, inclusive = false)
+                    if (!popped) {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            }
+            if (session is UserSession.LoggedIn) {
+                ProfileStatisticsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            } else {
+                Box(Modifier.fillMaxSize())
+            }
         }
 
         composable(Screen.Notifications.route) {
-            NotificationsScreen(
-                onNavigateBack = { navController.popBackStack() }
-            )
+            val session = userSession
+            LaunchedEffect(session) {
+                if (session !is UserSession.LoggedIn) {
+                    val popped = navController.popBackStack(Screen.Home.route, inclusive = false)
+                    if (!popped) {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(0) { inclusive = true }
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            }
+            if (session is UserSession.LoggedIn) {
+                NotificationsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            } else {
+                Box(Modifier.fillMaxSize())
+            }
         }
         composable(Screen.Lobby.route) {
             val session = userSession

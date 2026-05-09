@@ -21,6 +21,10 @@ sealed class AuthState {
     ) : AuthState()
 }
 
+/**
+ * [Guest] — unregistered: may play against another player only.
+ * [LoggedIn] — registered: profile with stats, competitions, leaderboard, notifications, etc.
+ */
 sealed class UserSession {
     data object NotLoggedIn : UserSession()
 

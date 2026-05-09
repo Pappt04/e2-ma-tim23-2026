@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -353,9 +352,19 @@ private fun GameOver(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text("Game Over", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(
+            text = "Game Over",
+            style = MaterialTheme.typography.headlineLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+        )
         ScoreCard(player1Name, state.player1Points, player2Name, state.player2Points)
-        Text("Result: $winner", fontWeight = FontWeight.Bold)
+        Text(
+            text = "Result: $winner",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center,
+        )
         Text("Max 20 points, min 0 points", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Spacer(modifier = Modifier.weight(1f))
         Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) { Text("Back to Games") }
@@ -364,16 +373,33 @@ private fun GameOver(
 
 @Composable
 private fun ScoreCard(p1Name: String, p1Pts: Int, p2Name: String, p2Pts: Int) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(p1Name)
-                Text("$p1Pts pts", fontWeight = FontWeight.Bold)
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(p1Name, style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = "$p1Pts pts",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
             }
-            HorizontalDivider()
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(p2Name)
-                Text("$p2Pts pts", fontWeight = FontWeight.Bold)
+            Text(
+                text = "vs",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.align(Alignment.CenterVertically),
+            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Text(p2Name, style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = "$p2Pts pts",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                )
             }
         }
     }

@@ -125,5 +125,5 @@ fun KorakPoKorakScreen(
 private fun timerColor(timeLeft: Int): Color = when {
     timeLeft >= 6 -> MaterialTheme.colorScheme.primary
     timeLeft >= 3 -> MaterialTheme.colorScheme.tertiary
-    else -> MaterialTheme.colorScheme.error
+    else -> MaterialTheme.colorScheme.secondary
 }

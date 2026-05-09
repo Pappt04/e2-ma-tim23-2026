@@ -9,36 +9,79 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
-    primary = Purple80,
-    secondary = PurpleGrey80,
-    tertiary = Pink80
+    primary = YolkYellow600,
+    onPrimary = TextOnYolk,
+    primaryContainer = YolkYellow800,
+    onPrimaryContainer = YolkYellow50,
+    secondary = GrapePurple500,
+    onSecondary = TextInverse,
+    secondaryContainer = GrapePurple700,
+    onSecondaryContainer = GrapePurple50,
+    tertiary = Neutral300,
+    onTertiary = TextPrimary,
+    tertiaryContainer = Neutral700,
+    onTertiaryContainer = Neutral100,
+    background = NeutralBgDeep,
+    onBackground = TextInverse,
+    surface = NeutralSurfaceDark,
+    onSurface = TextInverse,
+    surfaceVariant = NeutralSurfaceVariantDark,
+    onSurfaceVariant = Neutral100,
+    outline = Neutral300,
+    outlineVariant = Neutral500,
+    error = ErrorOnContainer,
+    onError = TextInverse,
+    errorContainer = ClownRed700,
+    onErrorContainer = ClownRed50,
+    inverseSurface = Neutral50,
+    inverseOnSurface = TextPrimary,
+    inversePrimary = YolkYellow600,
+    surfaceTint = Color.Transparent,
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = Purple40,
-    secondary = PurpleGrey40,
-    tertiary = Pink40
-
-    /* Other default colors to override
-    background = Color(0xFFFFFBFE),
-    surface = Color(0xFFFFFBFE),
-    onPrimary = Color.White,
-    onSecondary = Color.White,
-    onTertiary = Color.White,
-    onBackground = Color(0xFF1C1B1F),
-    onSurface = Color(0xFF1C1B1F),
-    */
+    primary = YolkYellow600,
+    onPrimary = TextOnYolk,
+    primaryContainer = YolkYellow50,
+    onPrimaryContainer = YolkYellow800,
+    secondary = GrapePurple500,
+    onSecondary = TextInverse,
+    secondaryContainer = GrapePurple50,
+    onSecondaryContainer = GrapePurple700,
+    tertiary = Neutral500,
+    onTertiary = TextInverse,
+    tertiaryContainer = Neutral100,
+    onTertiaryContainer = TextPrimary,
+    background = Neutral50,
+    onBackground = TextPrimary,
+    surface = Neutral100,
+    onSurface = TextPrimary,
+    surfaceVariant = Neutral50,
+    onSurfaceVariant = TextSecondary,
+    outline = Neutral300,
+    outlineVariant = Neutral100,
+    error = ErrorOnContainer,
+    onError = TextInverse,
+    errorContainer = ErrorBackground,
+    onErrorContainer = ClownRed700,
+    inverseSurface = Neutral900,
+    inverseOnSurface = TextInverse,
+    inversePrimary = YolkYellow400,
+    surfaceTint = Color.Transparent,
 )
 
 @Composable
 fun SlagalicaTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
@@ -50,9 +93,16 @@ fun SlagalicaTheme(
         else -> LightColorScheme
     }
 
+    val view = LocalView.current
+    SideEffect {
+        val window = (view.context as? Activity)?.window ?: return@SideEffect
+        WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
+        WindowCompat.getInsetsController(window, view).isAppearanceLightNavigationBars = !darkTheme
+    }
+
     MaterialTheme(
         colorScheme = colorScheme,
         typography = Typography,
-        content = content
+        content = content,
     )
 }
