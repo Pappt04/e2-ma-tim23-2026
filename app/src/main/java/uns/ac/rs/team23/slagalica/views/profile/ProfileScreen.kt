@@ -44,13 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-
-private data class TableRowData(
-    val label: String,
-    val value: String,
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -58,6 +52,7 @@ fun ProfileScreen(
     username: String,
     email: String,
     onNavigateBack: () -> Unit,
+    onNavigateToStatistics: () -> Unit,
     onLogout: () -> Unit,
 ) {
     var avatarVariant by remember { mutableIntStateOf(0) }
@@ -188,106 +183,12 @@ fun ProfileScreen(
             }
 
             item {
-                StatsHeaderStrip(title = "Game Statistics")
-            }
-
-            item {
-                StatsSectionTitle("Average Points")
-                StatsTableCard(
-                    subtitle = "Average points by game",
-                    rows = listOf(
-                        TableRowData("Ko zna zna", "18 / 50"),
-                        TableRowData("Moj broj", "16 / 30"),
-                        TableRowData("Korak po korak", "22 / 30"),
-                        TableRowData("Asocijacije", "24 / 30"),
-                        TableRowData("Skočko", "14 / 20"),
-                        TableRowData("Spojnice", "12 / 20"),
-                    ),
-                )
-            }
-
-            item {
-                StatsSectionTitle("Ko zna zna")
-                StatsTableCard(
-                    subtitle = "Correct and incorrect answers",
-                    rows = listOf(
-                        TableRowData("Correct", "38"),
-                        TableRowData("Incorrect", "19"),
-                    ),
-                )
-            }
-
-            item {
-                StatsSectionTitle("Moj broj")
-                StatsTableCard(
-                    subtitle = "Exact target number hit rate",
-                    rows = listOf(
-                        TableRowData("Accuracy", "61%"),
-                    ),
-                )
-            }
-
-            item {
-                StatsSectionTitle("Korak po korak")
-                StatsTableCard(
-                    subtitle = "Solved term by reveal step",
-                    rows = listOf(
-                        TableRowData("Step 1", "20%"),
-                        TableRowData("Step 2", "32%"),
-                        TableRowData("Step 3", "48%"),
-                        TableRowData("Step 4", "67%"),
-                        TableRowData("Step 5+", "78%"),
-                    ),
-                )
-            }
-
-            item {
-                StatsSectionTitle("Asocijacije")
-                StatsTableCard(
-                    subtitle = "Solved vs unsolved rounds",
-                    rows = listOf(
-                        TableRowData("Solved", "15"),
-                        TableRowData("Unsolved", "7"),
-                    ),
-                )
-            }
-
-            item {
-                StatsSectionTitle("Skočko")
-                StatsTableCard(
-                    subtitle = "Solved combination by attempt",
-                    rows = listOf(
-                        TableRowData("Attempt 1", "5%"),
-                        TableRowData("Attempt 2", "11%"),
-                        TableRowData("Attempt 3", "17%"),
-                        TableRowData("Attempt 4", "23%"),
-                        TableRowData("Attempt 5", "18%"),
-                        TableRowData("Attempt 6", "9%"),
-                    ),
-                )
-            }
-
-            item {
-                StatsSectionTitle("Spojnice")
-                StatsTableCard(
-                    subtitle = "Successfully connected terms",
-                    rows = listOf(
-                        TableRowData("Connection Accuracy", "74%"),
-                    ),
-                )
-            }
-
-            item {
-                StatsSectionTitle("Match Summary")
-                StatsTableCard(
-                    subtitle = "Overall match performance",
-                    rows = listOf(
-                        TableRowData("Total Matches", "42"),
-                        TableRowData("Wins", "26"),
-                        TableRowData("Losses", "16"),
-                        TableRowData("Win Rate", "62%"),
-                    ),
-                )
+                OutlinedButton(
+                    onClick = onNavigateToStatistics,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Statistics")
+                }
             }
 
             item {
@@ -300,84 +201,6 @@ fun ProfileScreen(
                     Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                     Spacer(modifier = Modifier.padding(3.dp))
                     Text("Log Out")
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun StatsHeaderStrip(title: String) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(MaterialTheme.colorScheme.primaryContainer)
-            .padding(horizontal = 14.dp, vertical = 10.dp),
-    ) {
-        Text(
-            text = title,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onPrimaryContainer,
-        )
-    }
-}
-
-@Composable
-private fun StatsSectionTitle(title: String) {
-    Text(
-        text = title,
-        style = MaterialTheme.typography.titleMedium,
-        fontWeight = FontWeight.Bold,
-        modifier = Modifier.padding(top = 4.dp),
-    )
-}
-
-@Composable
-private fun StatsTableCard(
-    subtitle: String,
-    rows: List<TableRowData>,
-) {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            HorizontalDivider()
-            rows.forEachIndexed { index, row ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = row.label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Spacer(modifier = Modifier.padding(6.dp))
-                    Text(
-                        text = row.value,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.End,
-                    )
-                }
-                if (index != rows.lastIndex) {
-                    HorizontalDivider(
-                        thickness = 0.5.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant,
-                    )
                 }
             }
         }
