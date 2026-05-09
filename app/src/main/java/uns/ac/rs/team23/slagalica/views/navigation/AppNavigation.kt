@@ -26,6 +26,7 @@ import uns.ac.rs.team23.slagalica.views.game.skocko.SkockoScreen
 import uns.ac.rs.team23.slagalica.views.game.asocijacije.AsocijacijeScreen
 import uns.ac.rs.team23.slagalica.views.game.koznazna.KoZnaZnaScreen
 import uns.ac.rs.team23.slagalica.views.profile.ProfileScreen
+import uns.ac.rs.team23.slagalica.views.profile.ProfileStatisticsScreen
 
 sealed class Screen(
     val route: String,
@@ -37,6 +38,7 @@ sealed class Screen(
     data object Home : Screen("home")
     data object Notifications : Screen("notifications")
     data object Profile : Screen("profile")
+    data object ProfileStatistics : Screen("profile_statistics")
 
     data object Lobby : Screen("lobby")
 
@@ -120,7 +122,15 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 username = if (session is UserSession.LoggedIn) session.username else "Guest",
                 email = if (session is UserSession.LoggedIn) session.email else "guest@local",
                 onNavigateBack = { navController.popBackStack() },
+                onNavigateToStatistics = {
+                    navController.navigate(Screen.ProfileStatistics.route)
+                },
                 onLogout = authViewModel::logout,
+            )
+        }
+        composable(Screen.ProfileStatistics.route) {
+            ProfileStatisticsScreen(
+                onNavigateBack = { navController.popBackStack() },
             )
         }
 

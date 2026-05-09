@@ -46,14 +46,12 @@ class KoZnaZnaViewModel : ViewModel() {
     val state: StateFlow<KoZnaZnaState> = _state.asStateFlow()
 
     private var timerJob: Job? = null
-    private var pendingSwitchJob: Job? = null
     private var questionElapsedSeconds = 0
     private var opponentAnswerDelay = 2
     private var opponentAnswerIndex = 0
 
     fun startRound() {
         timerJob?.cancel()
-        pendingSwitchJob?.cancel()
         questionElapsedSeconds = 0
         prepareOpponentPlan()
         _state.update {
@@ -110,11 +108,12 @@ class KoZnaZnaViewModel : ViewModel() {
 
                 if (_state.value.phase != KoZnaZnaPhase.PLAYING) break
 
-                if (_state.value.roundSecondsLeft <= 0 || _state.value.questionSecondsLeft <= 0) {
-                    resolveCurrentQuestion()
-                    if (_state.value.phase == KoZnaZnaPhase.PLAYING) {
-                        scheduleNextQuestion()
-                    }
+                val st = _state.value
+                val expired = st.questionSecondsLeft <= 0 || st.roundSecondsLeft <= 0
+                val bothAnswered =
+                    st.player1SelectedIndex != null && st.player2SelectedIndex != null
+                if (expired && !bothAnswered) {
+                    resolveAndAdvanceQuestion()
                 }
             }
         }
@@ -136,16 +135,19 @@ class KoZnaZnaViewModel : ViewModel() {
 
     private fun tryResolveQuestion() {
         val s = _state.value
+        if (s.phase != KoZnaZnaPhase.PLAYING) return
         val bothAnswered = s.player1SelectedIndex != null && s.player2SelectedIndex != null
         if (!bothAnswered) return
-
-        resolveCurrentQuestion()
-        if (_state.value.phase == KoZnaZnaPhase.PLAYING) {
-            scheduleNextQuestion()
-        }
+        resolveAndAdvanceQuestion()
     }
 
-    private fun resolveCurrentQuestion() {
+    private fun clampScore(v: Int): Int = v.coerceIn(-25, 50)
+
+    /**
+     * Resolves the current question once, applies spec score limits, then either ends the round
+     * or advances to the next question in the same update (avoids double-counting during delays).
+     */
+    private fun resolveAndAdvanceQuestion() {
         val s = _state.value
         if (s.phase != KoZnaZnaPhase.PLAYING) return
 
@@ -179,7 +181,6 @@ class KoZnaZnaViewModel : ViewModel() {
             }
         }
 
-        // Only messages shown to player 1 (no opponent answer details).
         val message =
             when {
                 p1Correct && p2Correct ->
@@ -198,41 +199,34 @@ class KoZnaZnaViewModel : ViewModel() {
 
         val nextIndex = s.currentQuestionIndex + 1
         val finished = nextIndex >= s.questions.size || s.roundSecondsLeft <= 0
+        val newP1 = clampScore(s.player1Points + p1Delta)
+        val newP2 = clampScore(s.player2Points + p2Delta)
 
-        _state.update {
-            it.copy(
-                player1Points = it.player1Points + p1Delta,
-                player2Points = it.player2Points + p2Delta,
-                infoMessage = message,
-                phase = if (finished) KoZnaZnaPhase.ROUND_END else it.phase,
-            )
-        }
-    }
-
-    private fun scheduleNextQuestion() {
-        pendingSwitchJob?.cancel()
-        pendingSwitchJob = viewModelScope.launch {
-            delay(700)
-            val s = _state.value
-            if (s.phase != KoZnaZnaPhase.PLAYING) return@launch
-            val nextIndex = s.currentQuestionIndex + 1
-            if (nextIndex >= s.questions.size || s.roundSecondsLeft <= 0) {
-                _state.update { it.copy(phase = KoZnaZnaPhase.ROUND_END) }
-                return@launch
-            }
-            questionElapsedSeconds = 0
-            prepareOpponentPlan()
+        if (finished) {
             _state.update {
                 it.copy(
+                    player1Points = newP1,
+                    player2Points = newP2,
+                    infoMessage = message,
+                    phase = KoZnaZnaPhase.ROUND_END,
+                )
+            }
+        } else {
+            questionElapsedSeconds = 0
+            _state.update {
+                it.copy(
+                    player1Points = newP1,
+                    player2Points = newP2,
+                    infoMessage = message,
                     currentQuestionIndex = nextIndex,
                     questionSecondsLeft = 5,
                     player1SelectedIndex = null,
                     player2SelectedIndex = null,
                     player1AnswerSecond = null,
                     player2AnswerSecond = null,
-                    infoMessage = "",
                 )
             }
+            prepareOpponentPlan()
         }
     }
 
@@ -252,7 +246,6 @@ class KoZnaZnaViewModel : ViewModel() {
 
     fun resetToIntro() {
         timerJob?.cancel()
-        pendingSwitchJob?.cancel()
         _state.update {
             it.copy(
                 phase = KoZnaZnaPhase.ROUND_INTRO,
@@ -272,7 +265,6 @@ class KoZnaZnaViewModel : ViewModel() {
 
     override fun onCleared() {
         timerJob?.cancel()
-        pendingSwitchJob?.cancel()
         super.onCleared()
     }
 

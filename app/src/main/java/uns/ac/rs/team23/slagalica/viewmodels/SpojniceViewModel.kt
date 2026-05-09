@@ -23,12 +23,6 @@ data class SpojnicePair(
     val right: String,
 )
 
-/** Wrong pair from starter; opponent phase can see these as hints (optional). */
-data class SpojniceWrongAttempt(
-    val leftIndex: Int,
-    val rightIndex: Int,
-)
-
 data class SpojniceState(
     val currentRound: Int = 1,
     val phase: SpojnicePhase = SpojnicePhase.ROUND_INTRO,
@@ -44,7 +38,6 @@ data class SpojniceState(
     val correctLeftToRightIndex: Map<Int, Int> = emptyMap(),
     /** Starter has tried exactly one pick per left index (correct or wrong). */
     val starterAttemptsUsedLeft: Set<Int> = emptySet(),
-    val starterWrongAttempts: List<SpojniceWrongAttempt> = emptyList(),
     val selectedLeftIndex: Int? = null,
     val selectedRightIndex: Int? = null,
     val infoMessage: String = "",
@@ -75,14 +68,9 @@ class SpojniceViewModel : ViewModel() {
                 rightOptions = pairs.map { p -> p.right }.shuffled(),
                 correctLeftToRightIndex = emptyMap(),
                 starterAttemptsUsedLeft = emptySet(),
-                starterWrongAttempts = emptyList(),
                 selectedLeftIndex = null,
                 selectedRightIndex = null,
-                infoMessage = if (starterIsP1) {
-                    "Starter: connect each left term once. Only correct matches stay visible."
-                } else {
-                    "Starter: connect each left term once. Only correct matches stay visible."
-                },
+                infoMessage = "Starter: try each left term once. Only correct pairs stay visible.",
             )
         }
     }
@@ -122,13 +110,15 @@ class SpojniceViewModel : ViewModel() {
                 if (correct) {
                     val delta = 2
                     _state.update {
+                        val p1 = if (starterIsP1) (it.player1Points + delta).coerceIn(0, 20) else it.player1Points
+                        val p2 = if (starterIsP1) it.player2Points else (it.player2Points + delta).coerceIn(0, 20)
                         it.copy(
                             correctLeftToRightIndex = it.correctLeftToRightIndex + (li to ri),
                             selectedLeftIndex = null,
                             selectedRightIndex = null,
                             starterAttemptsUsedLeft = it.starterAttemptsUsedLeft + li,
-                            player1Points = if (starterIsP1) it.player1Points + delta else it.player1Points,
-                            player2Points = if (starterIsP1) it.player2Points else it.player2Points + delta,
+                            player1Points = p1,
+                            player2Points = p2,
                             infoMessage = "Correct: +2",
                         )
                     }
@@ -136,7 +126,6 @@ class SpojniceViewModel : ViewModel() {
                     _state.update {
                         it.copy(
                             starterAttemptsUsedLeft = it.starterAttemptsUsedLeft + li,
-                            starterWrongAttempts = it.starterWrongAttempts + SpojniceWrongAttempt(li, ri),
                             selectedLeftIndex = null,
                             selectedRightIndex = null,
                             infoMessage = "Wrong — hidden until opponent turn.",
@@ -151,12 +140,16 @@ class SpojniceViewModel : ViewModel() {
                 if (correct) {
                     val delta = 2
                     _state.update {
+                        val p1 =
+                            if (opponentIsP1) (it.player1Points + delta).coerceIn(0, 20) else it.player1Points
+                        val p2 =
+                            if (opponentIsP1) it.player2Points else (it.player2Points + delta).coerceIn(0, 20)
                         it.copy(
                             correctLeftToRightIndex = it.correctLeftToRightIndex + (li to ri),
                             selectedLeftIndex = null,
                             selectedRightIndex = null,
-                            player1Points = if (opponentIsP1) it.player1Points + delta else it.player1Points,
-                            player2Points = if (opponentIsP1) it.player2Points else it.player2Points + delta,
+                            player1Points = p1,
+                            player2Points = p2,
                             infoMessage = "Correct: +2",
                         )
                     }
@@ -169,7 +162,7 @@ class SpojniceViewModel : ViewModel() {
                         )
                     }
                 }
-                if (_state.value.correctLeftToRightIndex.size == s.pairs.size) {
+                if (_state.value.correctLeftToRightIndex.size == _state.value.pairs.size) {
                     finishRoundAfterPlay()
                 }
             }
@@ -234,7 +227,6 @@ class SpojniceViewModel : ViewModel() {
                 rightOptions = samplePairsRound2().map { p -> p.right }.shuffled(),
                 correctLeftToRightIndex = emptyMap(),
                 starterAttemptsUsedLeft = emptySet(),
-                starterWrongAttempts = emptyList(),
                 selectedLeftIndex = null,
                 selectedRightIndex = null,
                 infoMessage = "",
