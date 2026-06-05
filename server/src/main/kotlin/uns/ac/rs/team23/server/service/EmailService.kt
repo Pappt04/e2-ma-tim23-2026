@@ -15,8 +15,8 @@ class EmailService(
         val link = "$baseUrl/api/auth/verify?token=$token"
         val message = SimpleMailMessage().apply {
             setTo(user.email)
-            subject = "Slagalica — potvrdi registraciju"
-            text = "Zdravo ${user.username},\n\nKlikni na link ispod da potvrdiš svoj nalog:\n$link\n\nLink ističe za 24 sata."
+            subject = "Slagalica — confirm your registration"
+            text = "Hello ${user.username},\n\nClick the link below to verify your account:\n$link\n\nThe link expires in 24 hours."
         }
         mailSender.send(message)
     }

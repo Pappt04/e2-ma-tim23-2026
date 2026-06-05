@@ -28,6 +28,9 @@ class User(
 
     var stars: Int = 0,
 
+    // Cumulative stars ever earned (never decreases) — used for token milestone conversion
+    var totalStarsEarned: Int = 0,
+
     var leagueLevel: Int = 0,
 
     var avatarIndex: Int = 0,
