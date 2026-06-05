@@ -26,10 +26,7 @@ class SecurityConfig(
         http
             .csrf { it.disable() }
             .authorizeHttpRequests { auth ->
-                auth
-                    .requestMatchers("/api/auth/register", "/api/auth/verify", "/api/auth/login").permitAll()
-                    .requestMatchers("/ws/**").permitAll()
-                    .anyRequest().authenticated()
+                auth.anyRequest().permitAll()
             }
             .exceptionHandling { ex ->
                 ex.authenticationEntryPoint(HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
