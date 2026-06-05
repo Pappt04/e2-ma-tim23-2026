@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-
-    <style name="Theme.Slagalica" parent="android:Theme.Material.NoActionBar">
-        <item name="android:statusBarColor">@color/slagalica_window_background</item>
-        <item name="android:navigationBarColor">@color/slagalica_window_background</item>
-        <item name="android:windowBackground">@color/slagalica_window_background</item>
-    </style>
-</resources>
