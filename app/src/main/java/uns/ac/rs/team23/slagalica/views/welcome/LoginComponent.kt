@@ -35,13 +35,13 @@ import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 fun LoginComponent(
     viewModel: AuthViewModel,
     onNavigateToRegister: () -> Unit,
+    onNavigateToForgotPassword: () -> Unit = {},
 ) {
     val loginState by viewModel.loginState.collectAsState()
     var passwordVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(loginState) {
         if (loginState is AuthState.Success) {
-            // TODO: navigate to home screen
             viewModel.clearLoginState()
         }
     }
@@ -57,7 +57,7 @@ fun LoginComponent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Login",
+                text = "Prijava",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -65,7 +65,7 @@ fun LoginComponent(
             OutlinedTextField(
                 value = viewModel.loginEmailOrUsername,
                 onValueChange = viewModel::onLoginEmailOrUsernameChange,
-                label = { Text("Email or username") },
+                label = { Text("Email ili korisničko ime") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -74,7 +74,7 @@ fun LoginComponent(
             OutlinedTextField(
                 value = viewModel.loginPassword,
                 onValueChange = viewModel::onLoginPasswordChange,
-                label = { Text("Password") },
+                label = { Text("Lozinka") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation =
@@ -86,7 +86,7 @@ fun LoginComponent(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
                     TextButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Text(if (passwordVisible) "Hide" else "Show")
+                        Text(if (passwordVisible) "Sakrij" else "Prikaži")
                     }
                 },
             )
@@ -106,7 +106,17 @@ fun LoginComponent(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = loginState !is AuthState.Loading,
             ) {
-                Text("Log in")
+                Text(if (loginState is AuthState.Loading) "Prijavljivanje..." else "Prijavi se")
+            }
+
+            TextButton(
+                onClick = onNavigateToForgotPassword,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(
+                    "Zaboravili ste lozinku?",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
         }
     }

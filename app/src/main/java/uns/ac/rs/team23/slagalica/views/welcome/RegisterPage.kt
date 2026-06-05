@@ -58,7 +58,7 @@ fun RegisterPage(
                 onClick = onNavigateBack,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Already have an account? Log in")
+                Text("Već imate nalog? Prijavite se")
             }
         }
     }

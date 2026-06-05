@@ -28,6 +28,7 @@ import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 fun WelcomePage(
     viewModel: AuthViewModel = koinViewModel(),
     onNavigateToRegister: () -> Unit = {},
+    onNavigateToForgotPassword: () -> Unit = {},
 ) {
     Box(
         modifier = Modifier
@@ -54,6 +55,7 @@ fun WelcomePage(
             LoginComponent(
                 viewModel = viewModel,
                 onNavigateToRegister = onNavigateToRegister,
+                onNavigateToForgotPassword = onNavigateToForgotPassword,
             )
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -62,7 +64,7 @@ fun WelcomePage(
                 onClick = onNavigateToRegister,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Don't have an account? Register here")
+                Text("Nemate nalog? Registrujte se")
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -73,7 +75,7 @@ fun WelcomePage(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 HorizontalDivider(modifier = Modifier.weight(1f))
-                Text("or", style = MaterialTheme.typography.bodySmall)
+                Text("ili", style = MaterialTheme.typography.bodySmall)
                 HorizontalDivider(modifier = Modifier.weight(1f))
             }
 
@@ -83,27 +85,14 @@ fun WelcomePage(
                 onClick = viewModel::loginAsGuest,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Continue as Guest")
+                Text("Nastavi kao gost")
             }
             Text(
-                text = "Guests can play matches only. Register to use profile, statistics, competitions, and leaderboard.",
+                text = "Gosti mogu samo igrati partije. Registrujte se za profil, statistiku, takmičenja i rang listu.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp),
             )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            TextButton(
-                onClick = viewModel::devLogin,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Text(
-                    text = "[DEV] Quick Login",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     }
 }
