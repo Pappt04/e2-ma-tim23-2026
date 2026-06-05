@@ -166,13 +166,14 @@ class MatchService(
     @Transactional
     fun abandonMatch(matchId: Long, userId: Long): MatchResponse {
         val match = matchRepository.findById(matchId).orElseThrow { IllegalArgumentException("Match not found") }
-        require(match.status == MatchStatus.IN_PROGRESS || match.status == MatchStatus.WAITING_FOR_OPPONENT)
+        val wasInProgress = match.status == MatchStatus.IN_PROGRESS
+        require(wasInProgress || match.status == MatchStatus.WAITING_FOR_OPPONENT)
 
         match.status = MatchStatus.ABANDONED
         match.completedAt = java.time.LocalDateTime.now()
 
         // Opponent wins if the match was in progress and it's not a friendly
-        if (!match.isFriendly && match.status == MatchStatus.IN_PROGRESS) {
+        if (!match.isFriendly && wasInProgress) {
             val opponent = if (match.player1.id == userId) match.player2 else match.player1
             if (opponent != null) {
                 match.winner = opponent

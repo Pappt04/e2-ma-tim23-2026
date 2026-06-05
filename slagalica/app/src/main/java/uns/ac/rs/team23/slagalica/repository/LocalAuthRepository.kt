@@ -6,12 +6,12 @@ import uns.ac.rs.team23.slagalica.models.UserProfile
 
 /**
  * Local (SharedPreferences) implementation of [AuthRepository].
- * Simulates email-verification flow without a real backend.
- * Replace with a FirebaseAuthRepository once google-services.json is added.
+ * Used for offline testing; replaced by [RemoteAuthRepository] in production.
  */
 class LocalAuthRepository(private val store: UserProfileStore) : AuthRepository {
 
     private fun hash(password: String): String = password.hashCode().toString()
+    private var currentUsername: String? = null
 
     override suspend fun register(
         email: String,
@@ -42,14 +42,25 @@ class LocalAuthRepository(private val store: UserProfileStore) : AuthRepository 
         if (!user.isEmailVerified) {
             return Result.failure(Exception("Potvrdite email adresu pre logovanja"))
         }
+        currentUsername = user.username
         return Result.success(user)
+    }
+
+    override suspend fun logout(): Result<Unit> {
+        currentUsername = null
+        return Result.success(Unit)
+    }
+
+    override suspend fun getProfile(): Result<UserProfile> {
+        val username = currentUsername ?: return Result.failure(Exception("Not logged in"))
+        return store.getByUsername(username)?.let { Result.success(it) }
+            ?: Result.failure(Exception("User not found"))
     }
 
     override suspend fun sendPasswordResetEmail(email: String): Result<Unit> {
         delay(400)
         store.getByEmail(email)
             ?: return Result.failure(Exception("Nije pronađen nalog sa ovim emailom"))
-        // In production this triggers Firebase sendPasswordResetEmail()
         return Result.success(Unit)
     }
 

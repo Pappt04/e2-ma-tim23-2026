@@ -9,14 +9,17 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uns.ac.rs.team23.slagalica.models.KorakPoKorakQuestion
+import uns.ac.rs.team23.slagalica.repository.GameRepository
 
-enum class KorakPhase { RoundIntro, PlayerTurn, OpponentChance, RoundEnd, GameOver }
+enum class KorakPhase { RoundIntro, Loading, PlayerTurn, OpponentChance, RoundEnd, GameOver }
 
 data class KorakPoKorakState(
     val currentRound: Int = 1,
     val phase: KorakPhase = KorakPhase.RoundIntro,
     val currentStep: Int = 1,
     val revealedClues: List<String> = emptyList(),
+    val allClues: List<String> = emptyList(),
     val targetAnswer: String = "",
     val timeLeft: Int = 10,
     val currentAnswer: String = "",
@@ -24,62 +27,60 @@ data class KorakPoKorakState(
     val player2Points: Int = 0,
     val roundCorrectAnswer: String = "",
     val showWrongFeedback: Boolean = false,
+    val errorMessage: String? = null,
 )
 
-private data class KorakQuestion(
-    val answer: String,
-    val steps: List<String>,
-)
+class KorakPoKorakViewModel(private val gameRepository: GameRepository) : ViewModel() {
 
-class KorakPoKorakViewModel : ViewModel() {
-    private val questions =
-        listOf(
-            KorakQuestion(
-                answer = "Nikola Tesla",
-                steps =
-                    listOf(
-                        "Secured backing from J.P. Morgan for his Wardenclyffe Tower",
-                        "His New York laboratory was destroyed by fire in 1895",
-                        "Demonstrated the first wireless radio transmission",
-                        "Born in Smiljan, in present-day Croatia, in 1856",
-                        "Had a famous conflict with Thomas Edison (AC vs DC)",
-                        "Pioneer of alternating current (AC) technology",
-                        "Serbian-American inventor; the SI unit of magnetic flux density bears his name",
-                    ),
-            ),
-            KorakQuestion(
-                answer = "Albert Einstein",
-                steps =
-                    listOf(
-                        "Renounced his German citizenship in 1896 to avoid military service",
-                        "Worked as a patent clerk in Bern, Switzerland",
-                        "Played the violin and loved sailing as hobbies",
-                        "Born in Ulm, Germany, in 1879",
-                        "Awarded the Nobel Prize in Physics in 1921",
-                        "Formulated the equation E = mc²",
-                        "German-born theoretical physicist who developed the theory of relativity",
-                    ),
-            ),
-        )
-
-    private val _state =
-        MutableStateFlow(
-            KorakPoKorakState(targetAnswer = questions[0].answer),
-        )
+    private val _state = MutableStateFlow(KorakPoKorakState())
     val state: StateFlow<KorakPoKorakState> = _state.asStateFlow()
 
     private var timerJob: Job? = null
+    private var loadedQuestion: KorakPoKorakQuestion? = null
+
+    init {
+        preloadQuestion()
+    }
+
+    private fun preloadQuestion() {
+        viewModelScope.launch {
+            gameRepository.getKorakPoKorakQuestion()
+                .onSuccess { loadedQuestion = it }
+                .onFailure { _state.update { s -> s.copy(errorMessage = it.message) } }
+        }
+    }
 
     fun beginRound() {
-        val question = questions[_state.value.currentRound - 1]
+        val question = loadedQuestion
+        if (question == null) {
+            _state.update { it.copy(phase = KorakPhase.Loading) }
+            viewModelScope.launch {
+                gameRepository.getKorakPoKorakQuestion()
+                    .onSuccess { q ->
+                        loadedQuestion = q
+                        startTurn(q)
+                    }
+                    .onFailure { err ->
+                        _state.update { it.copy(phase = KorakPhase.RoundIntro, errorMessage = err.message) }
+                    }
+            }
+            return
+        }
+        startTurn(question)
+    }
+
+    private fun startTurn(question: KorakPoKorakQuestion) {
         _state.update {
             it.copy(
                 phase = KorakPhase.PlayerTurn,
+                targetAnswer = question.answer,
+                allClues = question.clues,
                 currentStep = 1,
-                revealedClues = listOf(question.steps[0]),
+                revealedClues = listOf(question.clues[0]),
                 timeLeft = 10,
                 currentAnswer = "",
                 showWrongFeedback = false,
+                errorMessage = null,
             )
         }
         startTimer()
@@ -97,12 +98,11 @@ class KorakPoKorakViewModel : ViewModel() {
             return
         }
         timerJob?.cancel()
-        val points =
-            if (s.phase == KorakPhase.OpponentChance) {
-                5
-            } else {
-                20 - 2 * (s.currentStep - 1)
-            }
+        val points = if (s.phase == KorakPhase.OpponentChance) {
+            5
+        } else {
+            20 - 2 * (s.currentStep - 1)
+        }
         finishRound(points, scoredByOpponent = s.phase == KorakPhase.OpponentChance)
     }
 
@@ -111,24 +111,27 @@ class KorakPoKorakViewModel : ViewModel() {
             it.copy(
                 currentRound = 2,
                 phase = KorakPhase.RoundIntro,
-                targetAnswer = questions[1].answer,
+                targetAnswer = "",
                 currentAnswer = "",
                 revealedClues = emptyList(),
+                allClues = emptyList(),
                 showWrongFeedback = false,
+                errorMessage = null,
             )
         }
+        loadedQuestion = null
+        preloadQuestion()
     }
 
     private fun startTimer() {
         timerJob?.cancel()
-        timerJob =
-            viewModelScope.launch {
-                for (i in 9 downTo 0) {
-                    delay(1000)
-                    _state.update { it.copy(timeLeft = i) }
-                }
-                onTimerExpired()
+        timerJob = viewModelScope.launch {
+            for (i in 9 downTo 0) {
+                delay(1000)
+                _state.update { it.copy(timeLeft = i) }
             }
+            onTimerExpired()
+        }
     }
 
     private fun onTimerExpired() {
@@ -136,12 +139,11 @@ class KorakPoKorakViewModel : ViewModel() {
         when (s.phase) {
             KorakPhase.PlayerTurn -> {
                 val nextStep = s.currentStep + 1
-                if (nextStep <= 7) {
-                    val clues = questions[s.currentRound - 1].steps.take(nextStep)
+                if (nextStep <= s.allClues.size) {
                     _state.update {
                         it.copy(
                             currentStep = nextStep,
-                            revealedClues = clues,
+                            revealedClues = s.allClues.take(nextStep),
                             timeLeft = 10,
                             showWrongFeedback = false,
                         )
@@ -149,39 +151,27 @@ class KorakPoKorakViewModel : ViewModel() {
                     startTimer()
                 } else {
                     _state.update {
-                        it.copy(
-                            phase = KorakPhase.OpponentChance,
-                            timeLeft = 10,
-                            showWrongFeedback = false,
-                        )
+                        it.copy(phase = KorakPhase.OpponentChance, timeLeft = 10, showWrongFeedback = false)
                     }
                     startTimer()
                 }
             }
-
-            KorakPhase.OpponentChance -> {
-                finishRound(0, scoredByOpponent = false)
-            }
-
+            KorakPhase.OpponentChance -> finishRound(0, scoredByOpponent = false)
             else -> {}
         }
     }
 
-    private fun finishRound(
-        points: Int,
-        scoredByOpponent: Boolean,
-    ) {
+    private fun finishRound(points: Int, scoredByOpponent: Boolean) {
         timerJob?.cancel()
         val s = _state.value
         val activeIsP1 = s.currentRound == 1
 
-        val (newP1, newP2) =
-            when {
-                !scoredByOpponent && activeIsP1 -> s.player1Points + points to s.player2Points
-                !scoredByOpponent && !activeIsP1 -> s.player1Points to s.player2Points + points
-                scoredByOpponent && activeIsP1 -> s.player1Points to s.player2Points + points
-                else -> s.player1Points + points to s.player2Points
-            }
+        val (newP1, newP2) = when {
+            !scoredByOpponent && activeIsP1 -> s.player1Points + points to s.player2Points
+            !scoredByOpponent && !activeIsP1 -> s.player1Points to s.player2Points + points
+            scoredByOpponent && activeIsP1 -> s.player1Points to s.player2Points + points
+            else -> s.player1Points + points to s.player2Points
+        }
 
         _state.update {
             it.copy(
@@ -189,15 +179,12 @@ class KorakPoKorakViewModel : ViewModel() {
                 player1Points = newP1,
                 player2Points = newP2,
                 roundCorrectAnswer = s.targetAnswer,
-                revealedClues = questions[s.currentRound - 1].steps,
+                revealedClues = s.allClues,
             )
         }
     }
 
-    private fun matchesAnswer(
-        input: String,
-        target: String,
-    ): Boolean {
+    private fun matchesAnswer(input: String, target: String): Boolean {
         val norm = input.trim().lowercase()
         val t = target.trim().lowercase()
         return norm == t || t.split(" ").any { it == norm }

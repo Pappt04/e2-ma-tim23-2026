@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import uns.ac.rs.team23.slagalica.data.SessionStore
+import uns.ac.rs.team23.slagalica.models.UserProfile
 import uns.ac.rs.team23.slagalica.repository.AuthRepository
 
 sealed class AuthState {
@@ -33,8 +34,20 @@ class AuthViewModel(
     private val _userSession = MutableStateFlow<UserSession>(UserSession.NotLoggedIn)
     val userSession: StateFlow<UserSession> = _userSession.asStateFlow()
 
+    private val _userProfile = MutableStateFlow<UserProfile?>(null)
+    val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
+
     init {
         _userSession.value = sessionStore.restore()
+        if (_userSession.value is UserSession.LoggedIn) {
+            refreshProfile()
+        }
+    }
+
+    fun refreshProfile() {
+        viewModelScope.launch {
+            authRepository.getProfile().onSuccess { _userProfile.value = it }
+        }
     }
 
     // ── Login fields ──────────────────────────────────────────────────────────
@@ -62,6 +75,7 @@ class AuthViewModel(
                     val session = UserSession.LoggedIn(profile.username, profile.email)
                     sessionStore.save(session)
                     _userSession.value = session
+                    _userProfile.value = profile
                     _loginState.value = AuthState.Success
                 }
                 .onFailure { _loginState.value = AuthState.Error(it.message ?: "Greška pri logovanju") }
@@ -198,8 +212,12 @@ class AuthViewModel(
     }
 
     fun logout() {
+        viewModelScope.launch {
+            authRepository.logout()
+        }
         sessionStore.save(UserSession.NotLoggedIn)
         _userSession.value = UserSession.NotLoggedIn
+        _userProfile.value = null
     }
 
     /** Dev-only: simulate clicking the email verification link. */

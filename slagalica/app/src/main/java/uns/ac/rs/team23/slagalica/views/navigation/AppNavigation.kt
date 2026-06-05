@@ -62,6 +62,7 @@ private val AUTH_ROUTES = setOf(
 fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
     val navController = rememberNavController()
     val userSession by authViewModel.userSession.collectAsState()
+    val userProfile by authViewModel.userProfile.collectAsState()
 
     LaunchedEffect(userSession) {
         val current = navController.currentDestination?.route
@@ -131,6 +132,10 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 ProfileScreen(
                     username = session.username,
                     email = session.email,
+                    tokens = userProfile?.tokens ?: 0,
+                    stars = userProfile?.stars ?: 0,
+                    leagueLevel = userProfile?.leagueLevel ?: 0,
+                    region = userProfile?.region ?: "",
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToStatistics = { navController.navigate(Screen.ProfileStatistics.route) },
                     onNavigateToChangePassword = { navController.navigate(Screen.ChangePassword.route) },

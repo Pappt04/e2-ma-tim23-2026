@@ -34,6 +34,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -51,6 +52,10 @@ import androidx.compose.ui.unit.dp
 fun ProfileScreen(
     username: String,
     email: String,
+    tokens: Int = 0,
+    stars: Int = 0,
+    leagueLevel: Int = 0,
+    region: String = "",
     onNavigateBack: () -> Unit,
     onNavigateToStatistics: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
@@ -128,8 +133,8 @@ fun ProfileScreen(
                             .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        ProfileInfoRow("Token Count", "340")
-                        ProfileInfoRow("Total Stars", "127")
+                        ProfileInfoRow("Token Count", tokens.toString())
+                        ProfileInfoRow("Total Stars", stars.toString())
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween,
@@ -143,10 +148,10 @@ fun ProfileScreen(
                                     tint = Color(0xFFFFC107),
                                 )
                                 Spacer(modifier = Modifier.padding(3.dp))
-                                Text("Gold League")
+                                Text(LEAGUE_NAMES.getOrElse(leagueLevel) { "League $leagueLevel" })
                             }
                         }
-                        ProfileInfoRow("Region", "Vojvodina")
+                        ProfileInfoRow("Region", region)
                     }
                 }
             }

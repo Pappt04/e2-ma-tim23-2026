@@ -16,7 +16,6 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -86,26 +85,17 @@ fun RegisterComponent(
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
+                Text(
+                    "[DEV] Otvorite MailHog na http://10.0.2.2:8025 u browseru da biste pronašli email i kliknuli na verifikacioni link.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
 
                 Button(
                     onClick = onNavigateToLogin,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text("Idi na prijavu")
-                }
-
-                // Dev shortcut — simulates clicking the verification link
-                OutlinedButton(
-                    onClick = {
-                        viewModel.devVerifyEmail()
-                        onNavigateToLogin()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(
-                        "[DEV] Simuliraj klik na verifikacioni link",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
                 }
             }
         }
