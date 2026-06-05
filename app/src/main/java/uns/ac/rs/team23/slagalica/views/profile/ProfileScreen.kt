@@ -53,6 +53,7 @@ fun ProfileScreen(
     email: String,
     onNavigateBack: () -> Unit,
     onNavigateToStatistics: () -> Unit,
+    onNavigateToChangePassword: () -> Unit = {},
     onLogout: () -> Unit,
 ) {
     var avatarVariant by remember { mutableIntStateOf(0) }
@@ -187,7 +188,16 @@ fun ProfileScreen(
                     onClick = onNavigateToStatistics,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Statistics")
+                    Text("Statistika")
+                }
+            }
+
+            item {
+                OutlinedButton(
+                    onClick = onNavigateToChangePassword,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Promeni lozinku")
                 }
             }
 
@@ -200,7 +210,7 @@ fun ProfileScreen(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                     Spacer(modifier = Modifier.padding(3.dp))
-                    Text("Log Out")
+                    Text("Odjava")
                 }
             }
         }
