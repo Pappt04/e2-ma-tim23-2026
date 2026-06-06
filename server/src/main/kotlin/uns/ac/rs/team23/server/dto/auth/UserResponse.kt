@@ -12,6 +12,7 @@ data class UserResponse(
     val leagueLevel: Int,
     val avatarIndex: Int,
     val isEmailVerified: Boolean,
+    val isGuest: Boolean = false,
 ) {
     companion object {
         fun from(user: User) = UserResponse(
@@ -24,6 +25,7 @@ data class UserResponse(
             leagueLevel = user.leagueLevel,
             avatarIndex = user.avatarIndex,
             isEmailVerified = user.isEmailVerified,
+            isGuest = user.isGuest,
         )
     }
 }

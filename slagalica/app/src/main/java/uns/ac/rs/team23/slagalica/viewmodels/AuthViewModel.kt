@@ -207,8 +207,19 @@ class AuthViewModel(
     // ── Dev / Guest helpers ───────────────────────────────────────────────────
 
     fun loginAsGuest() {
-        sessionStore.save(UserSession.Guest)
-        _userSession.value = UserSession.Guest
+        viewModelScope.launch {
+            authRepository.loginAsGuest()
+                .onSuccess { profile ->
+                    sessionStore.save(UserSession.Guest)
+                    _userSession.value = UserSession.Guest
+                    _userProfile.value = profile
+                }
+                .onFailure {
+                    // Fallback to offline guest if server unreachable
+                    sessionStore.save(UserSession.Guest)
+                    _userSession.value = UserSession.Guest
+                }
+        }
     }
 
     fun logout() {

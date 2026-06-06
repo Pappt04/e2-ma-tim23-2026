@@ -35,6 +35,8 @@ class User(
 
     var avatarIndex: Int = 0,
 
+    var isGuest: Boolean = false,
+
     val createdAt: LocalDateTime = LocalDateTime.now(),
 
     var lastTokenGranted: LocalDate = LocalDate.now(),

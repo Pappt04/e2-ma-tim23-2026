@@ -14,6 +14,7 @@ import uns.ac.rs.team23.slagalica.repository.MatchRepository
 sealed class LobbyState {
     data object Idle : LobbyState()
     data object Searching : LobbyState()
+    data class InviteSent(val inviteId: Long, val opponentName: String) : LobbyState()
     data class Error(val message: String) : LobbyState()
     data class OpponentFound(val opponentName: String) : LobbyState()
     data class YouAreReady(val opponentName: String) : LobbyState()
@@ -91,6 +92,35 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
             }
             _state.value = LobbyState.Starting
         }
+    }
+
+    fun startFriendSearch(friendId: Long, username: String, friendly: Boolean = false) {
+        myUsername = username
+        _state.value = LobbyState.Searching
+        viewModelScope.launch {
+            matchRepository.sendFriendInvite(friendId, friendly)
+                .onSuccess { match ->
+                    if (match.status == "INVITE_SENT") {
+                        val opponentName = match.player2Username ?: "Friend"
+                        _state.value = LobbyState.InviteSent(match.id, opponentName)
+                    } else if (match.status == "IN_PROGRESS") {
+                        val opponent = resolveOpponent(match.player1Username, match.player2Username ?: "Opponent")
+                        onMatchFound(match.id, opponent)
+                    } else {
+                        _state.value = LobbyState.Error("Unexpected state: ${match.status}")
+                    }
+                }
+                .onFailure { _state.value = LobbyState.Error(it.message ?: "Failed to send invite") }
+        }
+    }
+
+    fun cancelInvite() {
+        val s = _state.value as? LobbyState.InviteSent ?: return
+        viewModelScope.launch {
+            matchRepository.cancelInvite(s.inviteId)
+        }
+        MatchStore.clear()
+        _state.value = LobbyState.Idle
     }
 
     fun cancel() {

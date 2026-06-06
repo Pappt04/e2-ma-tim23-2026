@@ -50,7 +50,7 @@ val AppModule = module {
     viewModel { LobbyViewModel(get()) }
     viewModelOf(::ChatViewModel)
     viewModelOf(::ChallengeViewModel)
-    viewModelOf(::NotificationsViewModel)
+    viewModel { NotificationsViewModel(get()) }
     viewModelOf(::SkockoViewModel)
     viewModelOf(::AsocijacijeViewModel)
     viewModelOf(::KoZnaZnaViewModel)

@@ -14,6 +14,7 @@ class ChatService(
     private val messageRepository: ChatMessageRepository,
     private val userRepository: UserRepository,
     private val messaging: SimpMessagingTemplate,
+    private val ntfy: NtfyService,
 ) {
 
     @Transactional
@@ -29,6 +30,12 @@ class ChatService(
 
         // Broadcast to everyone subscribed to this region's chat
         messaging.convertAndSend("/topic/chat/$region", response)
+
+        // Push to all other users in region so they get notified even when offline
+        val preview = content.take(80)
+        userRepository.findAllByRegion(region)
+            .filter { it.id != senderId && !it.isGuest }
+            .forEach { ntfy.notify(it.id, "New message in $region", "${sender.username}: $preview", tags = "speech_balloon") }
 
         return response
     }

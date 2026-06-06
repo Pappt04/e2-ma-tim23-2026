@@ -31,6 +31,9 @@ interface ApiService {
     @POST("api/auth/forgot-password")
     suspend fun forgotPassword(@Body body: Map<String, String>): Response<Map<String, String>>
 
+    @POST("api/auth/guest")
+    suspend fun loginAsGuest(): Response<UserResponse>
+
     // ── Games ─────────────────────────────────────────────────────────────────
 
     @GET("api/games/korak-po-korak/question")
@@ -70,6 +73,9 @@ interface ApiService {
         @Path("inviteId") inviteId: Long,
         @Query("accept") accept: Boolean,
     ): Response<MatchResponseDto>
+
+    @DELETE("api/matches/invites/{inviteId}")
+    suspend fun cancelInvite(@Path("inviteId") inviteId: Long): Response<Map<String, String>>
 
     // ── Chat ──────────────────────────────────────────────────────────────────
 

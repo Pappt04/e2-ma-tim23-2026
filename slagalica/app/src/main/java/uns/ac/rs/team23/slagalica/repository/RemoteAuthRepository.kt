@@ -35,6 +35,15 @@ class RemoteAuthRepository(
             }
         }
 
+    override suspend fun loginAsGuest(): Result<UserProfile> = runCatching {
+        val response = api.loginAsGuest()
+        if (response.isSuccessful) {
+            response.body()!!.toUserProfile()
+        } else {
+            throw Exception(parseErrorMessage(response.errorBody()?.string()))
+        }
+    }
+
     override suspend fun logout(): Result<Unit> = runCatching {
         runCatching { api.logout() }
         cookieJar.clear()
