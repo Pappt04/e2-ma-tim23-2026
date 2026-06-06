@@ -83,6 +83,24 @@ class UserService(
     fun findById(userId: Long): User =
         userRepository.findById(userId).orElseThrow { IllegalArgumentException("User not found") }
 
+    @Transactional
+    fun sendPasswordReset(email: String) {
+        val user = userRepository.findByEmail(email) ?: return
+        val token = UUID.randomUUID().toString()
+        tokenRepository.save(EmailVerificationToken(token = token, user = user))
+        emailService.sendPasswordResetEmail(user, token)
+    }
+
+    @Transactional
+    fun resetPasswordWithToken(token: String, newPassword: String): Boolean {
+        val record = tokenRepository.findByToken(token) ?: return false
+        if (record.isExpired()) return false
+        record.user.passwordHash = passwordEncoder.encode(newPassword)!!
+        userRepository.save(record.user)
+        tokenRepository.delete(record)
+        return true
+    }
+
     private fun grantDailyTokensIfNeeded(user: User) {
         val today = LocalDate.now()
         if (user.lastTokenGranted.isBefore(today)) {

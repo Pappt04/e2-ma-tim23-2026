@@ -13,7 +13,7 @@ class RetrofitClient(context: Context) {
 
     val cookieJar = PersistentCookieJar(context)
 
-    private val httpClient = OkHttpClient.Builder()
+    val httpClient: OkHttpClient = OkHttpClient.Builder()
         .cookieJar(cookieJar)
         .addInterceptor(HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BODY

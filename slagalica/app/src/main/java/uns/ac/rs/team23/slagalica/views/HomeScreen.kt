@@ -37,18 +37,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.Notifications
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     username: String,
-    /** Registered users get profile, stats, rankings, competitions, notifications, etc. */
     isRegistered: Boolean,
     onNavigateToPlay: () -> Unit,
     onLogout: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToProfile: () -> Unit,
+    onNavigateToChat: () -> Unit = {},
+    onNavigateToChallenge: () -> Unit = {},
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -123,6 +126,28 @@ fun HomeScreen(
                         onClick = {
                             scope.launch { drawerState.close() }
                             onNavigateToNotifications()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(0.dp),
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Forum, contentDescription = null) },
+                        label = { Text("Regional Chat") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToChat()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(0.dp),
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.MilitaryTech, contentDescription = null) },
+                        label = { Text("Challenges") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToChallenge()
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(0.dp),

@@ -74,6 +74,38 @@ class AuthController(
         }
     }
 
+    @PostMapping("/forgot-password")
+    fun forgotPassword(@RequestBody body: Map<String, String>): ResponseEntity<Map<String, String>> {
+        val email = body["email"] ?: return ResponseEntity.badRequest().body(mapOf("error" to "Email required"))
+        runCatching { userService.sendPasswordReset(email) }
+        return ResponseEntity.ok(mapOf("message" to "If that email is registered, a reset link has been sent."))
+    }
+
+    @PostMapping("/reset-password")
+    fun resetPassword(@RequestBody body: Map<String, String>): ResponseEntity<Map<String, String>> {
+        val token = body["token"] ?: return ResponseEntity.badRequest().body(mapOf("error" to "Token required"))
+        val newPassword = body["newPassword"] ?: return ResponseEntity.badRequest().body(mapOf("error" to "New password required"))
+        return if (userService.resetPasswordWithToken(token, newPassword)) {
+            ResponseEntity.ok(mapOf("message" to "Password reset successfully."))
+        } else {
+            ResponseEntity.badRequest().body(mapOf("error" to "Invalid or expired token."))
+        }
+    }
+
+    @GetMapping("/reset-password")
+    fun resetPasswordForm(@RequestParam token: String): ResponseEntity<String> {
+        return ResponseEntity.ok("""
+            <html><body>
+            <h2>Slagalica — Reset Password</h2>
+            <form method="POST" action="/api/auth/reset-password">
+                <input type="hidden" name="token" value="$token"/>
+                <label>New password: <input type="password" name="newPassword" required minlength="6"/></label><br/>
+                <button type="submit">Reset</button>
+            </form>
+            </body></html>
+        """.trimIndent())
+    }
+
     @GetMapping("/me")
     fun me(session: HttpSession): ResponseEntity<Any> {
         val userId = session.getAttribute("userId") as? Long

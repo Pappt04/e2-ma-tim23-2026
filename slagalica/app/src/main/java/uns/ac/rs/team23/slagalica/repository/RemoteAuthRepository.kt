@@ -49,8 +49,9 @@ class RemoteAuthRepository(
         }
     }
 
-    override suspend fun sendPasswordResetEmail(email: String): Result<Unit> =
-        Result.failure(Exception("Password reset via email is not supported yet"))
+    override suspend fun sendPasswordResetEmail(email: String): Result<Unit> = runCatching {
+        api.forgotPassword(mapOf("email" to email))
+    }
 
     override suspend fun changePassword(
         username: String,

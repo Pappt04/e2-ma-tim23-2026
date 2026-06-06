@@ -26,6 +26,8 @@ import uns.ac.rs.team23.slagalica.views.game.koznazna.KoZnaZnaScreen
 import uns.ac.rs.team23.slagalica.views.game.mojbroj.MojBrojScreen
 import uns.ac.rs.team23.slagalica.views.game.skocko.SkockoScreen
 import uns.ac.rs.team23.slagalica.views.game.spojnice.SpojniceScreen
+import uns.ac.rs.team23.slagalica.views.chat.ChatScreen
+import uns.ac.rs.team23.slagalica.views.challenge.ChallengeScreen
 import uns.ac.rs.team23.slagalica.views.lobby.LobbyScreen
 import uns.ac.rs.team23.slagalica.views.NotificationsScreen
 import uns.ac.rs.team23.slagalica.views.profile.ChangePasswordScreen
@@ -52,6 +54,12 @@ sealed class Screen(val route: String) {
     data object MojBroj : Screen("moj_broj")
     data object Skocko : Screen("skocko")
     data object Asocijacije : Screen("asocijacije")
+    data object Chat : Screen("chat/{region}") {
+        fun route(region: String) = "chat/$region"
+    }
+    data object Challenge : Screen("challenge/{region}") {
+        fun route(region: String) = "challenge/$region"
+    }
 }
 
 private val AUTH_ROUTES = setOf(
@@ -123,6 +131,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.Home.route) {
             val session = userSession
+            val region = userProfile?.region ?: ""
             HomeScreen(
                 username = if (session is UserSession.LoggedIn) session.username else "Gost",
                 isRegistered = session is UserSession.LoggedIn,
@@ -130,6 +139,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onLogout = authViewModel::logout,
                 onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
                 onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
+                onNavigateToChat = {
+                    if (region.isNotBlank()) navController.navigate(Screen.Chat.route(region))
+                },
+                onNavigateToChallenge = {
+                    if (region.isNotBlank()) navController.navigate(Screen.Challenge.route(region))
+                },
             )
         }
         composable(Screen.Profile.route) {
@@ -279,6 +294,23 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 player1Name = username,
                 player2Name = "Protivnik",
                 onFinish = { navController.popBackStack() },
+            )
+        }
+        composable(Screen.Chat.route) { backStack ->
+            val region = backStack.arguments?.getString("region") ?: ""
+            val session = userSession
+            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            ChatScreen(
+                region = region,
+                username = username,
+                onNavigateBack = { navController.popBackStack() },
+            )
+        }
+        composable(Screen.Challenge.route) { backStack ->
+            val region = backStack.arguments?.getString("region") ?: ""
+            ChallengeScreen(
+                region = region,
+                onNavigateBack = { navController.popBackStack() },
             )
         }
     }
