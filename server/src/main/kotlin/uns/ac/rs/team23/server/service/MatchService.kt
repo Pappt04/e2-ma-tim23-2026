@@ -194,6 +194,10 @@ class MatchService(
         return response
     }
 
+    fun cancelQueue(userId: Long) {
+        matchmaking.dequeue(userId)
+    }
+
     fun getCurrentMatch(userId: Long): MatchResponse? {
         val active = matchRepository.findActiveByUserId(
             userId,

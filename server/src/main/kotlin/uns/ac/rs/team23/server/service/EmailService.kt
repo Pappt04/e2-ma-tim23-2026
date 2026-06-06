@@ -22,4 +22,15 @@ class EmailService(
         }
         mailSender.send(message)
     }
+
+    fun sendPasswordResetEmail(user: User, token: String) {
+        val link = "$baseUrl/api/auth/reset-password?token=$token"
+        val message = SimpleMailMessage().apply {
+            from = fromAddress
+            setTo(user.email)
+            subject = "Slagalica — reset your password"
+            text = "Hello ${user.username},\n\nClick the link below to reset your password:\n$link\n\nThe link expires in 24 hours.\n\nIf you did not request this, ignore this email."
+        }
+        mailSender.send(message)
+    }
 }

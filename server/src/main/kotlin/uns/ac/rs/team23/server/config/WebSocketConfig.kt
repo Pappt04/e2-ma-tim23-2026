@@ -21,8 +21,12 @@ class WebSocketConfig : WebSocketMessageBrokerConfigurer {
     override fun registerStompEndpoints(registry: StompEndpointRegistry) {
         registry.addEndpoint("/ws")
             .setAllowedOriginPatterns("*")
-            // Copies HTTP session attributes (including userId) into the WebSocket session
             .addInterceptors(HttpSessionHandshakeInterceptor())
             .withSockJS()
+
+        // Plain WebSocket endpoint for native Android clients (no SockJS wrapping)
+        registry.addEndpoint("/ws-native")
+            .setAllowedOriginPatterns("*")
+            .addInterceptors(HttpSessionHandshakeInterceptor())
     }
 }

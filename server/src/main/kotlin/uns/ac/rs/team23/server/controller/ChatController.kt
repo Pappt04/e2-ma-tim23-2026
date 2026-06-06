@@ -32,6 +32,23 @@ class ChatController(private val chatService: ChatService) {
         return ResponseEntity.ok(chatService.getRecentMessages(region, limit.coerceIn(1, 200)))
     }
 
+    // ─── REST: send message (for clients without WebSocket/STOMP support) ────
+
+    @PostMapping("/{region}/messages")
+    fun sendMessageRest(
+        @PathVariable region: String,
+        @RequestBody req: SendMessageRequest,
+        session: HttpSession,
+    ): ResponseEntity<Any> {
+        val userId = session.getAttribute("userId") as? Long
+            ?: return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(mapOf("error" to "Not logged in"))
+        return try {
+            ResponseEntity.status(HttpStatus.CREATED).body(chatService.sendMessage(userId, region, req.content))
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.badRequest().body(mapOf("error" to (e.message ?: "Error")))
+        }
+    }
+
     // ─── WebSocket: send message ─────────────────────────────────────────────
 
     // Client sends to: /app/chat/{region}

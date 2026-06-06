@@ -72,6 +72,13 @@ class MatchController(private val matchService: MatchService) {
         }
     }
 
+    @DeleteMapping("/queue")
+    fun cancelQueue(session: HttpSession): ResponseEntity<Any> {
+        val userId = session.userId() ?: return unauthorized()
+        matchService.cancelQueue(userId)
+        return ResponseEntity.ok(mapOf("message" to "Removed from queue"))
+    }
+
     @GetMapping("/invites/pending")
     fun pendingInvites(session: HttpSession): ResponseEntity<Any> {
         val userId = session.userId() ?: return unauthorized()

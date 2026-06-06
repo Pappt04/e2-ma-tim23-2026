@@ -55,6 +55,12 @@ fun LobbyScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    LaunchedEffect(Unit) {
+        if (viewModel.state.value is LobbyState.Idle) {
+            viewModel.startSearch(currentUsername)
+        }
+    }
+
     LaunchedEffect(state) {
         if (state is LobbyState.Starting) onGameStart()
     }
@@ -80,6 +86,10 @@ fun LobbyScreen(
             contentAlignment = Alignment.Center,
         ) {
             when (val s = state) {
+                is LobbyState.Idle, is LobbyState.Error -> {
+                    SearchingContent()
+                }
+
                 is LobbyState.Searching -> {
                     SearchingContent()
                 }

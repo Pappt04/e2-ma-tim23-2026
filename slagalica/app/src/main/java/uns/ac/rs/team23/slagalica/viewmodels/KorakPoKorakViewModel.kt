@@ -30,7 +30,10 @@ data class KorakPoKorakState(
     val errorMessage: String? = null,
 )
 
-class KorakPoKorakViewModel(private val gameRepository: GameRepository) : ViewModel() {
+class KorakPoKorakViewModel(
+    private val gameRepository: GameRepository,
+    private val matchRepository: uns.ac.rs.team23.slagalica.repository.MatchRepository,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(KorakPoKorakState())
     val state: StateFlow<KorakPoKorakState> = _state.asStateFlow()
@@ -181,6 +184,18 @@ class KorakPoKorakViewModel(private val gameRepository: GameRepository) : ViewMo
                 roundCorrectAnswer = s.targetAnswer,
                 revealedClues = s.allClues,
             )
+        }
+
+        if (s.currentRound == 2) {
+            submitMatchScore(newP1)
+        }
+    }
+
+    private fun submitMatchScore(score: Int) {
+        val matchId = uns.ac.rs.team23.slagalica.data.MatchStore.matchId
+        if (matchId <= 0) return
+        viewModelScope.launch {
+            matchRepository.submitScore(matchId, score)
         }
     }
 
