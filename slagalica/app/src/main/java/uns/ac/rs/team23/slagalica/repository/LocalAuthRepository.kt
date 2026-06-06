@@ -46,6 +46,11 @@ class LocalAuthRepository(private val store: UserProfileStore) : AuthRepository 
         return Result.success(user)
     }
 
+    override suspend fun loginAsGuest(): Result<UserProfile> {
+        val profile = UserProfile(id = -1, username = "Guest", email = "", region = "")
+        return Result.success(profile)
+    }
+
     override suspend fun logout(): Result<Unit> {
         currentUsername = null
         return Result.success(Unit)

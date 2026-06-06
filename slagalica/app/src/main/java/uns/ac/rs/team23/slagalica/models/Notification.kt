@@ -6,6 +6,7 @@ enum class NotificationType(val label: String) {
     CHAT("Chat"),
     RANKING("Ranking"),
     REWARD("Rewards"),
+    INVITE("Invite"),
     OTHER("Other")
 }
 
@@ -15,5 +16,6 @@ data class Notification(
     val message: String,
     val type: NotificationType,
     val isRead: Boolean = false,
-    val timestamp: String = ""
+    val timestamp: String = "",
+    val inviteId: Long? = null,
 )

@@ -101,6 +101,21 @@ class UserService(
         return true
     }
 
+    @Transactional
+    fun registerGuest(): User {
+        val uid = UUID.randomUUID().toString().replace("-", "").take(10)
+        val user = User(
+            username = "Guest_$uid",
+            email = "guest_$uid@guest.local",
+            passwordHash = "",
+            region = "",
+            isEmailVerified = true,
+            isGuest = true,
+            tokens = 5,
+        )
+        return userRepository.save(user)
+    }
+
     private fun grantDailyTokensIfNeeded(user: User) {
         val today = LocalDate.now()
         if (user.lastTokenGranted.isBefore(today)) {

@@ -20,6 +20,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -27,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -94,6 +96,13 @@ fun LobbyScreen(
                     SearchingContent()
                 }
 
+                is LobbyState.InviteSent -> {
+                    InviteSentContent(
+                        opponentName = s.opponentName,
+                        onCancel = viewModel::cancelInvite,
+                    )
+                }
+
                 is LobbyState.OpponentFound -> {
                     ReadyContent(
                         currentUsername = currentUsername,
@@ -130,6 +139,33 @@ fun LobbyScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun InviteSentContent(opponentName: String, onCancel: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(
+            text = "Waiting for $opponentName...",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        LinearProgressIndicator(modifier = Modifier.fillMaxWidth(0.6f))
+        Text(
+            text = "Invite expires in 10 seconds",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        OutlinedButton(
+            onClick = onCancel,
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.error,
+            ),
+        ) {
+            Text("Cancel")
         }
     }
 }

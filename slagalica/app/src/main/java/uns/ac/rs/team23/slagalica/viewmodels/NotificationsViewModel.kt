@@ -2,39 +2,115 @@ package uns.ac.rs.team23.slagalica.viewmodels
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.models.Notification
 import uns.ac.rs.team23.slagalica.models.NotificationType
+import uns.ac.rs.team23.slagalica.repository.MatchRepository
 import uns.ac.rs.team23.slagalica.services.NtfyNotificationService
-import java.time.LocalDateTime
+import java.util.UUID
 
 enum class NotificationFilter { ALL, UNREAD, READ }
 
-class NotificationsViewModel : ViewModel() {
+class NotificationsViewModel(
+    private val matchRepository: MatchRepository,
+) : ViewModel() {
 
-    private val _notifications = MutableStateFlow(fakeMockNotifications())
+    private val _notifications = MutableStateFlow(emptyList<Notification>())
     val notifications: StateFlow<List<Notification>> = _notifications.asStateFlow()
+
+    private val _filter = MutableStateFlow(NotificationFilter.ALL)
+    val filter: StateFlow<NotificationFilter> = _filter.asStateFlow()
+
+    // notificationId -> seconds remaining for invite countdown
+    private val _inviteCountdowns = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val inviteCountdowns: StateFlow<Map<String, Int>> = _inviteCountdowns.asStateFlow()
+
+    private val countdownJobs = mutableMapOf<String, Job>()
 
     init {
         viewModelScope.launch {
             NtfyNotificationService.events.collect { incoming ->
                 _notifications.update { listOf(incoming) + it }
+                if (incoming.type == NotificationType.INVITE && incoming.inviteId != null) {
+                    startInviteCountdown(incoming.id, incoming.inviteId)
+                }
+            }
+        }
+        fetchPendingInvites()
+    }
+
+    private fun fetchPendingInvites() {
+        viewModelScope.launch {
+            matchRepository.getPendingInvites().onSuccess { invites ->
+                val inviteNotifs = invites.map { inv ->
+                    Notification(
+                        id = "invite_${inv.id}",
+                        title = "Match invite",
+                        message = "${inv.inviterUsername} is challenging you to a ${if (inv.isFriendly) "friendly" else "ranked"} match",
+                        type = NotificationType.INVITE,
+                        isRead = false,
+                        timestamp = "Now",
+                        inviteId = inv.id,
+                    )
+                }
+                if (inviteNotifs.isNotEmpty()) {
+                    _notifications.update { existing ->
+                        val existingInviteIds = existing.mapNotNull { it.inviteId }.toSet()
+                        val newOnes = inviteNotifs.filter { it.inviteId !in existingInviteIds }
+                        newOnes + existing
+                    }
+                    inviteNotifs.forEach { n ->
+                        if (n.inviteId != null) startInviteCountdown(n.id, n.inviteId)
+                    }
+                }
             }
         }
     }
 
-    private val _filter = MutableStateFlow(NotificationFilter.ALL)
-    val filter: StateFlow<NotificationFilter> = _filter.asStateFlow()
+    private fun startInviteCountdown(notificationId: String, inviteId: Long) {
+        countdownJobs[notificationId]?.cancel()
+        _inviteCountdowns.update { it + (notificationId to 10) }
+        countdownJobs[notificationId] = viewModelScope.launch {
+            for (sec in 9 downTo 0) {
+                delay(1_000)
+                _inviteCountdowns.update { it + (notificationId to sec) }
+            }
+            // Auto-reject on timeout
+            respondToInvite(inviteId, accept = false, notificationId = notificationId)
+        }
+    }
+
+    fun respondToInvite(inviteId: Long, accept: Boolean, notificationId: String) {
+        countdownJobs[notificationId]?.cancel()
+        countdownJobs.remove(notificationId)
+        _inviteCountdowns.update { it - notificationId }
+        viewModelScope.launch {
+            matchRepository.respondToInvite(inviteId, accept)
+                .onSuccess { match ->
+                    if (accept && match.status == "IN_PROGRESS") {
+                        val opponentName = if (match.player1Username == match.player2Username)
+                            match.player1Username
+                        else
+                            match.player2Username ?: match.player1Username
+                        MatchStore.set(match.id, opponentName)
+                    }
+                }
+            _notifications.update { list -> list.filter { it.id != notificationId } }
+        }
+    }
 
     val filtered get() = _notifications.value.filter {
         when (_filter.value) {
-            NotificationFilter.ALL    -> true
+            NotificationFilter.ALL -> true
             NotificationFilter.UNREAD -> !it.isRead
-            NotificationFilter.READ   -> it.isRead
+            NotificationFilter.READ -> it.isRead
         }
     }
 
@@ -49,23 +125,9 @@ class NotificationsViewModel : ViewModel() {
     fun markAllAsRead() {
         _notifications.update { list -> list.map { it.copy(isRead = true) } }
     }
-}
 
-private fun fakeMockNotifications() = listOf(
-    Notification("1", "New Message", "Marko sent you a message in chat.",
-        NotificationType.CHAT, false, "5 min ago"),
-    Notification("2", "Chat Message", "Tamas: 'Wanna play a game?'",
-        NotificationType.CHAT, true, "1h ago"),
-    Notification("3", "Leaderboard", "You reached 3rd place on the weekly leaderboard!",
-        NotificationType.RANKING, false, "3h ago"),
-    Notification("4", "New League", "You've advanced to the Gold league!",
-        NotificationType.RANKING, true, "Yesterday"),
-    Notification("5", "Reward!", "You received 5 tokens for 1st place on the leaderboard.",
-        NotificationType.REWARD, false, "Yesterday"),
-    Notification("6", "Weekly Rewards", "Last week's rewards have been distributed.",
-        NotificationType.REWARD, true, "2 days ago"),
-    Notification("7", "Game Invite", "Doroca is inviting you to a friendly match.",
-        NotificationType.OTHER, false, "20 min ago"),
-    Notification("8", "Welcome!", "You have successfully registered. Here are 5 tokens.",
-        NotificationType.OTHER, true, "5 days ago"),
-)
+    override fun onCleared() {
+        countdownJobs.values.forEach { it.cancel() }
+        super.onCleared()
+    }
+}

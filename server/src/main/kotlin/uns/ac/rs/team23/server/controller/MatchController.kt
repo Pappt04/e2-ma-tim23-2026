@@ -100,6 +100,17 @@ class MatchController(private val matchService: MatchService) {
         }
     }
 
+    @DeleteMapping("/invites/{inviteId}")
+    fun cancelInvite(@PathVariable inviteId: Long, session: HttpSession): ResponseEntity<Any> {
+        val userId = session.userId() ?: return unauthorized()
+        return try {
+            matchService.cancelInvite(inviteId, userId)
+            ResponseEntity.ok(mapOf("message" to "Invite cancelled"))
+        } catch (e: IllegalArgumentException) {
+            ResponseEntity.badRequest().body(error(e.message))
+        }
+    }
+
     private fun HttpSession.userId() = getAttribute("userId") as? Long
     private fun unauthorized(): ResponseEntity<Any> = ResponseEntity.status(HttpStatus.UNAUTHORIZED).body<Any>(mapOf("error" to "Not logged in"))
     private fun error(msg: String?): Any = mapOf("error" to (msg ?: "Error"))

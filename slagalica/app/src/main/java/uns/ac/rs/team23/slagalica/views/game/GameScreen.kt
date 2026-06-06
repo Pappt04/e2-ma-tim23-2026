@@ -20,19 +20,27 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import uns.ac.rs.team23.slagalica.repository.MatchRepository
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun GameScreen(
     playerName: String,
     opponentName: String,
+    matchId: Long = -1L,
+    matchRepository: MatchRepository? = null,
     onForfeit: () -> Unit,
     onNavigateToKoZnaZna: () -> Unit = {},
     onNavigateToSpojnice: () -> Unit = {},
@@ -42,6 +50,41 @@ fun GameScreen(
     onNavigateToAsocijacije: () -> Unit = {},
 ) {
     var showForfeitDialog by remember { mutableStateOf(false) }
+    var showOpponentLeftDialog by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    // Poll for opponent abandon while this screen is active
+    DisposableEffect(matchId, matchRepository) {
+        var pollingJob: Job? = null
+        if (matchId > 0 && matchRepository != null) {
+            pollingJob = scope.launch {
+                while (true) {
+                    delay(3_000)
+                    matchRepository.getCurrentMatch().onSuccess { match ->
+                        if (match != null && match.status == "ABANDONED") {
+                            showOpponentLeftDialog = true
+                            return@launch
+                        }
+                    }
+                }
+            }
+        }
+        onDispose { pollingJob?.cancel() }
+    }
+
+    if (showOpponentLeftDialog) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Opponent left") },
+            text = { Text("Your opponent abandoned the match. You win!") },
+            confirmButton = {
+                Button(onClick = {
+                    showOpponentLeftDialog = false
+                    onForfeit()
+                }) { Text("OK") }
+            },
+        )
+    }
 
     if (showForfeitDialog) {
         AlertDialog(
@@ -51,10 +94,7 @@ fun GameScreen(
             confirmButton = {
                 Button(
                     onClick = onForfeit,
-                    colors =
-                        ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.error,
-                        ),
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text("Forfeit") }
             },
             dismissButton = {
@@ -76,18 +116,13 @@ fun GameScreen(
         },
     ) { innerPadding ->
         Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding)
+                .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = "Games",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold,
-            )
+            Text(text = "Games", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
 
             gameList(
                 onNavigateToKoZnaZna,

@@ -106,6 +106,18 @@ class AuthController(
         """.trimIndent())
     }
 
+    @PostMapping("/guest")
+    fun loginAsGuest(request: HttpServletRequest): ResponseEntity<Any> {
+        return try {
+            val user = userService.registerGuest()
+            val session = request.getSession(true)
+            session.setAttribute("userId", user.id)
+            ResponseEntity.ok(UserResponse.from(user))
+        } catch (e: Exception) {
+            ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(mapOf("error" to "Could not create guest session"))
+        }
+    }
+
     @GetMapping("/me")
     fun me(session: HttpSession): ResponseEntity<Any> {
         val userId = session.getAttribute("userId") as? Long

@@ -6,6 +6,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -74,10 +75,14 @@ fun ChallengeScreen(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(challenges, key = { it.id }) { c ->
-                        ChallengeCard(
-                            challenge = c,
-                            onJoin = { viewModel.joinChallenge(c.id) {} },
-                        )
+                        if (c.status == "COMPLETED") {
+                            CompletedChallengeCard(challenge = c)
+                        } else {
+                            ChallengeCard(
+                                challenge = c,
+                                onJoin = { viewModel.joinChallenge(c.id) {} },
+                            )
+                        }
                     }
                 }
             }
@@ -96,6 +101,77 @@ fun ChallengeScreen(
             },
             onDismiss = { showCreateDialog = false },
         )
+    }
+}
+
+@Composable
+private fun CompletedChallengeCard(challenge: ChallengeResponseDto) {
+    val sorted = challenge.participants.sortedByDescending { it.totalScore }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "by ${challenge.creatorUsername}",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                AssistChip(onClick = {}, label = { Text("COMPLETED") })
+            }
+            Text(
+                text = "⭐ ${challenge.stakedStars} stars · 🎟 ${challenge.stakedTokens} tokens",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            sorted.forEachIndexed { index, p ->
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (index == 0) {
+                            Icon(
+                                Icons.Default.EmojiEvents,
+                                contentDescription = "Winner",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp),
+                            )
+                            Spacer(Modifier.width(4.dp))
+                        } else {
+                            Spacer(Modifier.width(22.dp))
+                        }
+                        Text(
+                            text = "${index + 1}. ${p.username}",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (index == 0) FontWeight.Bold else FontWeight.Normal,
+                        )
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "${p.totalScore} pts",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (index == 1) {
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = "Gets stake back",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.secondary,
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

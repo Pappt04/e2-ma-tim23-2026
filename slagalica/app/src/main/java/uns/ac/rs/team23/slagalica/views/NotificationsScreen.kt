@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,16 +30,18 @@ import uns.ac.rs.team23.slagalica.viewmodels.NotificationsViewModel
 @Composable
 fun NotificationsScreen(
     onNavigateBack: () -> Unit,
-    viewModel: NotificationsViewModel = koinViewModel()
+    onMatchStarted: () -> Unit = {},
+    viewModel: NotificationsViewModel = koinViewModel(),
 ) {
     val allNotifications by viewModel.notifications.collectAsState()
     val filter by viewModel.filter.collectAsState()
+    val countdowns by viewModel.inviteCountdowns.collectAsState()
 
     val displayed = allNotifications.filter {
         when (filter) {
-            NotificationFilter.ALL    -> true
+            NotificationFilter.ALL -> true
             NotificationFilter.UNREAD -> !it.isRead
-            NotificationFilter.READ   -> it.isRead
+            NotificationFilter.READ -> it.isRead
         }
     }
     val unreadCount = allNotifications.count { !it.isRead }
@@ -48,7 +51,7 @@ fun NotificationsScreen(
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Notification")
+                        Text("Notifications")
                         if (unreadCount > 0) {
                             Spacer(Modifier.width(8.dp))
                             Badge { Text("$unreadCount") }
@@ -57,25 +60,18 @@ fun NotificationsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Nazad")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
                     }
                 },
                 actions = {
                     if (unreadCount > 0) {
-                        TextButton(onClick = viewModel::markAllAsRead) {
-                            Text("Select all")
-                        }
+                        TextButton(onClick = viewModel::markAllAsRead) { Text("Mark all read") }
                     }
-                }
+                },
             )
-        }
+        },
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
-            // Filter tabs
+        Column(modifier = Modifier.fillMaxSize().padding(padding)) {
             FilterTabRow(filter, viewModel::setFilter, allNotifications)
 
             if (displayed.isEmpty()) {
@@ -83,15 +79,75 @@ fun NotificationsScreen(
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     items(displayed, key = { it.id }) { notif ->
-                        NotificationCard(
-                            notification = notif,
-                            onMarkRead = { viewModel.markAsRead(notif.id) }
+                        if (notif.type == NotificationType.INVITE && notif.inviteId != null) {
+                            InviteNotificationCard(
+                                notification = notif,
+                                secondsLeft = countdowns[notif.id] ?: 0,
+                                onAccept = {
+                                    viewModel.respondToInvite(notif.inviteId, accept = true, notificationId = notif.id)
+                                    onMatchStarted()
+                                },
+                                onReject = {
+                                    viewModel.respondToInvite(notif.inviteId, accept = false, notificationId = notif.id)
+                                },
+                            )
+                        } else {
+                            NotificationCard(
+                                notification = notif,
+                                onMarkRead = { viewModel.markAsRead(notif.id) },
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun InviteNotificationCard(
+    notification: Notification,
+    secondsLeft: Int,
+    onAccept: () -> Unit,
+    onReject: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+        elevation = CardDefaults.cardElevation(4.dp),
+    ) {
+        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.SportsEsports, contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(notification.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.weight(1f))
+                // Countdown badge
+                Surface(
+                    shape = CircleShape,
+                    color = if (secondsLeft <= 3) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            "$secondsLeft",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSecondary,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
+            }
+            Text(notification.message, style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onAccept, modifier = Modifier.weight(1f)) { Text("Accept") }
+                OutlinedButton(onClick = onReject, modifier = Modifier.weight(1f)) { Text("Reject") }
             }
         }
     }
@@ -101,119 +157,72 @@ fun NotificationsScreen(
 private fun FilterTabRow(
     current: NotificationFilter,
     onSelect: (NotificationFilter) -> Unit,
-    all: List<Notification>
+    all: List<Notification>,
 ) {
     val unread = all.count { !it.isRead }
-    val read   = all.count {  it.isRead }
+    val read = all.count { it.isRead }
 
     TabRow(selectedTabIndex = current.ordinal) {
-        Tab(selected = current == NotificationFilter.ALL,
-            onClick = { onSelect(NotificationFilter.ALL) },
+        Tab(selected = current == NotificationFilter.ALL, onClick = { onSelect(NotificationFilter.ALL) },
             text = { Text("All (${all.size})") })
-        Tab(selected = current == NotificationFilter.UNREAD,
-            onClick = { onSelect(NotificationFilter.UNREAD) },
+        Tab(selected = current == NotificationFilter.UNREAD, onClick = { onSelect(NotificationFilter.UNREAD) },
             text = { Text("Unread ($unread)") })
-        Tab(selected = current == NotificationFilter.READ,
-            onClick = { onSelect(NotificationFilter.READ) },
+        Tab(selected = current == NotificationFilter.READ, onClick = { onSelect(NotificationFilter.READ) },
             text = { Text("Read ($read)") })
     }
 }
 
 @Composable
-private fun NotificationCard(
-    notification: Notification,
-    onMarkRead: () -> Unit
-) {
+private fun NotificationCard(notification: Notification, onMarkRead: () -> Unit) {
     val bgColor by animateColorAsState(
         if (notification.isRead) MaterialTheme.colorScheme.surface
         else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
-        label = "bg"
+        label = "bg",
     )
 
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = bgColor),
-        elevation = CardDefaults.cardElevation(if (notification.isRead) 1.dp else 3.dp)
+        elevation = CardDefaults.cardElevation(if (notification.isRead) 1.dp else 3.dp),
     ) {
-        Row(
-            modifier = Modifier.padding(12.dp),
-            verticalAlignment = Alignment.Top
-        ) {
-            // Icon with channel color
+        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.Top) {
             Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(notification.type.color().copy(alpha = 0.15f)),
-                contentAlignment = Alignment.Center
+                modifier = Modifier.size(42.dp).clip(CircleShape)
+                    .background(notification.type.cardColor().copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = notification.type.icon(),
-                    contentDescription = null,
-                    tint = notification.type.color(),
-                    modifier = Modifier.size(22.dp)
-                )
+                Icon(imageVector = notification.type.icon(), contentDescription = null,
+                    tint = notification.type.cardColor(), modifier = Modifier.size(22.dp))
             }
-
             Spacer(Modifier.width(12.dp))
-
             Column(modifier = Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        text = notification.type.label,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = notification.type.color(),
-                        fontWeight = FontWeight.SemiBold
-                    )
+                    Text(notification.type.label, style = MaterialTheme.typography.labelSmall,
+                        color = notification.type.cardColor(), fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.weight(1f))
-                    Text(
-                        text = notification.timestamp,
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Text(notification.timestamp, style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-
                 Spacer(Modifier.height(2.dp))
-
-                Text(
-                    text = notification.title,
-                    style = MaterialTheme.typography.bodyMedium,
+                Text(notification.title, style = MaterialTheme.typography.bodyMedium,
                     fontWeight = if (notification.isRead) FontWeight.Normal else FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = notification.message,
-                    style = MaterialTheme.typography.bodySmall,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(notification.message, style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
-
+                    maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (!notification.isRead) {
                     Spacer(Modifier.height(6.dp))
-                    TextButton(
-                        onClick = onMarkRead,
-                        contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.height(24.dp)
-                    ) {
-                        Text("Mark as read",
-                            style = MaterialTheme.typography.labelSmall)
+                    TextButton(onClick = onMarkRead, contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.height(24.dp)) {
+                        Text("Mark as read", style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
-
-            // Unread dot indicator
             if (!notification.isRead) {
                 Spacer(Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier
-                        .size(10.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                        .align(Alignment.Top)
-                )
+                Box(modifier = Modifier.size(10.dp).clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary).align(Alignment.Top))
             }
         }
     }
@@ -221,42 +230,34 @@ private fun NotificationCard(
 
 @Composable
 private fun EmptyNotificationsPlaceholder(filter: NotificationFilter) {
-    Column(
-        modifier = Modifier.fillMaxSize(),
+    Column(modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Icon(
-            imageVector = Icons.Default.Notifications,
-            contentDescription = null,
+        verticalArrangement = Arrangement.Center) {
+        Icon(imageVector = Icons.Default.Notifications, contentDescription = null,
             modifier = Modifier.size(64.dp),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
-        )
+            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f))
         Spacer(Modifier.height(16.dp))
-        Text(
-            text = when (filter) {
-                NotificationFilter.UNREAD -> "No unread notifications"
-                NotificationFilter.READ   -> "No read notifications"
-                NotificationFilter.ALL    -> "No notifications"
-            },
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
+        Text(text = when (filter) {
+            NotificationFilter.UNREAD -> "No unread notifications"
+            NotificationFilter.READ -> "No read notifications"
+            NotificationFilter.ALL -> "No notifications"
+        }, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-// Extension helpers za tip notifikacije
 @Composable
-private fun NotificationType.color() = when (this) {
-    NotificationType.CHAT    -> MaterialTheme.colorScheme.tertiary
+private fun NotificationType.cardColor(): Color = when (this) {
+    NotificationType.CHAT -> MaterialTheme.colorScheme.tertiary
     NotificationType.RANKING -> MaterialTheme.colorScheme.secondary
-    NotificationType.REWARD  -> MaterialTheme.colorScheme.primary
-    NotificationType.OTHER   -> MaterialTheme.colorScheme.primary
+    NotificationType.REWARD -> MaterialTheme.colorScheme.primary
+    NotificationType.INVITE -> MaterialTheme.colorScheme.primary
+    NotificationType.OTHER -> MaterialTheme.colorScheme.primary
 }
 
 private fun NotificationType.icon(): ImageVector = when (this) {
-    NotificationType.CHAT    -> Icons.Default.MailOutline
+    NotificationType.CHAT -> Icons.Default.MailOutline
     NotificationType.RANKING -> Icons.Default.Star
-    NotificationType.REWARD  -> Icons.Default.Star
-    NotificationType.OTHER   -> Icons.Default.Notifications
+    NotificationType.REWARD -> Icons.Default.Star
+    NotificationType.INVITE -> Icons.Default.SportsEsports
+    NotificationType.OTHER -> Icons.Default.Notifications
 }

@@ -15,6 +15,9 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import org.koin.androidx.compose.koinViewModel
+import org.koin.compose.koinInject
+import uns.ac.rs.team23.slagalica.data.MatchStore
+import uns.ac.rs.team23.slagalica.repository.MatchRepository
 import uns.ac.rs.team23.slagalica.services.NtfyNotificationService
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.UserSession
@@ -205,7 +208,14 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 }
             }
             if (session is UserSession.LoggedIn) {
-                NotificationsScreen(onNavigateBack = { navController.popBackStack() })
+                NotificationsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onMatchStarted = {
+                        navController.navigate(Screen.Game.route) {
+                            popUpTo(Screen.Home.route)
+                        }
+                    },
+                )
             } else {
                 Box(Modifier.fillMaxSize())
             }
@@ -226,9 +236,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         composable(Screen.Game.route) {
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val matchRepo: MatchRepository = koinInject()
             GameScreen(
                 playerName = username,
-                opponentName = "Protivnik",
+                opponentName = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                matchId = MatchStore.matchId,
+                matchRepository = matchRepo,
                 onForfeit = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }

@@ -89,19 +89,25 @@ class NtfyNotificationService : Service() {
                 val title = json.optString("title", "Slagalica")
                 val message = json.optString("message", "")
                 val tags = json.optString("tags", "")
+                val isInvite = tags.contains("crossed_swords") && title.startsWith("Match invite")
                 val notifType = when {
-                    tags.contains("envelope") || tags.contains("speech") -> NotificationType.CHAT
+                    isInvite -> NotificationType.INVITE
+                    tags.contains("speech_balloon") || tags.contains("envelope") || tags.contains("speech") -> NotificationType.CHAT
                     tags.contains("trophy") || tags.contains("star") -> NotificationType.RANKING
                     tags.contains("tada") -> NotificationType.REWARD
                     else -> NotificationType.OTHER
                 }
+                val inviteId = if (isInvite) {
+                    Regex("inviteId:(\\d+)").find(message)?.groupValues?.get(1)?.toLongOrNull()
+                } else null
                 val notif = Notification(
                     id = id ?: System.currentTimeMillis().toString(),
                     title = title,
-                    message = message,
+                    message = message.replace(Regex("\\s*inviteId:\\d+"), ""),
                     type = notifType,
                     isRead = false,
                     timestamp = "Just now",
+                    inviteId = inviteId,
                 )
                 _events.tryEmit(notif)
                 showNotification(title, message)

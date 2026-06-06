@@ -1,6 +1,7 @@
 package uns.ac.rs.team23.server.service
 
 import org.springframework.messaging.simp.SimpMessagingTemplate
+import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import uns.ac.rs.team23.server.dto.match.GameResultResponse
@@ -71,7 +72,7 @@ class MatchService(
             inviteeId.toString(), "/queue/invites",
             mapOf("inviteId" to invite.id, "from" to inviter.username, "friendly" to friendly)
         )
-        ntfy.notify(inviteeId, "Match invite!", "${inviter.username} is challenging you to a ${if (friendly) "friendly" else "ranked"} match", tags = "crossed_swords")
+        ntfy.notify(inviteeId, "Match invite!", "${inviter.username} is challenging you to a ${if (friendly) "friendly" else "ranked"} match inviteId:${invite.id}", tags = "crossed_swords")
         return MatchResponse(
             id = invite.id, player1Id = inviterId, player1Username = inviter.username,
             player2Id = inviteeId, player2Username = invitee.username,
@@ -192,6 +193,34 @@ class MatchService(
         val response = buildResponse(match)
         messaging.convertAndSend("/topic/match/${match.id}", response)
         return response
+    }
+
+    @Transactional
+    fun cancelInvite(inviteId: Long, userId: Long) {
+        val invite = inviteRepository.findById(inviteId).orElseThrow { IllegalArgumentException("Invite not found") }
+        require(invite.inviter.id == userId) { "Only the sender can cancel an invite" }
+        require(invite.status == InviteStatus.PENDING) { "Invite already resolved" }
+        invite.status = InviteStatus.EXPIRED
+        inviteRepository.save(invite)
+        messaging.convertAndSendToUser(
+            invite.invitee.id.toString(), "/queue/invites",
+            mapOf("inviteId" to inviteId, "cancelled" to true)
+        )
+    }
+
+    @Scheduled(fixedDelay = 3000)
+    @Transactional
+    fun expireOldInvites() {
+        val expired = inviteRepository.findByStatusAndExpiresAtBefore(InviteStatus.PENDING, java.time.LocalDateTime.now())
+        expired.forEach { invite ->
+            invite.status = InviteStatus.EXPIRED
+            inviteRepository.save(invite)
+            messaging.convertAndSendToUser(
+                invite.inviter.id.toString(), "/queue/invites",
+                mapOf("inviteId" to invite.id, "expired" to true, "inviteeUsername" to invite.invitee.username)
+            )
+            ntfy.notify(invite.inviter.id, "Invite expired", "${invite.invitee.username} did not respond in time", tags = "hourglass_done")
+        }
     }
 
     fun cancelQueue(userId: Long) {
