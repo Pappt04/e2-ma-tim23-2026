@@ -31,6 +31,7 @@ data class UserResponse(
     val isEmailVerified: Boolean,
 ) {
     fun toUserProfile() = UserProfile(
+        id = id,
         username = username,
         email = email,
         region = region,

@@ -1,12 +1,15 @@
 package uns.ac.rs.team23.slagalica.viewmodels
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import uns.ac.rs.team23.slagalica.models.Notification
 import uns.ac.rs.team23.slagalica.models.NotificationType
+import uns.ac.rs.team23.slagalica.services.NtfyNotificationService
 import java.time.LocalDateTime
 
 enum class NotificationFilter { ALL, UNREAD, READ }
@@ -15,6 +18,14 @@ class NotificationsViewModel : ViewModel() {
 
     private val _notifications = MutableStateFlow(fakeMockNotifications())
     val notifications: StateFlow<List<Notification>> = _notifications.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            NtfyNotificationService.events.collect { incoming ->
+                _notifications.update { listOf(incoming) + it }
+            }
+        }
+    }
 
     private val _filter = MutableStateFlow(NotificationFilter.ALL)
     val filter: StateFlow<NotificationFilter> = _filter.asStateFlow()

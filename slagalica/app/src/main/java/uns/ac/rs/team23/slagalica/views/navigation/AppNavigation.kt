@@ -10,10 +10,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.services.NtfyNotificationService
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.UserSession
 import uns.ac.rs.team23.slagalica.views.HomeScreen
@@ -63,6 +65,16 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
     val navController = rememberNavController()
     val userSession by authViewModel.userSession.collectAsState()
     val userProfile by authViewModel.userProfile.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(userProfile?.id) {
+        val id = userProfile?.id ?: 0L
+        if (id > 0L) {
+            NtfyNotificationService.start(context, id)
+        } else {
+            NtfyNotificationService.stop(context)
+        }
+    }
 
     LaunchedEffect(userSession) {
         val current = navController.currentDestination?.route

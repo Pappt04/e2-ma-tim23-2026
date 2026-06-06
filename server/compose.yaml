@@ -16,5 +16,14 @@ services:
       - "1025:1025"
       - "8025:8025"
 
+  ntfy:
+    image: binwiederhier/ntfy
+    command: serve
+    ports:
+      - "8081:80"
+    volumes:
+      - ntfy_data:/var/lib/ntfy
+
 volumes:
   postgres_data:
+  ntfy_data:
