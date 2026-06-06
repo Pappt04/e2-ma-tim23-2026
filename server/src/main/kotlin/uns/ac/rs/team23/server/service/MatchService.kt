@@ -18,6 +18,7 @@ class MatchService(
     private val userRepository: UserRepository,
     private val matchmaking: MatchmakingService,
     private val messaging: SimpMessagingTemplate,
+    private val ntfy: NtfyService,
 ) {
 
     // ─── Matchmaking ─────────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ class MatchService(
             messaging.convertAndSend("/topic/match/${match.id}", response)
             // Notify the waiting opponent they got matched
             messaging.convertAndSendToUser(opponentId.toString(), "/queue/matched", response)
+            ntfy.notify(opponentId, "Match found!", "${player.username} joined your queue", tags = "crossed_swords")
             response
         } else {
             matchmaking.enqueue(userId)
@@ -64,11 +66,12 @@ class MatchService(
         val invite = inviteRepository.save(
             MatchInvite(inviter = inviter, invitee = invitee, isFriendly = friendly)
         )
-        // Push notification to invitee
+        // Push notification to invitee via WebSocket and ntfy
         messaging.convertAndSendToUser(
             inviteeId.toString(), "/queue/invites",
             mapOf("inviteId" to invite.id, "from" to inviter.username, "friendly" to friendly)
         )
+        ntfy.notify(inviteeId, "Match invite!", "${inviter.username} is challenging you to a ${if (friendly) "friendly" else "ranked"} match", tags = "crossed_swords")
         return MatchResponse(
             id = invite.id, player1Id = inviterId, player1Username = inviter.username,
             player2Id = inviteeId, player2Username = invitee.username,
@@ -115,6 +118,7 @@ class MatchService(
         val response = buildResponse(match)
         messaging.convertAndSend("/topic/match/${match.id}", response)
         messaging.convertAndSendToUser(invite.inviter.id.toString(), "/queue/matched", response)
+        ntfy.notify(invite.inviter.id, "Invite accepted!", "${invite.invitee.username} accepted your match invite", tags = "white_check_mark")
         return response
     }
 

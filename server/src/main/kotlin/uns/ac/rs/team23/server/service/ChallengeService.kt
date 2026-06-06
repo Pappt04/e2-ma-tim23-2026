@@ -16,6 +16,7 @@ class ChallengeService(
     private val gameResultRepository: ChallengeGameResultRepository,
     private val userRepository: UserRepository,
     private val messaging: SimpMessagingTemplate,
+    private val ntfy: NtfyService,
 ) {
 
     @Transactional
@@ -62,6 +63,7 @@ class ChallengeService(
 
         val response = buildResponse(challenge)
         messaging.convertAndSend("/topic/challenges/${challenge.region}", response)
+        ntfy.notify(challenge.creator.id, "Someone joined your challenge!", "${user.username} joined your challenge", tags = "tada")
         return response
     }
 

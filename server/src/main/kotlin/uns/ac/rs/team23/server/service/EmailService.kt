@@ -10,10 +10,12 @@ import uns.ac.rs.team23.server.model.User
 class EmailService(
     private val mailSender: JavaMailSender,
     @Value("\${app.base-url}") private val baseUrl: String,
+    @Value("\${spring.mail.username}") private val fromAddress: String,
 ) {
     fun sendVerificationEmail(user: User, token: String) {
         val link = "$baseUrl/api/auth/verify?token=$token"
         val message = SimpleMailMessage().apply {
+            from = fromAddress
             setTo(user.email)
             subject = "Slagalica — confirm your registration"
             text = "Hello ${user.username},\n\nClick the link below to verify your account:\n$link\n\nThe link expires in 24 hours."
