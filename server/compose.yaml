@@ -1,0 +1,29 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: slagalica
+      POSTGRES_USER: slagalica
+      POSTGRES_PASSWORD: slagalica
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  mailhog:
+    image: mailhog/mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+  ntfy:
+    image: binwiederhier/ntfy
+    command: serve
+    ports:
+      - "8081:80"
+    volumes:
+      - ntfy_data:/var/lib/ntfy
+
+volumes:
+  postgres_data:
+  ntfy_data:

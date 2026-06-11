@@ -1,0 +1,7 @@
+[*.{kt,kts}]
+# This disables the specific check for function naming project-wide
+ktlint_standard_function-naming = disabled
+
+# Optional: If you want to keep the rule but allow PascalCase 
+# (Note: Support for this specific property depends on your ktlint version)
+ktlint_function_naming_ignore_when_annotated_with = Composable
