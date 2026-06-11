@@ -230,6 +230,13 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 matchId = MatchStore.matchId,
                 matchRepository = matchRepo,
                 onForfeit = {
+                    MatchStore.clear()
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                },
+                onAllGamesFinished = {
+                    MatchStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -247,8 +254,11 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             KorakPoKorakScreen(
                 player1Name = username,
-                player2Name = "Protivnik",
-                onFinish = { navController.popBackStack() },
+                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                onFinish = {
+                    MatchStore.currentGameIndex++
+                    navController.popBackStack()
+                },
             )
         }
         composable(Screen.KoZnaZna.route) {
@@ -256,8 +266,11 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             KoZnaZnaScreen(
                 player1Name = username,
-                player2Name = "Protivnik",
-                onFinish = { navController.popBackStack() },
+                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                onFinish = {
+                    MatchStore.currentGameIndex++
+                    navController.popBackStack()
+                },
             )
         }
         composable(Screen.Spojnice.route) {
@@ -265,8 +278,11 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             SpojniceScreen(
                 player1Name = username,
-                player2Name = "Protivnik",
-                onFinish = { navController.popBackStack() },
+                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                onFinish = {
+                    MatchStore.currentGameIndex++
+                    navController.popBackStack()
+                },
             )
         }
         composable(Screen.MojBroj.route) {
@@ -274,8 +290,11 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             MojBrojScreen(
                 player1Name = username,
-                player2Name = "Protivnik",
-                onFinish = { navController.popBackStack() },
+                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                onFinish = {
+                    MatchStore.currentGameIndex++
+                    navController.popBackStack()
+                },
             )
         }
         composable(Screen.Skocko.route) {
@@ -283,8 +302,11 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             SkockoScreen(
                 player1Name = username,
-                player2Name = "Protivnik",
-                onFinish = { navController.popBackStack() },
+                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                onFinish = {
+                    MatchStore.currentGameIndex++
+                    navController.popBackStack()
+                },
             )
         }
         composable(Screen.Asocijacije.route) {
@@ -292,8 +314,11 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             AsocijacijeScreen(
                 player1Name = username,
-                player2Name = "Protivnik",
-                onFinish = { navController.popBackStack() },
+                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                onFinish = {
+                    MatchStore.currentGameIndex++
+                    navController.popBackStack()
+                },
             )
         }
         composable(Screen.Chat.route) { backStack ->
