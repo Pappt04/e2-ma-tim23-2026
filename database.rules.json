@@ -1,0 +1,28 @@
+{
+  "rules": {
+    "queue": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": "auth != null && auth.uid == $uid"
+      }
+    },
+    "userActiveMatch": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": false
+      }
+    },
+    "matchState": {
+      "$matchId": {
+        ".read": "auth != null",
+        ".write": false
+      }
+    },
+    "invites": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        ".write": false
+      }
+    }
+  }
+}

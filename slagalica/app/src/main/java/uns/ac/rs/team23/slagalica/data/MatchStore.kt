@@ -1,21 +1,21 @@
 package uns.ac.rs.team23.slagalica.data
 
 object MatchStore {
-    var matchId: Long = -1L
+    var matchId: String = ""
     var opponentUsername: String = ""
     var isFriendly: Boolean = false
 
-    fun set(id: Long, opponent: String, friendly: Boolean = false) {
+    fun set(id: String, opponent: String, friendly: Boolean = false) {
         matchId = id
         opponentUsername = opponent
         isFriendly = friendly
     }
 
     fun clear() {
-        matchId = -1L
+        matchId = ""
         opponentUsername = ""
         isFriendly = false
     }
 
-    val isActive: Boolean get() = matchId > 0
+    val isActive: Boolean get() = matchId.isNotBlank()
 }

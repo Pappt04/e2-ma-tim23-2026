@@ -5,11 +5,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import uns.ac.rs.team23.slagalica.data.SessionStore
 import uns.ac.rs.team23.slagalica.models.UserProfile
 import uns.ac.rs.team23.slagalica.repository.AuthRepository
 
@@ -27,7 +27,6 @@ sealed class UserSession {
 }
 
 class AuthViewModel(
-    private val sessionStore: SessionStore,
     private val authRepository: AuthRepository,
 ) : ViewModel() {
 
@@ -38,9 +37,17 @@ class AuthViewModel(
     val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
 
     init {
-        _userSession.value = sessionStore.restore()
-        if (_userSession.value is UserSession.LoggedIn) {
-            refreshProfile()
+        // Firebase Auth persists state across restarts — restore from current user
+        val current = FirebaseAuth.getInstance().currentUser
+        if (current != null) {
+            if (current.isAnonymous) {
+                _userSession.value = UserSession.Guest
+            } else {
+                val username = current.displayName ?: ""
+                val email = current.email ?: ""
+                _userSession.value = UserSession.LoggedIn(username, email)
+                refreshProfile()
+            }
         }
     }
 
@@ -73,7 +80,6 @@ class AuthViewModel(
             authRepository.login(loginEmailOrUsername, loginPassword)
                 .onSuccess { profile ->
                     val session = UserSession.LoggedIn(profile.username, profile.email)
-                    sessionStore.save(session)
                     _userSession.value = session
                     _userProfile.value = profile
                     _loginState.value = AuthState.Success
@@ -204,19 +210,16 @@ class AuthViewModel(
         changeConfirmNewPassword = ""
     }
 
-    // ── Dev / Guest helpers ───────────────────────────────────────────────────
+    // ── Guest ─────────────────────────────────────────────────────────────────
 
     fun loginAsGuest() {
         viewModelScope.launch {
             authRepository.loginAsGuest()
                 .onSuccess { profile ->
-                    sessionStore.save(UserSession.Guest)
                     _userSession.value = UserSession.Guest
                     _userProfile.value = profile
                 }
                 .onFailure {
-                    // Fallback to offline guest if server unreachable
-                    sessionStore.save(UserSession.Guest)
                     _userSession.value = UserSession.Guest
                 }
         }
@@ -226,16 +229,7 @@ class AuthViewModel(
         viewModelScope.launch {
             authRepository.logout()
         }
-        sessionStore.save(UserSession.NotLoggedIn)
         _userSession.value = UserSession.NotLoggedIn
         _userProfile.value = null
-    }
-
-    /** Dev-only: simulate clicking the email verification link. */
-    fun devVerifyEmail() {
-        val username = registerUsername.ifBlank {
-            (sessionStore.restore() as? UserSession.LoggedIn)?.username ?: return
-        }
-        viewModelScope.launch { authRepository.verifyEmailDev(username) }
     }
 }

@@ -5,7 +5,7 @@ data class SendMessageRequest(
 )
 
 data class ChatMessageDto(
-    val id: Long,
+    val id: String,
     val senderUsername: String,
     val region: String,
     val content: String,

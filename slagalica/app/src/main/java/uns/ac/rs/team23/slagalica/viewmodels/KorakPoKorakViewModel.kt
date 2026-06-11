@@ -193,7 +193,7 @@ class KorakPoKorakViewModel(
 
     private fun submitMatchScore(score: Int) {
         val matchId = uns.ac.rs.team23.slagalica.data.MatchStore.matchId
-        if (matchId <= 0) return
+        if (matchId.isBlank()) return
         viewModelScope.launch {
             matchRepository.submitScore(matchId, score)
         }

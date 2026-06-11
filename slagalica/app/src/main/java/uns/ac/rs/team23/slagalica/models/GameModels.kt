@@ -1,7 +1,7 @@
 package uns.ac.rs.team23.slagalica.models
 
 data class KorakPoKorakQuestion(
-    val id: Long,
+    val id: String,
     val clues: List<String>,
     val answer: String,
 )
