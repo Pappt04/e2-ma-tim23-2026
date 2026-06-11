@@ -10,6 +10,4 @@ interface AuthRepository {
     suspend fun getProfile(): Result<UserProfile>
     suspend fun sendPasswordResetEmail(email: String): Result<Unit>
     suspend fun changePassword(username: String, oldPassword: String, newPassword: String): Result<Unit>
-    /** Dev shortcut — simulates clicking the email verification link. */
-    suspend fun verifyEmailDev(username: String)
 }

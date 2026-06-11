@@ -13,8 +13,7 @@ import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.models.Notification
 import uns.ac.rs.team23.slagalica.models.NotificationType
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
-import uns.ac.rs.team23.slagalica.services.NtfyNotificationService
-import java.util.UUID
+import uns.ac.rs.team23.slagalica.services.SlagalicaFcmService
 
 enum class NotificationFilter { ALL, UNREAD, READ }
 
@@ -36,7 +35,7 @@ class NotificationsViewModel(
 
     init {
         viewModelScope.launch {
-            NtfyNotificationService.events.collect { incoming ->
+            SlagalicaFcmService.events.collect { incoming ->
                 _notifications.update { listOf(incoming) + it }
                 if (incoming.type == NotificationType.INVITE && incoming.inviteId != null) {
                     startInviteCountdown(incoming.id, incoming.inviteId)
@@ -74,7 +73,7 @@ class NotificationsViewModel(
         }
     }
 
-    private fun startInviteCountdown(notificationId: String, inviteId: Long) {
+    private fun startInviteCountdown(notificationId: String, inviteId: String) {
         countdownJobs[notificationId]?.cancel()
         _inviteCountdowns.update { it + (notificationId to 10) }
         countdownJobs[notificationId] = viewModelScope.launch {
@@ -87,7 +86,7 @@ class NotificationsViewModel(
         }
     }
 
-    fun respondToInvite(inviteId: Long, accept: Boolean, notificationId: String) {
+    fun respondToInvite(inviteId: String, accept: Boolean, notificationId: String) {
         countdownJobs[notificationId]?.cancel()
         countdownJobs.remove(notificationId)
         _inviteCountdowns.update { it - notificationId }

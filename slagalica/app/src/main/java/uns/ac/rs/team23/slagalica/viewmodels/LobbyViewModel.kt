@@ -14,7 +14,7 @@ import uns.ac.rs.team23.slagalica.repository.MatchRepository
 sealed class LobbyState {
     data object Idle : LobbyState()
     data object Searching : LobbyState()
-    data class InviteSent(val inviteId: Long, val opponentName: String) : LobbyState()
+    data class InviteSent(val inviteId: String, val opponentName: String) : LobbyState()
     data class Error(val message: String) : LobbyState()
     data class OpponentFound(val opponentName: String) : LobbyState()
     data class YouAreReady(val opponentName: String) : LobbyState()
@@ -72,7 +72,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
     private fun resolveOpponent(player1: String, player2: String): String =
         if (player1 == myUsername) player2 else player1
 
-    private fun onMatchFound(matchId: Long, opponentName: String) {
+    private fun onMatchFound(matchId: String, opponentName: String) {
         MatchStore.set(matchId, opponentName)
         _state.value = LobbyState.OpponentFound(opponentName)
     }
@@ -94,7 +94,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
         }
     }
 
-    fun startFriendSearch(friendId: Long, username: String, friendly: Boolean = false) {
+    fun startFriendSearch(friendId: String, username: String, friendly: Boolean = false) {
         myUsername = username
         _state.value = LobbyState.Searching
         viewModelScope.launch {

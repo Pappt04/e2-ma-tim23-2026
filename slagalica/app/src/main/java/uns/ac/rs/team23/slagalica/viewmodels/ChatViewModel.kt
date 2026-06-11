@@ -10,7 +10,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import uns.ac.rs.team23.slagalica.BuildConfig
 import uns.ac.rs.team23.slagalica.network.dto.ChatMessageDto
 import uns.ac.rs.team23.slagalica.repository.ChatRepository
 
@@ -30,20 +29,16 @@ class ChatViewModel(
     private var region: String = ""
     private var myUsername: String = ""
 
-    private val wsUrl = BuildConfig.BASE_URL
-        .replace("https://", "wss://")
-        .replace("http://", "ws://")
-        .removeSuffix("/") + "/ws-native"
-
     fun init(region: String, username: String) {
         this.region = region
         this.myUsername = username
         loadHistory()
-        chatRepository.connectStomp(region, wsUrl) { incoming ->
-            _messages.update { existing ->
-                // Avoid duplicate if we already added it optimistically
-                if (existing.any { it.id == incoming.id && incoming.id > 0 }) existing
-                else existing + incoming
+        viewModelScope.launch {
+            chatRepository.observeMessages(region).collect { incoming ->
+                _messages.update { existing ->
+                    if (existing.any { it.id == incoming.id && incoming.id.isNotBlank() }) existing
+                    else existing + incoming
+                }
             }
         }
     }
@@ -71,9 +66,4 @@ class ChatViewModel(
     fun clearError() { _error.value = null }
 
     fun isMyMessage(msg: ChatMessageDto): Boolean = msg.senderUsername == myUsername
-
-    override fun onCleared() {
-        chatRepository.disconnectStomp()
-        super.onCleared()
-    }
 }

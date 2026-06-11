@@ -66,7 +66,7 @@ class ChallengeViewModel(
         }
     }
 
-    fun joinChallenge(challengeId: Long, onJoined: () -> Unit) {
+    fun joinChallenge(challengeId: String, onJoined: () -> Unit) {
         viewModelScope.launch {
             _loading.value = true
             challengeRepository.joinChallenge(challengeId)

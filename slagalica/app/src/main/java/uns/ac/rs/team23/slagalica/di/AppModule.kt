@@ -1,21 +1,20 @@
 package uns.ac.rs.team23.slagalica.di
 
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
-import uns.ac.rs.team23.slagalica.data.SessionStore
-import uns.ac.rs.team23.slagalica.network.RetrofitClient
-import uns.ac.rs.team23.slagalica.network.StompClient
 import uns.ac.rs.team23.slagalica.repository.AuthRepository
 import uns.ac.rs.team23.slagalica.repository.ChallengeRepository
 import uns.ac.rs.team23.slagalica.repository.ChatRepository
+import uns.ac.rs.team23.slagalica.repository.FirebaseAuthRepository
+import uns.ac.rs.team23.slagalica.repository.FirebaseChallengeRepository
+import uns.ac.rs.team23.slagalica.repository.FirebaseChatRepository
+import uns.ac.rs.team23.slagalica.repository.FirebaseGameRepository
+import uns.ac.rs.team23.slagalica.repository.FirebaseMatchRepository
 import uns.ac.rs.team23.slagalica.repository.GameRepository
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
-import uns.ac.rs.team23.slagalica.repository.RemoteAuthRepository
-import uns.ac.rs.team23.slagalica.repository.RemoteChallengeRepository
-import uns.ac.rs.team23.slagalica.repository.RemoteChatRepository
-import uns.ac.rs.team23.slagalica.repository.RemoteGameRepository
-import uns.ac.rs.team23.slagalica.repository.RemoteMatchRepository
 import uns.ac.rs.team23.slagalica.viewmodels.AsocijacijeViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.ChallengeViewModel
@@ -29,22 +28,19 @@ import uns.ac.rs.team23.slagalica.viewmodels.SkockoViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceViewModel
 
 val AppModule = module {
-    // Data stores
-    single { SessionStore(get()) }
-
-    // Network
-    single { RetrofitClient(get()) }
-    single { StompClient(get<RetrofitClient>().httpClient) }
+    // Firebase singletons
+    single { FirebaseAuth.getInstance() }
+    single { FirebaseFirestore.getInstance() }
 
     // Repositories
-    single<AuthRepository> { RemoteAuthRepository(get<RetrofitClient>().api, get<RetrofitClient>().cookieJar) }
-    single<GameRepository> { RemoteGameRepository(get<RetrofitClient>().api) }
-    single<MatchRepository> { RemoteMatchRepository(get<RetrofitClient>().api) }
-    single<ChatRepository> { RemoteChatRepository(get<RetrofitClient>().api, get()) }
-    single<ChallengeRepository> { RemoteChallengeRepository(get<RetrofitClient>().api) }
+    single<AuthRepository> { FirebaseAuthRepository(get(), get()) }
+    single<GameRepository> { FirebaseGameRepository(get()) }
+    single<MatchRepository> { FirebaseMatchRepository(get(), get()) }
+    single<ChatRepository> { FirebaseChatRepository(get(), get()) }
+    single<ChallengeRepository> { FirebaseChallengeRepository(get(), get()) }
 
     // ViewModels
-    viewModel { AuthViewModel(get(), get()) }
+    viewModel { AuthViewModel(get()) }
     viewModel { KorakPoKorakViewModel(get(), get()) }
     viewModel { MojBrojViewModel(get(), get()) }
     viewModel { LobbyViewModel(get()) }

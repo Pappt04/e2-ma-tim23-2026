@@ -11,10 +11,10 @@ data class GameResultRequest(
 )
 
 data class MatchResponseDto(
-    val id: Long,
-    val player1Id: Long,
+    val id: String,
+    val player1Id: String,
     val player1Username: String,
-    val player2Id: Long?,
+    val player2Id: String?,
     val player2Username: String?,
     val status: String,
     val isFriendly: Boolean,
@@ -22,11 +22,11 @@ data class MatchResponseDto(
     val currentGameType: String?,
     val player1TotalScore: Int,
     val player2TotalScore: Int,
-    val winnerId: Long?,
+    val winnerId: String?,
 )
 
 data class MatchInviteResponseDto(
-    val id: Long,
+    val id: String,
     val inviterUsername: String,
     val isFriendly: Boolean,
 )

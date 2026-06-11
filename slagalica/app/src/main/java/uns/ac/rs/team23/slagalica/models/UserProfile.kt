@@ -1,7 +1,7 @@
 package uns.ac.rs.team23.slagalica.models
 
 data class UserProfile(
-    val id: Long = 0,
+    val id: String = "",
     val username: String = "",
     val email: String = "",
     val region: String = "",

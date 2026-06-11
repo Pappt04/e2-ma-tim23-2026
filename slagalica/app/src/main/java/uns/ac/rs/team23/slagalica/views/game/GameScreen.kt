@@ -39,7 +39,7 @@ import uns.ac.rs.team23.slagalica.repository.MatchRepository
 fun GameScreen(
     playerName: String,
     opponentName: String,
-    matchId: Long = -1L,
+    matchId: String = "",
     matchRepository: MatchRepository? = null,
     onForfeit: () -> Unit,
     onNavigateToKoZnaZna: () -> Unit = {},
@@ -56,7 +56,7 @@ fun GameScreen(
     // Poll for opponent abandon while this screen is active
     DisposableEffect(matchId, matchRepository) {
         var pollingJob: Job? = null
-        if (matchId > 0 && matchRepository != null) {
+        if (matchId.isNotBlank() && matchRepository != null) {
             pollingJob = scope.launch {
                 while (true) {
                     delay(3_000)

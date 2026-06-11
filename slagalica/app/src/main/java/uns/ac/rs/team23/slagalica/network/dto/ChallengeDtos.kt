@@ -12,14 +12,14 @@ data class SubmitChallengeScoreRequest(
 )
 
 data class ChallengeParticipantDto(
-    val id: Long,
+    val id: String,
     val username: String,
     val totalScore: Int,
     val gamesCompleted: Int,
 )
 
 data class ChallengeResponseDto(
-    val id: Long,
+    val id: String,
     val creatorUsername: String,
     val region: String,
     val stakedStars: Int,
