@@ -1,0 +1,7 @@
+{
+  "compiler": {
+    "jvm": {
+      "target": "11"
+    }
+  }
+}

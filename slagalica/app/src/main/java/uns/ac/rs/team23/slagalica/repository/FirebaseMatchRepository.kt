@@ -1,0 +1,376 @@
+package uns.ac.rs.team23.slagalica.repository
+
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.tasks.await
+import uns.ac.rs.team23.slagalica.network.dto.MatchInviteResponseDto
+import uns.ac.rs.team23.slagalica.network.dto.MatchResponseDto
+
+private val GAME_ORDER = listOf(
+    "KO_ZNA_ZNA", "SPOJNICE", "ASOCIJACIJE", "SKOCKO", "KORAK_PO_KORAK", "MOJ_BROJ"
+)
+
+class FirebaseMatchRepository(
+    private val auth: FirebaseAuth,
+    private val firestore: FirebaseFirestore,
+) : MatchRepository {
+
+    override suspend fun startRandomMatch(friendly: Boolean): Result<MatchResponseDto> =
+        runCatching {
+            val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+            val userDoc = firestore.collection("users").document(uid).get().await()
+            val username = userDoc.getString("username") ?: ""
+
+            // Try to claim an existing waiting match
+            val waitingSnap = firestore.collection("matches")
+                .whereEqualTo("status", "WAITING_FOR_OPPONENT")
+                .whereEqualTo("isFriendly", friendly)
+                .limit(5)
+                .get()
+                .await()
+
+            for (doc in waitingSnap.documents) {
+                if (doc.getString("player1Id") == uid) continue
+                try {
+                    var joined: MatchResponseDto? = null
+                    firestore.runTransaction { tx ->
+                        val snap = tx.get(doc.reference)
+                        if (snap.getString("status") != "WAITING_FOR_OPPONENT" ||
+                            snap.getString("player2Id") != null
+                        ) throw Exception("already taken")
+                        tx.update(
+                            doc.reference, mapOf(
+                                "player2Id" to uid,
+                                "player2Username" to username,
+                                "status" to "IN_PROGRESS",
+                                "currentGameType" to GAME_ORDER[0],
+                            )
+                        )
+                        joined = MatchResponseDto(
+                            id = doc.id,
+                            player1Id = snap.getString("player1Id") ?: "",
+                            player1Username = snap.getString("player1Username") ?: "",
+                            player2Id = uid,
+                            player2Username = username,
+                            status = "IN_PROGRESS",
+                            isFriendly = friendly,
+                            currentGameIndex = 0,
+                            currentGameType = GAME_ORDER[0],
+                            player1TotalScore = 0,
+                            player2TotalScore = 0,
+                            winnerId = null,
+                        )
+                    }.await()
+                    return@runCatching joined!!
+                } catch (_: Exception) {
+                    continue
+                }
+            }
+
+            // No match to join — create a new waiting match
+            val matchRef = firestore.collection("matches").document()
+            matchRef.set(
+                mapOf(
+                    "player1Id" to uid,
+                    "player1Username" to username,
+                    "player2Id" to null,
+                    "player2Username" to null,
+                    "status" to "WAITING_FOR_OPPONENT",
+                    "isFriendly" to friendly,
+                    "currentGameIndex" to 0,
+                    "currentGameType" to null,
+                    "player1TotalScore" to 0,
+                    "player2TotalScore" to 0,
+                    "winnerId" to null,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                )
+            ).await()
+
+            MatchResponseDto(
+                id = matchRef.id,
+                player1Id = uid,
+                player1Username = username,
+                player2Id = null,
+                player2Username = null,
+                status = "WAITING_FOR_OPPONENT",
+                isFriendly = friendly,
+                currentGameIndex = 0,
+                currentGameType = null,
+                player1TotalScore = 0,
+                player2TotalScore = 0,
+                winnerId = null,
+            )
+        }
+
+    override suspend fun getCurrentMatch(): Result<MatchResponseDto?> = runCatching {
+        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+
+        val snap1 = firestore.collection("matches")
+            .whereEqualTo("player1Id", uid)
+            .whereIn("status", listOf("WAITING_FOR_OPPONENT", "IN_PROGRESS"))
+            .limit(1)
+            .get()
+            .await()
+        if (!snap1.isEmpty) return@runCatching snap1.documents[0].toMatchResponseDto()
+
+        val snap2 = firestore.collection("matches")
+            .whereEqualTo("player2Id", uid)
+            .whereEqualTo("status", "IN_PROGRESS")
+            .limit(1)
+            .get()
+            .await()
+        if (!snap2.isEmpty) return@runCatching snap2.documents[0].toMatchResponseDto()
+
+        null
+    }
+
+    override suspend fun submitScore(matchId: String, score: Int): Result<MatchResponseDto> =
+        runCatching {
+            val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+            val matchRef = firestore.collection("matches").document(matchId)
+
+            firestore.runTransaction { tx ->
+                val match = tx.get(matchRef)
+                val currentGameType = match.getString("currentGameType")
+                    ?: throw Exception("No current game type")
+                val currentGameIndex = (match.getLong("currentGameIndex") ?: 0L).toInt()
+                val isPlayer1 = match.getString("player1Id") == uid
+
+                val gameResultRef = matchRef.collection("gameResults").document(currentGameType)
+                val gameResult = tx.get(gameResultRef)
+
+                val scoreField = if (isPlayer1) "player1Score" else "player2Score"
+                val completedField = if (isPlayer1) "player1Completed" else "player2Completed"
+
+                tx.set(
+                    gameResultRef,
+                    mapOf(
+                        "gameType" to currentGameType,
+                        "gameIndex" to currentGameIndex,
+                        scoreField to score,
+                        completedField to true,
+                    ),
+                    SetOptions.merge(),
+                )
+
+                val otherCompleted = if (isPlayer1)
+                    gameResult.getBoolean("player2Completed") == true
+                else
+                    gameResult.getBoolean("player1Completed") == true
+
+                if (otherCompleted) {
+                    val existingP1 = (gameResult.getLong("player1Score") ?: 0L).toInt()
+                    val existingP2 = (gameResult.getLong("player2Score") ?: 0L).toInt()
+                    val p1Score = if (isPlayer1) score else existingP1
+                    val p2Score = if (isPlayer1) existingP2 else score
+
+                    val newP1Total = (match.getLong("player1TotalScore") ?: 0L).toInt() + p1Score
+                    val newP2Total = (match.getLong("player2TotalScore") ?: 0L).toInt() + p2Score
+                    val nextGameIndex = currentGameIndex + 1
+
+                    if (nextGameIndex >= GAME_ORDER.size) {
+                        val winnerId = when {
+                            newP1Total > newP2Total -> match.getString("player1Id")
+                            newP2Total > newP1Total -> match.getString("player2Id")
+                            else -> null
+                        }
+                        tx.update(
+                            matchRef, mapOf(
+                                "player1TotalScore" to newP1Total,
+                                "player2TotalScore" to newP2Total,
+                                "status" to "COMPLETED",
+                                "winnerId" to winnerId,
+                                "completedAt" to FieldValue.serverTimestamp(),
+                            )
+                        )
+                    } else {
+                        tx.update(
+                            matchRef, mapOf(
+                                "player1TotalScore" to newP1Total,
+                                "player2TotalScore" to newP2Total,
+                                "currentGameIndex" to nextGameIndex,
+                                "currentGameType" to GAME_ORDER[nextGameIndex],
+                            )
+                        )
+                    }
+                }
+            }.await()
+
+            matchRef.get().await().toMatchResponseDto()
+        }
+
+    override suspend fun abandonMatch(matchId: String): Result<MatchResponseDto> = runCatching {
+        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val matchRef = firestore.collection("matches").document(matchId)
+        val match = matchRef.get().await()
+        val opponentId = if (match.getString("player1Id") == uid)
+            match.getString("player2Id") else match.getString("player1Id")
+        matchRef.update(
+            mapOf(
+                "status" to "ABANDONED",
+                "winnerId" to opponentId,
+                "completedAt" to FieldValue.serverTimestamp(),
+            )
+        ).await()
+        matchRef.get().await().toMatchResponseDto()
+    }
+
+    override suspend fun cancelQueue(): Result<Unit> = runCatching {
+        val uid = auth.currentUser?.uid ?: return@runCatching
+        val snap = firestore.collection("matches")
+            .whereEqualTo("player1Id", uid)
+            .whereEqualTo("status", "WAITING_FOR_OPPONENT")
+            .limit(1)
+            .get()
+            .await()
+        snap.documents.firstOrNull()?.reference?.delete()?.await()
+    }
+
+    override suspend fun sendFriendInvite(
+        friendId: String,
+        friendly: Boolean,
+    ): Result<MatchResponseDto> = runCatching {
+        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val userDoc = firestore.collection("users").document(uid).get().await()
+        val username = userDoc.getString("username") ?: ""
+        val friendDoc = firestore.collection("users").document(friendId).get().await()
+        val friendUsername = friendDoc.getString("username") ?: "Prijatelj"
+
+        val inviteRef = firestore.collection("matchInvites").document()
+        inviteRef.set(
+            mapOf(
+                "inviterId" to uid,
+                "inviterUsername" to username,
+                "inviteeId" to friendId,
+                "inviteeUsername" to friendUsername,
+                "isFriendly" to friendly,
+                "status" to "PENDING",
+                "createdAt" to FieldValue.serverTimestamp(),
+            )
+        ).await()
+
+        MatchResponseDto(
+            id = inviteRef.id,
+            player1Id = uid,
+            player1Username = username,
+            player2Id = friendId,
+            player2Username = friendUsername,
+            status = "INVITE_SENT",
+            isFriendly = friendly,
+            currentGameIndex = 0,
+            currentGameType = null,
+            player1TotalScore = 0,
+            player2TotalScore = 0,
+            winnerId = null,
+        )
+    }
+
+    override suspend fun getPendingInvites(): Result<List<MatchInviteResponseDto>> = runCatching {
+        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val snapshot = firestore.collection("matchInvites")
+            .whereEqualTo("inviteeId", uid)
+            .whereEqualTo("status", "PENDING")
+            .orderBy("createdAt", Query.Direction.DESCENDING)
+            .get()
+            .await()
+        snapshot.documents.mapNotNull { doc ->
+            MatchInviteResponseDto(
+                id = doc.id,
+                inviterUsername = doc.getString("inviterUsername") ?: return@mapNotNull null,
+                isFriendly = doc.getBoolean("isFriendly") ?: false,
+            )
+        }
+    }
+
+    override suspend fun respondToInvite(
+        inviteId: String,
+        accept: Boolean,
+    ): Result<MatchResponseDto> = runCatching {
+        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val inviteRef = firestore.collection("matchInvites").document(inviteId)
+        val invite = inviteRef.get().await()
+
+        val inviterId = invite.getString("inviterId") ?: throw Exception("Neispravan poziv")
+        val inviterUsername = invite.getString("inviterUsername") ?: ""
+        val inviteeUsername = invite.getString("inviteeUsername") ?: ""
+        val isFriendly = invite.getBoolean("isFriendly") ?: false
+
+        if (!accept) {
+            inviteRef.update("status", "REJECTED").await()
+            return@runCatching MatchResponseDto(
+                id = "",
+                player1Id = inviterId,
+                player1Username = inviterUsername,
+                player2Id = uid,
+                player2Username = inviteeUsername,
+                status = "REJECTED",
+                isFriendly = isFriendly,
+                currentGameIndex = 0,
+                currentGameType = null,
+                player1TotalScore = 0,
+                player2TotalScore = 0,
+                winnerId = null,
+            )
+        }
+
+        val matchRef = firestore.collection("matches").document()
+        matchRef.set(
+            mapOf(
+                "player1Id" to inviterId,
+                "player1Username" to inviterUsername,
+                "player2Id" to uid,
+                "player2Username" to inviteeUsername,
+                "status" to "IN_PROGRESS",
+                "isFriendly" to isFriendly,
+                "currentGameIndex" to 0,
+                "currentGameType" to GAME_ORDER[0],
+                "player1TotalScore" to 0,
+                "player2TotalScore" to 0,
+                "winnerId" to null,
+                "createdAt" to FieldValue.serverTimestamp(),
+            )
+        ).await()
+
+        inviteRef.update(mapOf("status" to "ACCEPTED", "matchId" to matchRef.id)).await()
+
+        MatchResponseDto(
+            id = matchRef.id,
+            player1Id = inviterId,
+            player1Username = inviterUsername,
+            player2Id = uid,
+            player2Username = inviteeUsername,
+            status = "IN_PROGRESS",
+            isFriendly = isFriendly,
+            currentGameIndex = 0,
+            currentGameType = GAME_ORDER[0],
+            player1TotalScore = 0,
+            player2TotalScore = 0,
+            winnerId = null,
+        )
+    }
+
+    override suspend fun cancelInvite(inviteId: String): Result<Unit> = runCatching {
+        firestore.collection("matchInvites").document(inviteId)
+            .update("status", "CANCELLED")
+            .await()
+    }
+
+    private fun com.google.firebase.firestore.DocumentSnapshot.toMatchResponseDto() =
+        MatchResponseDto(
+            id = id,
+            player1Id = getString("player1Id") ?: "",
+            player1Username = getString("player1Username") ?: "",
+            player2Id = getString("player2Id"),
+            player2Username = getString("player2Username"),
+            status = getString("status") ?: "WAITING_FOR_OPPONENT",
+            isFriendly = getBoolean("isFriendly") ?: false,
+            currentGameIndex = (getLong("currentGameIndex") ?: 0L).toInt(),
+            currentGameType = getString("currentGameType"),
+            player1TotalScore = (getLong("player1TotalScore") ?: 0L).toInt(),
+            player2TotalScore = (getLong("player2TotalScore") ?: 0L).toInt(),
+            winnerId = getString("winnerId"),
+        )
+}

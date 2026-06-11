@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: server
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:slagalica}
+    username: ${DB_USERNAME:slagalica}
+    password: ${DB_PASSWORD:slagalica}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  session:
+    store-type: jdbc
+    jdbc:
+      initialize-schema: always
+    timeout: 24h
+
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+
+server:
+  port: ${SERVER_PORT:8080}
+
+app:
+  base-url: ${APP_BASE_URL:http://localhost:8080}
+
+ntfy:
+  url: ${NTFY_URL:http://localhost:8081}
