@@ -9,8 +9,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.models.KorakPoKorakQuestion
+import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.repository.GameRepository
+import uns.ac.rs.team23.slagalica.repository.MatchRepository
 
 enum class KorakPhase { RoundIntro, Loading, PlayerTurn, OpponentChance, RoundEnd, GameOver }
 
@@ -30,64 +33,90 @@ data class KorakPoKorakState(
     val errorMessage: String? = null,
 )
 
+/**
+ * Real-time, host-authoritative "Korak po korak".
+ *
+ * The host fetches one question, writes the shared state into the game-state `payload`, owns the
+ * per-step 10s deadline (revealing one clue per step) and the opponent's 10s steal window. The
+ * active player validates its own answer locally for instant feedback and, on a correct answer,
+ * tells the host to finish the round; the host applies all scoring and round transitions. Round 1
+ * is played by player 1, round 2 by player 2. `currentAnswer`/`showWrongFeedback` are local UI only.
+ */
 class KorakPoKorakViewModel(
     private val gameRepository: GameRepository,
-    private val matchRepository: uns.ac.rs.team23.slagalica.repository.MatchRepository,
+    private val matchRepository: MatchRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(KorakPoKorakState())
     val state: StateFlow<KorakPoKorakState> = _state.asStateFlow()
 
-    private var timerJob: Job? = null
-    private var loadedQuestion: KorakPoKorakQuestion? = null
+    private var started = false
+    private var matchId: String = ""
+    private var isHost: Boolean = false
+    private val authoritative: Boolean get() = isHost || matchId.isBlank()
 
-    init {
-        preloadQuestion()
-    }
+    private var observerJob: Job? = null
+    private var loopJob: Job? = null
+    private var latest: GameStateDto? = null
+    private var deadlineAt: Long = 0
+    private var lastHandledDeadline: Long = -1
+    private var lastIntentSeq: Long = -1
+    private var mySeq: Long = 0
+    private var advanced = false
 
-    private fun preloadQuestion() {
-        viewModelScope.launch {
-            gameRepository.getKorakPoKorakQuestion()
-                .onSuccess { loadedQuestion = it }
-                .onFailure { _state.update { s -> s.copy(errorMessage = it.message) } }
-        }
-    }
+    /** Host-only: the full clue list / answer for the active question. */
+    private var hostClues: List<String> = emptyList()
 
-    fun beginRound() {
-        val question = loadedQuestion
-        if (question == null) {
+    fun enter() {
+        if (started) return
+        started = true
+        matchId = MatchStore.matchId
+        isHost = MatchStore.isHost
+
+        if (matchId.isNotBlank()) {
             _state.update { it.copy(phase = KorakPhase.Loading) }
-            viewModelScope.launch {
-                gameRepository.getKorakPoKorakQuestion()
-                    .onSuccess { q ->
-                        loadedQuestion = q
-                        startTurn(q)
-                    }
-                    .onFailure { err ->
-                        _state.update { it.copy(phase = KorakPhase.RoundIntro, errorMessage = err.message) }
-                    }
+            observerJob = viewModelScope.launch {
+                matchRepository.observeGameState(matchId, GAME_TYPE).collect { gs ->
+                    latest = gs
+                    if (gs != null) rebuildState(gs)
+                }
             }
-            return
+            if (isHost) hostStartRound(1)
+        } else {
+            hostStartRound(1)
         }
-        startTurn(question)
+        startLoop()
     }
 
-    private fun startTurn(question: KorakPoKorakQuestion) {
-        _state.update {
-            it.copy(
-                phase = KorakPhase.PlayerTurn,
-                targetAnswer = question.answer,
-                allClues = question.clues,
-                currentStep = 1,
-                revealedClues = listOf(question.clues[0]),
-                timeLeft = 10,
-                currentAnswer = "",
-                showWrongFeedback = false,
-                errorMessage = null,
-            )
+    private fun startLoop() {
+        loopJob?.cancel()
+        loopJob = viewModelScope.launch {
+            while (true) {
+                tick()
+                delay(200)
+            }
         }
-        startTimer()
     }
+
+    private fun tick() {
+        val s = _state.value
+        val now = now()
+        if (deadlineAt > 0 && (s.phase == KorakPhase.PlayerTurn || s.phase == KorakPhase.OpponentChance)) {
+            val left = (((deadlineAt - now) + 999) / 1000).toInt().coerceIn(0, 10)
+            if (left != s.timeLeft) _state.update { it.copy(timeLeft = left) }
+        }
+        if (authoritative && deadlineAt > 0 && now >= deadlineAt && deadlineAt != lastHandledDeadline) {
+            lastHandledDeadline = deadlineAt
+            handleTimeout()
+        }
+        if (isHost) processGuestIntent()
+    }
+
+    // --- Public actions (screen) ---
+
+    fun beginRound() { /* host-driven: round auto-starts */ }
+
+    fun prepareNextRound() { /* host-driven: rounds auto-advance */ }
 
     fun onAnswerChange(text: String) {
         _state.update { it.copy(currentAnswer = text, showWrongFeedback = false) }
@@ -95,118 +124,233 @@ class KorakPoKorakViewModel(
 
     fun submitAnswer() {
         val s = _state.value
-        val correct = matchesAnswer(s.currentAnswer, s.targetAnswer)
-        if (!correct) {
+        if (!localActive(s)) return
+        if (s.phase != KorakPhase.PlayerTurn && s.phase != KorakPhase.OpponentChance) return
+        if (!matchesAnswer(s.currentAnswer, s.targetAnswer)) {
             _state.update { it.copy(currentAnswer = "", showWrongFeedback = true) }
             return
         }
-        timerJob?.cancel()
-        val points = if (s.phase == KorakPhase.OpponentChance) {
-            5
-        } else {
-            20 - 2 * (s.currentStep - 1)
-        }
-        finishRound(points, scoredByOpponent = s.phase == KorakPhase.OpponentChance)
+        val opp = s.phase == KorakPhase.OpponentChance
+        val points = if (opp) 5 else 20 - 2 * (s.currentStep - 1)
+        _state.update { it.copy(currentAnswer = "", showWrongFeedback = false) }
+        if (authoritative) applyFinish(points, opp)
+        else sendIntent(mapOf("t" to "solve", "pts" to points, "opp" to opp))
     }
 
-    fun prepareNextRound() {
-        _state.update {
-            it.copy(
-                currentRound = 2,
-                phase = KorakPhase.RoundIntro,
-                targetAnswer = "",
-                currentAnswer = "",
-                revealedClues = emptyList(),
-                allClues = emptyList(),
-                showWrongFeedback = false,
-                errorMessage = null,
-            )
-        }
-        loadedQuestion = null
-        preloadQuestion()
-    }
+    // --- Apply (authoritative) ---
 
-    private fun startTimer() {
-        timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            for (i in 9 downTo 0) {
-                delay(1000)
-                _state.update { it.copy(timeLeft = i) }
-            }
-            onTimerExpired()
-        }
-    }
-
-    private fun onTimerExpired() {
-        val s = _state.value
-        when (s.phase) {
-            KorakPhase.PlayerTurn -> {
-                val nextStep = s.currentStep + 1
-                if (nextStep <= s.allClues.size) {
-                    _state.update {
-                        it.copy(
-                            currentStep = nextStep,
-                            revealedClues = s.allClues.take(nextStep),
-                            timeLeft = 10,
-                            showWrongFeedback = false,
-                        )
-                    }
-                    startTimer()
-                } else {
-                    _state.update {
-                        it.copy(phase = KorakPhase.OpponentChance, timeLeft = 10, showWrongFeedback = false)
-                    }
-                    startTimer()
-                }
-            }
-            KorakPhase.OpponentChance -> finishRound(0, scoredByOpponent = false)
-            else -> {}
-        }
-    }
-
-    private fun finishRound(points: Int, scoredByOpponent: Boolean) {
-        timerJob?.cancel()
+    private fun applyFinish(points: Int, scoredByOpponent: Boolean) {
         val s = _state.value
         val activeIsP1 = s.currentRound == 1
-
         val (newP1, newP2) = when {
             !scoredByOpponent && activeIsP1 -> s.player1Points + points to s.player2Points
             !scoredByOpponent && !activeIsP1 -> s.player1Points to s.player2Points + points
             scoredByOpponent && activeIsP1 -> s.player1Points to s.player2Points + points
             else -> s.player1Points + points to s.player2Points
         }
-
-        _state.update {
-            it.copy(
-                phase = if (s.currentRound == 1) KorakPhase.RoundEnd else KorakPhase.GameOver,
-                player1Points = newP1,
-                player2Points = newP2,
+        val over = s.currentRound >= 2
+        commit(
+            s.copy(
+                phase = if (over) KorakPhase.GameOver else KorakPhase.RoundEnd,
+                player1Points = newP1, player2Points = newP2,
                 roundCorrectAnswer = s.targetAnswer,
-                revealedClues = s.allClues,
+                revealedClues = hostClues.ifEmpty { s.revealedClues },
+            ),
+            if (over) 0 else now() + ROUND_END_MILLIS,
+        )
+        if (over) finishMatch(newP1, newP2)
+    }
+
+    private fun handleTimeout() {
+        val s = _state.value
+        when (s.phase) {
+            KorakPhase.PlayerTurn -> {
+                val nextStep = s.currentStep + 1
+                if (nextStep <= hostClues.size) {
+                    commit(s.copy(currentStep = nextStep, revealedClues = hostClues.take(nextStep)), now() + STEP_MILLIS)
+                } else {
+                    commit(s.copy(phase = KorakPhase.OpponentChance), now() + STEP_MILLIS)
+                }
+            }
+            KorakPhase.OpponentChance -> applyFinish(0, scoredByOpponent = false)
+            KorakPhase.RoundEnd -> hostStartRound(2)
+            else -> {}
+        }
+    }
+
+    private fun finishMatch(p1: Int, p2: Int) {
+        if (isHost && !advanced) {
+            advanced = true
+            viewModelScope.launch { matchRepository.advanceMatch(matchId, GAME_TYPE, p1, p2) }
+        }
+    }
+
+    private fun hostStartRound(round: Int) {
+        if (!authoritative) return
+        viewModelScope.launch {
+            val q = gameRepository.getKorakPoKorakQuestion().getOrNull()
+            if (q == null) {
+                _state.update { it.copy(errorMessage = "Failed to load question", phase = KorakPhase.RoundIntro) }
+                return@launch
+            }
+            hostClues = q.clues
+            val s = buildRoundState(round, q)
+            val deadline = now() + STEP_MILLIS
+            if (isHost) {
+                deadlineAt = deadline
+                _state.value = s
+                matchRepository.setGameState(
+                    matchId, GAME_TYPE,
+                    mapOf(
+                        "gameType" to GAME_TYPE,
+                        "hostId" to MatchStore.hostId,
+                        "phase" to "RUN",
+                        "round" to round,
+                        "index" to 0,
+                        "turn" to if (round == 1) "p1" else "p2",
+                        "deadlineAt" to deadline,
+                        "payload" to stateToMap(s, deadline),
+                        "p1Input" to emptyMap<String, Any?>(),
+                        "p2Input" to emptyMap<String, Any?>(),
+                        "p1Score" to s.player1Points,
+                        "p2Score" to s.player2Points,
+                    ),
+                )
+            } else {
+                deadlineAt = deadline
+                _state.value = s
+            }
+        }
+    }
+
+    private fun buildRoundState(round: Int, q: KorakPoKorakQuestion): KorakPoKorakState {
+        val prev = _state.value
+        return KorakPoKorakState(
+            currentRound = round,
+            phase = KorakPhase.PlayerTurn,
+            currentStep = 1,
+            revealedClues = listOf(q.clues[0]),
+            allClues = q.clues,
+            targetAnswer = q.answer,
+            timeLeft = 10,
+            player1Points = if (round == 1) 0 else prev.player1Points,
+            player2Points = if (round == 1) 0 else prev.player2Points,
+        )
+    }
+
+    // --- Commit / sync ---
+
+    private fun commit(s: KorakPoKorakState, deadline: Long) {
+        deadlineAt = deadline
+        _state.update { cur -> s.copy(currentAnswer = cur.currentAnswer, showWrongFeedback = cur.showWrongFeedback) }
+        if (!isHost) return
+        viewModelScope.launch {
+            matchRepository.patchGameState(
+                matchId, GAME_TYPE,
+                mapOf(
+                    "payload" to stateToMap(s, deadline),
+                    "deadlineAt" to deadline,
+                    "p1Score" to s.player1Points,
+                    "p2Score" to s.player2Points,
+                ),
             )
         }
-
-        if (s.currentRound == 2) {
-            submitMatchScore(newP1)
-        }
     }
 
-    private fun submitMatchScore(score: Int) {
-        val matchId = uns.ac.rs.team23.slagalica.data.MatchStore.matchId
-        if (matchId.isBlank()) return
+    private fun sendIntent(fields: Map<String, Any?>) {
+        mySeq++
         viewModelScope.launch {
-            matchRepository.submitScore(matchId, score)
+            matchRepository.patchGameState(
+                matchId, GAME_TYPE,
+                mapOf("p2Input" to (fields + ("seq" to mySeq))),
+            )
         }
     }
+
+    private fun processGuestIntent() {
+        val gs = latest ?: return
+        val seq = numberOrNull(gs.p2Input["seq"])?.toLong() ?: return
+        if (seq <= lastIntentSeq) return
+        lastIntentSeq = seq
+        if (gs.p2Input["t"] != "solve") return
+        // Guest may legitimately solve during its own PlayerTurn (round 2) or during a steal.
+        val pts = numberOrNull(gs.p2Input["pts"]) ?: 0
+        val opp = gs.p2Input["opp"] == true
+        applyFinish(pts, opp)
+    }
+
+    private fun rebuildState(gs: GameStateDto) {
+        val (s, dl) = mapToState(gs.payload) ?: return
+        deadlineAt = dl
+        _state.update { cur -> s.copy(currentAnswer = cur.currentAnswer, showWrongFeedback = cur.showWrongFeedback) }
+    }
+
+    // --- Turn helpers ---
+
+    private fun activeIsP1(s: KorakPoKorakState): Boolean = when (s.phase) {
+        KorakPhase.PlayerTurn -> s.currentRound == 1
+        KorakPhase.OpponentChance -> s.currentRound != 1
+        else -> s.currentRound == 1
+    }
+
+    private fun localActive(s: KorakPoKorakState): Boolean =
+        matchId.isBlank() || (activeIsP1(s) == isHost)
 
     private fun matchesAnswer(input: String, target: String): Boolean {
         val norm = input.trim().lowercase()
         val t = target.trim().lowercase()
-        return norm == t || t.split(" ").any { it == norm }
+        return norm.isNotEmpty() && (norm == t || t.split(" ").any { it == norm })
     }
 
+    // --- Serialization ---
+
+    private fun stateToMap(s: KorakPoKorakState, deadline: Long): Map<String, Any?> = mapOf(
+        "round" to s.currentRound,
+        "phase" to s.phase.name,
+        "step" to s.currentStep,
+        "revealed" to s.revealedClues,
+        "target" to s.targetAnswer,
+        "correct" to s.roundCorrectAnswer,
+        "p1" to s.player1Points,
+        "p2" to s.player2Points,
+        "deadline" to deadline,
+    )
+
+    private fun mapToState(p: Map<String, Any?>): Pair<KorakPoKorakState, Long>? {
+        val phaseName = p["phase"] as? String ?: return null
+        val revealed = (p["revealed"] as? List<*>)?.map { it.toString() } ?: emptyList()
+        val s = KorakPoKorakState(
+            currentRound = numberOrNull(p["round"]) ?: 1,
+            phase = runCatching { KorakPhase.valueOf(phaseName) }.getOrDefault(KorakPhase.PlayerTurn),
+            currentStep = numberOrNull(p["step"]) ?: 1,
+            revealedClues = revealed,
+            allClues = revealed,
+            targetAnswer = p["target"] as? String ?: "",
+            roundCorrectAnswer = p["correct"] as? String ?: "",
+            player1Points = numberOrNull(p["p1"]) ?: 0,
+            player2Points = numberOrNull(p["p2"]) ?: 0,
+        )
+        return s to (numberOrNull(p["deadline"])?.toLong() ?: 0L)
+    }
+
+    private fun numberOrNull(v: Any?): Int? = when (v) {
+        is Long -> v.toInt()
+        is Int -> v
+        is Double -> v.toInt()
+        else -> null
+    }
+
+    private fun now() = System.currentTimeMillis()
+
     override fun onCleared() {
-        timerJob?.cancel()
+        observerJob?.cancel()
+        loopJob?.cancel()
         super.onCleared()
+    }
+
+    companion object {
+        private const val GAME_TYPE = "KORAK_PO_KORAK"
+        private const val STEP_MILLIS = 10_000L
+        private const val ROUND_END_MILLIS = 4_000L
     }
 }

@@ -18,8 +18,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -37,6 +39,16 @@ fun KorakPoKorakScreen(
     viewModel: KorakPoKorakViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) { viewModel.enter() }
+
+    // Both clients reach GameOver together (host-driven); auto-advance to the next game.
+    LaunchedEffect(state.phase) {
+        if (state.phase == KorakPhase.GameOver) {
+            delay(4_000)
+            onFinish()
+        }
+    }
 
     val activeName = if (state.currentRound == 1) player1Name else player2Name
     val opponentName = if (state.currentRound == 1) player2Name else player1Name

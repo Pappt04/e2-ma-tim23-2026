@@ -28,8 +28,10 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -50,6 +52,17 @@ fun SpojniceScreen(
     viewModel: SpojniceViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+
+    LaunchedEffect(Unit) { viewModel.enter() }
+
+    // Both clients reach GAME_OVER together (host-driven); auto-advance to the next game.
+    LaunchedEffect(state.phase) {
+        if (state.phase == SpojnicePhase.GAME_OVER) {
+            delay(4_000)
+            onFinish()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

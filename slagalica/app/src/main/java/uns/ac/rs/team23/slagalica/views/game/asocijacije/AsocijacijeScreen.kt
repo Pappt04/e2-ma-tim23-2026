@@ -42,6 +42,16 @@ fun AsocijacijeScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    LaunchedEffect(Unit) { viewModel.enter() }
+
+    // Both clients reach GAME_OVER together (host-driven); auto-advance to the next game.
+    LaunchedEffect(state.phase) {
+        if (state.phase == AsocijacijePhase.GAME_OVER) {
+            kotlinx.coroutines.delay(4_000)
+            onFinish()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
