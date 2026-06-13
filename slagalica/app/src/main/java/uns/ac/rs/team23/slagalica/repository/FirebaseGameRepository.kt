@@ -13,14 +13,38 @@ class FirebaseGameRepository(
 ) : GameRepository {
 
     override suspend fun getKorakPoKorakQuestion(): Result<KorakPoKorakQuestion> = runCatching {
-        val snapshot = firestore.collection("korakPoKorakQuestions").get().await()
-        if (snapshot.isEmpty) throw Exception("Nema dostupnih pitanja")
-        val doc = snapshot.documents.random()
-        @Suppress("UNCHECKED_CAST")
-        val clues = doc.get("clues") as? List<String> ?: emptyList()
-        val finalWord = doc.getString("finalWord") ?: throw Exception("Neispravan format pitanja")
-        KorakPoKorakQuestion(id = doc.id, clues = clues, answer = finalWord)
+        val snapshot = runCatching {
+            firestore.collection("korakPoKorakQuestions").get().await()
+        }.getOrNull()
+        if (snapshot != null && !snapshot.isEmpty) {
+            val doc = snapshot.documents.random()
+            @Suppress("UNCHECKED_CAST")
+            val clues = doc.get("clues") as? List<String> ?: emptyList()
+            val finalWord = doc.getString("finalWord") ?: doc.getString("answer")
+            if (clues.isNotEmpty() && !finalWord.isNullOrBlank()) {
+                return@runCatching KorakPoKorakQuestion(id = doc.id, clues = clues, answer = finalWord)
+            }
+        }
+        bundledKorakQuestions().random()
     }
+
+    private fun bundledKorakQuestions(): List<KorakPoKorakQuestion> = listOf(
+        KorakPoKorakQuestion(
+            id = "bundled-1",
+            clues = listOf("Država", "Grad", "Reka", "Most", "Evropa"),
+            answer = "Beograd",
+        ),
+        KorakPoKorakQuestion(
+            id = "bundled-2",
+            clues = listOf("Planeta", "Crvena", "Sused", "Zemlja", "Svemir"),
+            answer = "Mars",
+        ),
+        KorakPoKorakQuestion(
+            id = "bundled-3",
+            clues = listOf("Sport", "Mreža", "Lopta", "Gol", "Tim"),
+            answer = "Fudbal",
+        ),
+    )
 
     override suspend fun getMojBrojPuzzle(): Result<MojBrojPuzzle> = runCatching {
         generateMojBroj()

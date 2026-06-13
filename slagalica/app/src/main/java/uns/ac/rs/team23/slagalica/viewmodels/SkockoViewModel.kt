@@ -53,7 +53,9 @@ data class SkockoState(
     val player2Points: Int = 0,
     val roundSolved: Boolean = false,
     val showSolution: Boolean = false,
-    val awaitingRoundEndConfirm: Boolean = false
+    val awaitingRoundEndConfirm: Boolean = false,
+    val p1Ready: Boolean = false,
+    val p2Ready: Boolean = false,
 )
 
 // ─── ViewModel ──────────────────────────────────────────────────────────────
@@ -86,6 +88,7 @@ class SkockoViewModel(
     private var lastIntentSeq: Long = -1
     private var mySeq: Long = 0
     private var advanced = false
+    private var roundStarting = false
 
     private val syms = SkockoSymbol.values()
 
@@ -99,7 +102,7 @@ class SkockoViewModel(
             observerJob = viewModelScope.launch {
                 matchRepository.observeGameState(matchId, GAME_TYPE).collect { gs ->
                     latest = gs
-                    if (gs != null) rebuildState(gs)
+                    if (gs != null && !isHost) rebuildState(gs)
                 }
             }
             if (isHost) hostInit()
@@ -168,13 +171,21 @@ class SkockoViewModel(
 
     fun startRound() { /* host-driven: rounds auto-start; no-op kept for screen compatibility */ }
 
-    fun nextRound() {
-        if (!authoritative) return
-        if (_state.value.phase == SkockoPhase.ROUND_END) {
-            lastHandledDeadline = -1
-            startRoundInternal(2)
+    fun markReady() {
+        val s = _state.value
+        if (s.phase != SkockoPhase.ROUND_END) return
+        if (isHost) {
+            if (s.p1Ready) return
+            commit(s.copy(p1Ready = true), 0)
+            checkBothReady()
+        } else {
+            if (s.p2Ready) return
+            _state.update { it.copy(p2Ready = true) }
+            sendIntent("ready")
         }
     }
+
+    fun isMyTurn(): Boolean = localActive(_state.value)
 
     fun confirmRoundEnd() = act {
         if (authoritative) applyConfirm() else sendIntent("confirm")
@@ -243,9 +254,9 @@ class SkockoViewModel(
                     s.copy(
                         attempts = newAttempts, currentInput = List(4) { null },
                         showSolution = true, phase = SkockoPhase.ROUND_END,
-                        awaitingRoundEndConfirm = false,
+                        awaitingRoundEndConfirm = false, p1Ready = false, p2Ready = false,
                     ),
-                    now() + ROUND_END_MILLIS,
+                    0,
                 )
             }
             mainCount >= 6 -> {
@@ -264,7 +275,23 @@ class SkockoViewModel(
     private fun applyConfirm() {
         val s = _state.value
         if (!s.awaitingRoundEndConfirm) return
-        commit(s.copy(phase = SkockoPhase.ROUND_END, awaitingRoundEndConfirm = false), now() + ROUND_END_MILLIS)
+        commit(
+            s.copy(phase = SkockoPhase.ROUND_END, awaitingRoundEndConfirm = false, p1Ready = false, p2Ready = false),
+            0,
+        )
+    }
+
+    private fun checkBothReady() {
+        val s = _state.value
+        if (s.phase != SkockoPhase.ROUND_END || !s.p1Ready || !s.p2Ready) return
+        if (roundStarting) return
+        roundStarting = true
+        if (s.currentRound < 2) {
+            startRoundInternal(2)
+        } else {
+            finishGame(s)
+        }
+        roundStarting = false
     }
 
     private fun startRoundInternal(round: Int) {
@@ -277,6 +304,7 @@ class SkockoViewModel(
             player1Points = s.player1Points,
             player2Points = s.player2Points,
         )
+        lastHandledDeadline = -1
         commit(ns, now() + PLAYER_MILLIS)
     }
 
@@ -287,11 +315,11 @@ class SkockoViewModel(
             SkockoPhase.PLAYER_TURN ->
                 commit(s.copy(phase = SkockoPhase.OPPONENT_STEAL, currentInput = List(4) { null }), now() + STEAL_MILLIS)
             SkockoPhase.OPPONENT_STEAL ->
-                commit(s.copy(phase = SkockoPhase.ROUND_END, showSolution = true, currentInput = List(4) { null }), now() + ROUND_END_MILLIS)
-            SkockoPhase.ROUND_END -> {
-                if (s.currentRound < 2) startRoundInternal(2)
-                else finishGame(s)
-            }
+                commit(
+                    s.copy(phase = SkockoPhase.ROUND_END, showSolution = true, currentInput = List(4) { null },
+                        awaitingRoundEndConfirm = false, p1Ready = false, p2Ready = false),
+                    0,
+                )
             else -> {}
         }
     }
@@ -308,6 +336,7 @@ class SkockoViewModel(
 
     private fun commit(s: SkockoState, deadline: Long) {
         deadlineAt = deadline
+        if (deadline > now()) lastHandledDeadline = -1
         _state.value = s
         if (!isHost) return
         viewModelScope.launch {
@@ -339,21 +368,32 @@ class SkockoViewModel(
         val seq = numberOrNull(gs.p2Input["seq"])?.toLong() ?: return
         if (seq <= lastIntentSeq) return
         lastIntentSeq = seq
-        if (activeIsP1(_state.value)) return // not the guest's turn → ignore
         val type = gs.p2Input["type"] as? String ?: return
-        val a = numberOrNull(gs.p2Input["a"]) ?: -1
         when (type) {
-            "add" -> if (a in syms.indices) applyAdd(syms[a])
-            "rm" -> applyRemove(a)
-            "submit" -> applySubmit()
+            "ready" -> {
+                val s = _state.value
+                if (s.phase == SkockoPhase.ROUND_END && !s.p2Ready) {
+                    commit(s.copy(p2Ready = true), 0)
+                    checkBothReady()
+                }
+            }
             "confirm" -> applyConfirm()
+            else -> {
+                if (activeIsP1(_state.value)) return
+                val a = numberOrNull(gs.p2Input["a"]) ?: -1
+                when (type) {
+                    "add" -> if (a in syms.indices) applyAdd(syms[a])
+                    "rm" -> applyRemove(a)
+                    "submit" -> applySubmit()
+                }
+            }
         }
     }
 
     private fun rebuildState(gs: GameStateDto) {
-        val (s, dl) = mapToState(gs.payload) ?: return
-        deadlineAt = dl
-        _state.value = s
+        val (s, _) = mapToState(gs.payload, gs) ?: return
+        deadlineAt = effectiveDeadline(gs, gs.payload)
+        _state.value = s.copy(secondsLeft = secsLeft(deadlineAt, timerMax(s.phase)))
     }
 
     // --- Turn helpers ---
@@ -425,11 +465,16 @@ class SkockoViewModel(
         "solved" to s.roundSolved,
         "show" to s.showSolution,
         "confirm" to s.awaitingRoundEndConfirm,
+        "p1Ready" to s.p1Ready,
+        "p2Ready" to s.p2Ready,
         "deadline" to deadline,
     )
 
+    private fun timerMax(phase: SkockoPhase): Int =
+        if (phase == SkockoPhase.OPPONENT_STEAL) 10 else 30
+
     @Suppress("UNCHECKED_CAST")
-    private fun mapToState(p: Map<String, Any?>): Pair<SkockoState, Long>? {
+    private fun mapToState(p: Map<String, Any?>, gs: GameStateDto): Pair<SkockoState, Long>? {
         val phaseName = p["phase"] as? String ?: return null
         fun sym(i: Int?): SkockoSymbol? = i?.let { if (it in syms.indices) syms[it] else null }
         val solution = (p["solution"] as? List<*>)?.mapNotNull { sym(numberOrNull(it)) } ?: emptyList()
@@ -439,9 +484,8 @@ class SkockoViewModel(
             SkockoAttempt(ss, numberOrNull(m["cp"]) ?: 0, numberOrNull(m["cs"]) ?: 0, m["opp"] == true)
         } ?: emptyList()
         val input = (p["input"] as? List<*>)?.map { sym(numberOrNull(it)) } ?: List(4) { null }
-        val deadline = numberOrNull(p["deadline"])?.toLong() ?: 0L
+        val deadline = effectiveDeadline(gs, p)
         val phase = runCatching { SkockoPhase.valueOf(phaseName) }.getOrDefault(SkockoPhase.PLAYER_TURN)
-        val maxSecs = if (phase == SkockoPhase.OPPONENT_STEAL) 10 else 30
         val s = SkockoState(
             phase = phase,
             currentRound = numberOrNull(p["round"]) ?: 1,
@@ -449,18 +493,17 @@ class SkockoViewModel(
             solution = solution,
             attempts = attempts,
             currentInput = if (input.size == 4) input else List(4) { null },
-            secondsLeft = secsLeft(deadline, maxSecs),
+            secondsLeft = secsLeft(deadline, timerMax(phase)),
             player1Points = numberOrNull(p["p1"]) ?: 0,
             player2Points = numberOrNull(p["p2"]) ?: 0,
             roundSolved = p["solved"] == true,
             showSolution = p["show"] == true,
             awaitingRoundEndConfirm = p["confirm"] == true,
+            p1Ready = p["p1Ready"] == true,
+            p2Ready = p["p2Ready"] == true,
         )
         return s to deadline
     }
-
-    private fun secsLeft(deadline: Long, max: Int): Int =
-        if (deadline <= 0) max else (((deadline - now()) + 999) / 1000).toInt().coerceIn(0, max)
 
     private fun numberOrNull(v: Any?): Int? = when (v) {
         is Long -> v.toInt()

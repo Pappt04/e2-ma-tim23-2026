@@ -50,6 +50,8 @@ data class AsocijacijeState(
     val selectedGuessTarget: GuessTarget? = null,
     val wrongGuessTarget: GuessTarget? = null,
     val errorMessage: String? = null,
+    val p1Ready: Boolean = false,
+    val p2Ready: Boolean = false,
 )
 
 /**
@@ -82,6 +84,7 @@ class AsocijacijeViewModel(
     private var lastIntentSeq: Long = -1
     private var mySeq: Long = 0
     private var advanced = false
+    private var roundStarting = false
 
     fun enter() {
         if (started) return
@@ -94,7 +97,7 @@ class AsocijacijeViewModel(
             observerJob = viewModelScope.launch {
                 matchRepository.observeGameState(matchId, GAME_TYPE).collect { gs ->
                     latest = gs
-                    if (gs != null) rebuildState(gs)
+                    if (gs != null && !isHost) rebuildState(gs)
                 }
             }
             if (isHost) hostStartRound(1)
@@ -132,13 +135,21 @@ class AsocijacijeViewModel(
 
     fun startRound() { /* host-driven */ }
 
-    fun nextRound() {
-        if (!authoritative) return
-        if (_state.value.phase == AsocijacijePhase.ROUND_END) {
-            lastHandledDeadline = -1
-            hostStartRound(2)
+    fun markReady() {
+        val s = _state.value
+        if (s.phase != AsocijacijePhase.ROUND_END) return
+        if (isHost) {
+            if (s.p1Ready) return
+            commit(s.copy(p1Ready = true), 0)
+            checkBothReady()
+        } else {
+            if (s.p2Ready) return
+            _state.update { it.copy(p2Ready = true) }
+            sendIntent(mapOf("t" to "ready"))
         }
     }
+
+    fun nextRound() = markReady()
 
     /** Local UI only: which cell/answer the active player is typing into. */
     fun selectGuessTarget(target: GuessTarget) {
@@ -259,15 +270,24 @@ class AsocijacijeViewModel(
 
     private fun endRound() {
         val s = _state.value
-        if (s.currentRound >= 2) {
+        commit(s.copy(phase = AsocijacijePhase.ROUND_END, p1Ready = false, p2Ready = false), 0)
+    }
+
+    private fun checkBothReady() {
+        val s = _state.value
+        if (s.phase != AsocijacijePhase.ROUND_END || !s.p1Ready || !s.p2Ready) return
+        if (roundStarting) return
+        roundStarting = true
+        if (s.currentRound < 2) {
+            hostStartRound(2)
+        } else {
             commit(s.copy(phase = AsocijacijePhase.GAME_OVER), 0)
             if (isHost && !advanced) {
                 advanced = true
                 viewModelScope.launch { matchRepository.advanceMatch(matchId, GAME_TYPE, s.player1Points, s.player2Points) }
             }
-        } else {
-            commit(s.copy(phase = AsocijacijePhase.ROUND_END), now() + ROUND_END_MILLIS)
         }
+        roundStarting = false
     }
 
     private fun hostStartRound(round: Int) {
@@ -325,17 +345,12 @@ class AsocijacijeViewModel(
 
     private fun handleTimeout() {
         val s = _state.value
-        when (s.phase) {
-            AsocijacijePhase.PLAYING -> endRound()
-            AsocijacijePhase.ROUND_END -> hostStartRound(2)
-            else -> {}
-        }
+        if (s.phase == AsocijacijePhase.PLAYING) endRound()
     }
-
-    // --- Commit / sync ---
 
     private fun commit(s: AsocijacijeState, deadline: Long) {
         deadlineAt = deadline
+        if (deadline > now()) lastHandledDeadline = -1
         // Preserve local-only UI fields already in _state.
         _state.update { cur ->
             s.copy(
@@ -373,22 +388,31 @@ class AsocijacijeViewModel(
         val seq = numberOrNull(gs.p2Input["seq"])?.toLong() ?: return
         if (seq <= lastIntentSeq) return
         lastIntentSeq = seq
-        if (_state.value.activePlayer == 1) return // guest acts only when it's player 2's turn
         when (gs.p2Input["t"] as? String) {
-            "reveal" -> applyReveal(numberOrNull(gs.p2Input["a"]) ?: return, numberOrNull(gs.p2Input["b"]) ?: return)
-            "guess" -> applySubmit(gs.p2Input["tg"] as? String ?: return, gs.p2Input["g"] as? String ?: return)
-            "pass" -> applyPass()
+            "ready" -> {
+                val s = _state.value
+                if (s.phase == AsocijacijePhase.ROUND_END && !s.p2Ready) {
+                    commit(s.copy(p2Ready = true), 0)
+                    checkBothReady()
+                }
+            }
+            "reveal" -> if (_state.value.activePlayer != 1)
+                applyReveal(numberOrNull(gs.p2Input["a"]) ?: return, numberOrNull(gs.p2Input["b"]) ?: return)
+            "guess" -> if (_state.value.activePlayer != 1)
+                applySubmit(gs.p2Input["tg"] as? String ?: return, gs.p2Input["g"] as? String ?: return)
+            "pass" -> if (_state.value.activePlayer != 1) applyPass()
         }
     }
 
     private fun rebuildState(gs: GameStateDto) {
-        val (s, dl) = mapToState(gs.payload) ?: return
-        deadlineAt = dl
+        val (s, _) = mapToState(gs.payload, gs) ?: return
+        deadlineAt = effectiveDeadline(gs, gs.payload)
         _state.update { cur ->
             s.copy(
                 guessInput = cur.guessInput,
                 selectedGuessTarget = cur.selectedGuessTarget,
                 wrongGuessTarget = cur.wrongGuessTarget,
+                secondsLeft = secsLeft(deadlineAt, 120),
             )
         }
     }
@@ -415,11 +439,13 @@ class AsocijacijeViewModel(
         "p1" to s.player1Points,
         "p2" to s.player2Points,
         "waiting" to s.waitingForGuess,
+        "p1Ready" to s.p1Ready,
+        "p2Ready" to s.p2Ready,
         "deadline" to deadline,
     )
 
     @Suppress("UNCHECKED_CAST")
-    private fun mapToState(p: Map<String, Any?>): Pair<AsocijacijeState, Long>? {
+    private fun mapToState(p: Map<String, Any?>, gs: GameStateDto): Pair<AsocijacijeState, Long>? {
         val phaseName = p["phase"] as? String ?: return null
         val columns = (p["columns"] as? List<*>)?.mapNotNull {
             val m = it as? Map<String, Any?> ?: return@mapNotNull null
@@ -428,7 +454,7 @@ class AsocijacijeViewModel(
             val revealed = (m["revealed"] as? List<*>)?.map { r -> r == true } ?: List(4) { false }
             AsocijacijeColumn(words, answer, revealed, m["solved"] == true)
         } ?: emptyList()
-        val deadline = numberOrNull(p["deadline"])?.toLong() ?: 0L
+        val deadline = effectiveDeadline(gs, p)
         val s = AsocijacijeState(
             phase = runCatching { AsocijacijePhase.valueOf(phaseName) }.getOrDefault(AsocijacijePhase.PLAYING),
             currentRound = numberOrNull(p["round"]) ?: 1,
@@ -440,12 +466,11 @@ class AsocijacijeViewModel(
             player1Points = numberOrNull(p["p1"]) ?: 0,
             player2Points = numberOrNull(p["p2"]) ?: 0,
             waitingForGuess = p["waiting"] == true,
+            p1Ready = p["p1Ready"] == true,
+            p2Ready = p["p2Ready"] == true,
         )
         return s to deadline
     }
-
-    private fun secsLeft(deadline: Long, max: Int): Int =
-        if (deadline <= 0) max else (((deadline - now()) + 999) / 1000).toInt().coerceIn(0, max)
 
     private fun numberOrNull(v: Any?): Int? = when (v) {
         is Long -> v.toInt()
