@@ -89,7 +89,6 @@ class MojBrojViewModel(
     private var latest: GameStateDto? = null
     private var renderedRound = -1
     private var lastResolvedRound = -1
-    private var lastReadySeq = 0L
     private var roundStarting = false
     private var advanced = false
 
@@ -121,7 +120,6 @@ class MojBrojViewModel(
             val target = puzzle?.targetNumber ?: (100..999).random()
             val numbers = puzzle?.numbers ?: drawNumbersFallback()
             renderedRound = round
-            lastReadySeq = 0L
             matchRepository.setGameState(
                 matchId, GAME_TYPE,
                 mapOf(
@@ -175,7 +173,8 @@ class MojBrojViewModel(
                 if (isHost) {
                     updateHostTimer()
                     maybeResolve()
-                    processGuestReady()
+                    syncReadyFromPayload()
+                    syncFinishedPhase()
                     checkBothReady()
                 } else {
                     rebuildState()
@@ -190,16 +189,19 @@ class MojBrojViewModel(
         if (s.phase != MojBrojPhase.RoundEnd) return
         if (isHost) {
             if (s.p1Ready) return
-            _state.update { it.copy(p1Ready = true) }
-            patchPayloadReady(p1Ready = true, p2Ready = s.p2Ready)
+            val p2Ready = latest?.payload?.get("p2Ready") == true || s.p2Ready
+            _state.update { it.copy(p1Ready = true, p2Ready = p2Ready) }
+            patchPayloadReady(p1Ready = true, p2Ready = p2Ready)
             checkBothReady()
         } else {
             if (s.p2Ready) return
+            val gs = latest ?: return
+            val payload = gs.payload.toMutableMap().apply { put("p2Ready", true) }
             _state.update { it.copy(p2Ready = true) }
             viewModelScope.launch {
                 matchRepository.patchGameState(
                     matchId, GAME_TYPE,
-                    mapOf("p2Input" to mapOf("t" to "ready", "seq" to System.currentTimeMillis())),
+                    mapOf("payload" to payload),
                 )
             }
         }
@@ -300,18 +302,28 @@ class MojBrojViewModel(
         }
     }
 
-    private fun processGuestReady() {
+    private fun syncReadyFromPayload() {
         val gs = latest ?: return
         if (gs.phase != "ROUND_END") return
-        val seq = longOrNull(gs.p2Input["seq"]) ?: return
-        if (seq <= lastReadySeq) return
-        if (gs.p2Input["t"] != "ready") return
-        lastReadySeq = seq
-        if (!_state.value.p2Ready) {
-            val p1Ready = _state.value.p1Ready
-            _state.update { it.copy(p2Ready = true) }
-            patchPayloadReady(p1Ready = p1Ready, p2Ready = true)
-            checkBothReady()
+        val p1 = gs.payload["p1Ready"] == true
+        val p2 = gs.payload["p2Ready"] == true
+        val s = _state.value
+        if (s.phase != MojBrojPhase.RoundEnd) return
+        if (s.p1Ready != p1 || s.p2Ready != p2) {
+            _state.update { it.copy(p1Ready = p1, p2Ready = p2) }
+        }
+    }
+
+    private fun syncFinishedPhase() {
+        val gs = latest ?: return
+        if (gs.phase != "FINISHED") return
+        if (_state.value.phase == MojBrojPhase.GameOver) return
+        _state.update {
+            it.copy(
+                phase = MojBrojPhase.GameOver,
+                player1Points = gs.p1Score,
+                player2Points = gs.p2Score,
+            )
         }
     }
 
@@ -321,7 +333,10 @@ class MojBrojViewModel(
         if (roundStarting) return
         roundStarting = true
         if (s.currentRound >= TOTAL_ROUNDS) {
-            if (advanced) return
+            if (advanced) {
+                roundStarting = false
+                return
+            }
             advanced = true
             viewModelScope.launch {
                 matchRepository.patchGameState(
@@ -334,11 +349,12 @@ class MojBrojViewModel(
                 )
                 matchRepository.advanceMatch(matchId, GAME_TYPE, s.player1Points, s.player2Points)
                 _state.update { it.copy(phase = MojBrojPhase.GameOver) }
+                roundStarting = false
             }
         } else {
             startRoundAsHost(round = s.currentRound + 1, p1Score = s.player1Points, p2Score = s.player2Points)
+            roundStarting = false
         }
-        roundStarting = false
     }
 
     private fun patchPayloadReady(p1Ready: Boolean, p2Ready: Boolean) {
@@ -432,7 +448,7 @@ class MojBrojViewModel(
                 iSubmitted = iSubmitted,
                 activeIsMe = activeIsMe,
                 p1Ready = gs.payload["p1Ready"] == true,
-                p2Ready = gs.payload["p2Ready"] == true || it.p2Ready,
+                p2Ready = gs.payload["p2Ready"] == true,
             )
         }
     }
