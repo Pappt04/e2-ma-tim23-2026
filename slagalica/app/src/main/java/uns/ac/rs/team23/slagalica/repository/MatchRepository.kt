@@ -5,6 +5,7 @@ import uns.ac.rs.team23.slagalica.network.dto.MatchResponseDto
 
 interface MatchRepository {
     suspend fun startRandomMatch(friendly: Boolean): Result<MatchResponseDto>
+    suspend fun tryJoinWaiting(username: String, friendly: Boolean): Result<MatchResponseDto?>
     suspend fun sendFriendInvite(friendId: String, friendly: Boolean): Result<MatchResponseDto>
     suspend fun getCurrentMatch(): Result<MatchResponseDto?>
     suspend fun submitScore(matchId: String, score: Int): Result<MatchResponseDto>

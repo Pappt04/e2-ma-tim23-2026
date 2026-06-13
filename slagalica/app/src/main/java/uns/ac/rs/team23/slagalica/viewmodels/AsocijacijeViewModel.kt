@@ -9,23 +9,25 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-
-// ─── Faze igre ──────────────────────────────────────────────────────────────
+import uns.ac.rs.team23.slagalica.data.MatchStore
+import uns.ac.rs.team23.slagalica.models.AsocijacijeColumnData
+import uns.ac.rs.team23.slagalica.models.AsocijacijeQuestion
+import uns.ac.rs.team23.slagalica.repository.GameRepository
+import uns.ac.rs.team23.slagalica.repository.MatchRepository
 
 enum class AsocijacijePhase {
     ROUND_INTRO,
+    LOADING,
     PLAYING,
     ROUND_END,
-    GAME_OVER
+    GAME_OVER,
 }
 
-// ─── Model jedne kolone ──────────────────────────────────────────────────────
-
 data class AsocijacijeColumn(
-    val words: List<String>,                             // 4 reči/fraze
-    val answer: String,                                  // rešenje kolone
+    val words: List<String>,
+    val answer: String,
     val revealedFields: List<Boolean> = List(4) { false },
-    val isSolved: Boolean = false
+    val isSolved: Boolean = false,
 )
 
 sealed interface GuessTarget {
@@ -33,99 +35,79 @@ sealed interface GuessTarget {
     data object Final : GuessTarget
 }
 
-// ─── Glavni state ────────────────────────────────────────────────────────────
-
 data class AsocijacijeState(
     val phase: AsocijacijePhase = AsocijacijePhase.ROUND_INTRO,
     val currentRound: Int = 1,
     val columns: List<AsocijacijeColumn> = emptyList(),
     val finalAnswer: String = "",
     val isFinalSolved: Boolean = false,
-    val activePlayer: Int = 1,           // 1 ili 2
+    val activePlayer: Int = 1,
     val secondsLeft: Int = 120,
     val player1Points: Int = 0,
     val player2Points: Int = 0,
     val guessInput: String = "",
-    val waitingForGuess: Boolean = false,  // posle otkrivanja, igrač može da pogađa
+    val waitingForGuess: Boolean = false,
     val selectedGuessTarget: GuessTarget? = null,
-    val wrongGuessTarget: GuessTarget? = null
+    val wrongGuessTarget: GuessTarget? = null,
+    val errorMessage: String? = null,
 )
 
-// ─── Mock pitanja ────────────────────────────────────────────────────────────
-
-private data class AsocijacijePuzzle(
-    val columns: List<AsocijacijeColumn>,
-    val finalAnswer: String
-)
-
-// ─── ViewModel ───────────────────────────────────────────────────────────────
-
-class AsocijacijeViewModel : ViewModel() {
+class AsocijacijeViewModel(
+    private val gameRepository: GameRepository,
+    private val matchRepository: MatchRepository,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(AsocijacijeState())
     val state: StateFlow<AsocijacijeState> = _state.asStateFlow()
 
     private var timerJob: Job? = null
+    private var loadedQuestion: AsocijacijeQuestion? = null
 
-    private val puzzles = listOf(
-        AsocijacijePuzzle(
-            columns = listOf(
-                AsocijacijeColumn(
-                    words = listOf("FUDBAL", "TRPEZARIJA", "SVEDSKA", "NOGA"),
-                    answer = "STO"
-                ),
-                AsocijacijeColumn(
-                    words = listOf("NAUKA", "FORMULA", "ANALIZA", "GIMNAZIJA"),
-                    answer = "MATEMATIKA"
-                ),
-                AsocijacijeColumn(
-                    words = listOf("ARMIKA", "ROK", "DOM", "POLICIJA"),
-                    answer = "VOJSKA"
-                ),
-                AsocijacijeColumn(
-                    words = listOf("RUKAVICE", "KAPA", "IGLA", "KARDIO"),
-                    answer = "HIRURG"
-                )
-            ),
-            finalAnswer = "OPERACIJA"
-        ),
-        AsocijacijePuzzle(
-            columns = listOf(
-                AsocijacijeColumn(
-                    words = listOf("PATIKE", "MUZIKA", "PANDORA", "CRNA"),
-                    answer = "KUTIJA"
-                ),
-                AsocijacijeColumn(
-                    words = listOf("TRKA", "LUDI", "REP", "TROJA"),
-                    answer = "KONJ"
-                ),
-                AsocijacijeColumn(
-                    words = listOf("RADIONICA", "MAJSTOR", "PIVO", "SKOLA"),
-                    answer = "ZANAT"
-                ),
-                AsocijacijeColumn(
-                    words = listOf("CILJ", "CISCENJE", "SMIRENJE", "PLACANJE"),
-                    answer = "CILJ"
-                )
-            ),
-            finalAnswer = "ALAT"
-        )
-    )
+    init {
+        preloadQuestion()
+    }
+
+    private fun preloadQuestion() {
+        viewModelScope.launch {
+            gameRepository.getAsocijacijeQuestion()
+                .onSuccess { loadedQuestion = it }
+                .onFailure { _state.update { s -> s.copy(errorMessage = it.message) } }
+        }
+    }
 
     fun startRound() {
-        val puzzle = puzzles[(_state.value.currentRound - 1).coerceIn(0, puzzles.size - 1)]
+        val question = loadedQuestion
+        if (question == null) {
+            _state.update { it.copy(phase = AsocijacijePhase.LOADING) }
+            viewModelScope.launch {
+                gameRepository.getAsocijacijeQuestion()
+                    .onSuccess { q ->
+                        loadedQuestion = q
+                        applyQuestion(q)
+                    }
+                    .onFailure { err ->
+                        _state.update { it.copy(phase = AsocijacijePhase.ROUND_INTRO, errorMessage = err.message) }
+                    }
+            }
+            return
+        }
+        applyQuestion(question)
+    }
+
+    private fun applyQuestion(question: AsocijacijeQuestion) {
         _state.update { s ->
             s.copy(
                 phase = AsocijacijePhase.PLAYING,
-                columns = puzzle.columns,
-                finalAnswer = puzzle.finalAnswer,
+                columns = question.columns.map { AsocijacijeColumn(words = it.words, answer = it.answer) },
+                finalAnswer = question.finalAnswer,
                 isFinalSolved = false,
                 activePlayer = if (s.currentRound == 1) 1 else 2,
                 secondsLeft = 120,
                 guessInput = "",
                 waitingForGuess = false,
                 selectedGuessTarget = null,
-                wrongGuessTarget = null
+                wrongGuessTarget = null,
+                errorMessage = null,
             )
         }
         startTimer()
@@ -138,17 +120,14 @@ class AsocijacijeViewModel : ViewModel() {
                 delay(1000L)
                 _state.update { it.copy(secondsLeft = it.secondsLeft - 1) }
             }
-            if (_state.value.phase == AsocijacijePhase.PLAYING) {
-                endRound()
-            }
+            if (_state.value.phase == AsocijacijePhase.PLAYING) endRound()
         }
     }
 
-    // Igrač klikne na polje da ga otkrije
     fun revealField(col: Int, row: Int) {
         val s = _state.value
         if (s.phase != AsocijacijePhase.PLAYING) return
-        if (s.waitingForGuess) return       // mora da pogodi ili da proda pre otkrivanja
+        if (s.waitingForGuess) return
         if (col !in s.columns.indices) return
         val column = s.columns[col]
         if (column.revealedFields[row] || column.isSolved) return
@@ -163,7 +142,7 @@ class AsocijacijeViewModel : ViewModel() {
                 waitingForGuess = true,
                 guessInput = "",
                 selectedGuessTarget = null,
-                wrongGuessTarget = null
+                wrongGuessTarget = null,
             )
         }
     }
@@ -172,13 +151,8 @@ class AsocijacijeViewModel : ViewModel() {
         val s = _state.value
         if (s.phase != AsocijacijePhase.PLAYING || !canGuessNow(s)) return
         when (target) {
-            is GuessTarget.Column -> {
-                val col = s.columns.getOrNull(target.index) ?: return
-                if (col.isSolved) return
-            }
-            GuessTarget.Final -> {
-                if (s.isFinalSolved) return
-            }
+            is GuessTarget.Column -> if (s.columns.getOrNull(target.index)?.isSolved == true) return
+            GuessTarget.Final -> if (s.isFinalSolved) return
         }
         _state.update { it.copy(selectedGuessTarget = target, guessInput = "", wrongGuessTarget = null) }
     }
@@ -189,18 +163,17 @@ class AsocijacijeViewModel : ViewModel() {
 
     fun submitGuess() {
         val s = _state.value
-        if (s.phase != AsocijacijePhase.PLAYING) return
-        if (!canGuessNow(s)) return
-        val selectedTarget = s.selectedGuessTarget ?: return
+        if (s.phase != AsocijacijePhase.PLAYING || !canGuessNow(s)) return
+        val target = s.selectedGuessTarget ?: return
         val guess = s.guessInput.trim()
         if (guess.isEmpty()) return
 
-        when (selectedTarget) {
+        when (target) {
             is GuessTarget.Column -> {
-                val targetColumn = s.columns.getOrNull(selectedTarget.index) ?: return
-                if (targetColumn.isSolved) return
-                if (guess.equals(targetColumn.answer, ignoreCase = true)) {
-                    solveColumn(selectedTarget.index)
+                val col = s.columns.getOrNull(target.index) ?: return
+                if (col.isSolved) return
+                if (guess.equals(col.answer, ignoreCase = true)) {
+                    solveColumn(target.index)
                     return
                 }
             }
@@ -214,31 +187,30 @@ class AsocijacijeViewModel : ViewModel() {
 
         _state.update {
             it.copy(
-                wrongGuessTarget = selectedTarget,
+                wrongGuessTarget = target,
                 waitingForGuess = false,
                 guessInput = "",
-                selectedGuessTarget = null
+                selectedGuessTarget = null,
             )
         }
         viewModelScope.launch {
             delay(1000L)
             if (_state.value.phase == AsocijacijePhase.PLAYING) {
-                _state.update { current -> current.copy(wrongGuessTarget = null) }
+                _state.update { it.copy(wrongGuessTarget = null) }
                 switchPlayer()
             } else {
-                _state.update { current -> current.copy(wrongGuessTarget = null) }
+                _state.update { it.copy(wrongGuessTarget = null) }
             }
         }
     }
 
-    // Igrač proda (ne želi da pogađa, prelazi red)
     fun passGuess() {
         _state.update {
             it.copy(
                 waitingForGuess = false,
                 guessInput = "",
                 selectedGuessTarget = null,
-                wrongGuessTarget = null
+                wrongGuessTarget = null,
             )
         }
         switchPlayer()
@@ -248,7 +220,7 @@ class AsocijacijeViewModel : ViewModel() {
         val s = _state.value
         val column = s.columns[col]
         val unrevealedCount = column.revealedFields.count { !it }
-        val colPoints = 2 + unrevealedCount   // f) 2 boda + 1 bod za svako neotvoreno
+        val colPoints = 2 + unrevealedCount
 
         val newColumns = s.columns.toMutableList().also {
             it[col] = column.copy(isSolved = true, revealedFields = List(4) { true })
@@ -264,7 +236,7 @@ class AsocijacijeViewModel : ViewModel() {
                 guessInput = "",
                 waitingForGuess = true,
                 selectedGuessTarget = null,
-                wrongGuessTarget = null
+                wrongGuessTarget = null,
             )
         }
         if (newColumns.all { it.isSolved }) endRound()
@@ -272,16 +244,11 @@ class AsocijacijeViewModel : ViewModel() {
 
     private fun solveFinal() {
         val s = _state.value
-        // g) 7 + 6 za svaku neotvorenu kolonu + bodovi za otvorene
         var points = 7
         for (col in s.columns) {
             if (!col.isSolved) {
                 val anyRevealed = col.revealedFields.any { it }
-                if (!anyRevealed) {
-                    points += 6  // potpuno neotvorena kolona
-                } else {
-                    points += 2 + col.revealedFields.count { !it }  // delimično otvorena
-                }
+                points += if (!anyRevealed) 6 else 2 + col.revealedFields.count { !it }
             }
         }
 
@@ -295,7 +262,7 @@ class AsocijacijeViewModel : ViewModel() {
                 player2Points = newP2,
                 guessInput = "",
                 selectedGuessTarget = null,
-                wrongGuessTarget = null
+                wrongGuessTarget = null,
             )
         }
         endRound()
@@ -307,8 +274,10 @@ class AsocijacijeViewModel : ViewModel() {
 
     private fun endRound() {
         timerJob?.cancel()
-        if (_state.value.currentRound >= 2) {
+        val s = _state.value
+        if (s.currentRound >= 2) {
             _state.update { it.copy(phase = AsocijacijePhase.GAME_OVER) }
+            submitMatchScore(s.player1Points)
         } else {
             _state.update { it.copy(phase = AsocijacijePhase.ROUND_END) }
         }
@@ -316,21 +285,25 @@ class AsocijacijeViewModel : ViewModel() {
 
     fun nextRound() {
         _state.update { it.copy(currentRound = 2, phase = AsocijacijePhase.ROUND_INTRO) }
+        loadedQuestion = null
+        preloadQuestion()
     }
 
-    override fun onCleared() {
-        super.onCleared()
-        timerJob?.cancel()
+    private fun submitMatchScore(score: Int) {
+        val matchId = MatchStore.matchId
+        if (matchId.isBlank()) return
+        viewModelScope.launch {
+            matchRepository.submitScore(matchId, score)
+        }
     }
 
     private fun canGuessNow(state: AsocijacijeState): Boolean {
         if (state.waitingForGuess) return true
-        return !hasRevealableFields(state)
+        return !state.columns.any { col -> !col.isSolved && col.revealedFields.any { !it } }
     }
 
-    private fun hasRevealableFields(state: AsocijacijeState): Boolean {
-        return state.columns.any { column ->
-            !column.isSolved && column.revealedFields.any { revealed -> !revealed }
-        }
+    override fun onCleared() {
+        timerJob?.cancel()
+        super.onCleared()
     }
 }

@@ -10,3 +10,14 @@ data class MojBrojPuzzle(
     val targetNumber: Int,
     val numbers: List<Int>,
 )
+
+data class AsocijacijeColumnData(
+    val words: List<String>,
+    val answer: String,
+)
+
+data class AsocijacijeQuestion(
+    val id: String,
+    val columns: List<AsocijacijeColumnData>,
+    val finalAnswer: String,
+)
