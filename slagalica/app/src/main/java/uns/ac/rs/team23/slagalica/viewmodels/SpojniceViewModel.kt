@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
+import uns.ac.rs.team23.slagalica.repository.StatisticsRepository
 
 enum class SpojnicePhase {
     ROUND_INTRO,
@@ -58,6 +59,7 @@ data class SpojniceState(
  */
 class SpojniceViewModel(
     private val matchRepository: MatchRepository,
+    private val statisticsRepository: StatisticsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SpojniceState())
@@ -77,6 +79,23 @@ class SpojniceViewModel(
     private var mySeq: Long = 0
     private var advanced = false
     private var roundStarting = false
+    /** Stats guard so the local player's connections are recorded once at game end. */
+    private var statRecorded = false
+
+    private fun recordStats(increments: Map<String, Long>) {
+        if (matchId.isBlank() || MatchStore.isFriendly) return
+        viewModelScope.launch { statisticsRepository.recordGameStats(GAME_TYPE, increments) }
+    }
+
+    /** Record the local player's successful connections vs the 10 possible (once, at game end). */
+    private fun maybeRecordStats() {
+        val s = _state.value
+        if (s.phase != SpojnicePhase.GAME_OVER || statRecorded) return
+        statRecorded = true
+        val myPoints = if (isHost) s.player1Points else s.player2Points
+        // Each successful connection is worth 2 points; 5 terms per round over 2 rounds = 10 max.
+        recordStats(mapOf("connected" to (myPoints / 2).toLong(), "total" to 10L))
+    }
 
     fun enter() {
         if (started) return
@@ -146,6 +165,7 @@ class SpojniceViewModel(
             handleTimeout()
         }
         if (isHost) processGuestIntent()
+        maybeRecordStats()
     }
 
     // --- Public actions (screen) ---

@@ -2,9 +2,12 @@ package uns.ac.rs.team23.slagalica.repository
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
+import uns.ac.rs.team23.slagalica.models.GameDetailStats
 import uns.ac.rs.team23.slagalica.models.GameTypeStatistic
 import uns.ac.rs.team23.slagalica.models.PlayerStatistics
 
@@ -95,7 +98,47 @@ class FirebaseStatisticsRepository(
             totalPoints = totalPoints,
             bestMatchScore = bestMatchScore,
             perGame = perGameStats,
+            detail = readGameDetail(uid),
         )
+    }
+
+    /** Reads the per-game detail counters from the `users/{uid}/stats` subcollection. */
+    private suspend fun readGameDetail(uid: String): GameDetailStats {
+        val snap = firestore.collection("users").document(uid).collection("stats").get().await()
+        val byType = snap.documents.associateBy { it.id }
+        fun n(doc: DocumentSnapshot?, key: String) = (doc?.getLong(key) ?: 0L).toInt()
+        val ko = byType["KO_ZNA_ZNA"]
+        val mb = byType["MOJ_BROJ"]
+        val kpk = byType["KORAK_PO_KORAK"]
+        val aso = byType["ASOCIJACIJE"]
+        val sko = byType["SKOCKO"]
+        val spo = byType["SPOJNICE"]
+        return GameDetailStats(
+            koCorrect = n(ko, "correct"),
+            koIncorrect = n(ko, "incorrect"),
+            mbFound = n(mb, "found"),
+            mbRounds = n(mb, "rounds"),
+            korakSteps = (1..7).map { n(kpk, "step$it") },
+            korakSolved = n(kpk, "solved"),
+            asoSolved = n(aso, "solved"),
+            asoUnsolved = n(aso, "unsolved"),
+            skockoAttempts = (1..6).map { n(sko, "attempt$it") },
+            spojniceConnected = n(spo, "connected"),
+            spojniceTotal = n(spo, "total"),
+        )
+    }
+
+    override suspend fun recordGameStats(
+        gameType: String,
+        increments: Map<String, Long>,
+    ): Result<Unit> = runCatching {
+        if (increments.isEmpty()) return@runCatching
+        val uid = auth.currentUser?.uid ?: return@runCatching
+        val data = increments.mapValues { FieldValue.increment(it.value) }
+        firestore.collection("users").document(uid)
+            .collection("stats").document(gameType)
+            .set(data, SetOptions.merge())
+            .await()
     }
 
     private fun scoreFor(match: DocumentSnapshot, isPlayer1: Boolean): Int {

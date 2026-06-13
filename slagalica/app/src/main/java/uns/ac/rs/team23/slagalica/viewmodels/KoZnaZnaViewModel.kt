@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
+import uns.ac.rs.team23.slagalica.repository.StatisticsRepository
 
 enum class KoZnaZnaPhase {
     ROUND_INTRO,
@@ -51,6 +52,7 @@ data class KoZnaZnaState(
  */
 class KoZnaZnaViewModel(
     private val matchRepository: MatchRepository,
+    private val statisticsRepository: StatisticsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(KoZnaZnaState())
@@ -68,6 +70,29 @@ class KoZnaZnaViewModel(
 
     /** Host guard so each question is resolved exactly once. */
     private var lastResolvedIndex = -1
+
+    /** Stats guard: highest question index already tallied into the local player's stats. */
+    private var lastStatTalliedIndex = -1
+
+    private fun recordStats(increments: Map<String, Long>) {
+        if (matchId.isBlank() || MatchStore.isFriendly) return
+        viewModelScope.launch { statisticsRepository.recordGameStats(GAME_TYPE, increments) }
+    }
+
+    /** Tally the local player's hit/miss for every question that has finished resolving. */
+    private fun tallyLocalAnswers(gs: GameStateDto, questions: List<KoZnaZnaQuestion>) {
+        if (matchId.isBlank() || MatchStore.isFriendly) return
+        val myInput = if (isHost) gs.p1Input else gs.p2Input
+        // Questions strictly before gs.index are done; at FINISHED the current one is done too.
+        val resolvedUpTo = if (gs.phase == "FINISHED") gs.index else gs.index - 1
+        while (lastStatTalliedIndex < resolvedUpTo) {
+            val q = lastStatTalliedIndex + 1
+            val correctIndex = questions.getOrNull(q)?.correctIndex ?: break
+            val answer = answerFor(myInput, q)?.first
+            recordStats(mapOf((if (answer == correctIndex) "correct" else "incorrect") to 1L))
+            lastStatTalliedIndex = q
+        }
+    }
 
     /** Called once when the screen opens. */
     fun enter() {
@@ -243,6 +268,7 @@ class KoZnaZnaViewModel(
             return
         }
         val questions = parseQuestions(gs.payload)
+        tallyLocalAnswers(gs, questions)
         val now = System.currentTimeMillis()
         val qLeft = if (gs.deadlineAt > 0)
             (((gs.deadlineAt - now) + 999) / 1000).toInt().coerceIn(0, 5) else 5

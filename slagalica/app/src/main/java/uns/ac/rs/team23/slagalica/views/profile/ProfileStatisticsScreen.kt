@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
@@ -32,6 +33,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.models.GameDetailStats
 import uns.ac.rs.team23.slagalica.models.PlayerStatistics
 import uns.ac.rs.team23.slagalica.viewmodels.StatisticsUiState
 import uns.ac.rs.team23.slagalica.viewmodels.StatisticsViewModel
@@ -144,6 +146,8 @@ private fun StatisticsContent(stats: PlayerStatistics) {
             )
         }
 
+        detailSections(stats.detail)
+
         if (stats.perGame.isNotEmpty()) {
             item {
                 StatsSectionTitle("Average Points by Game")
@@ -175,6 +179,83 @@ private fun StatisticsContent(stats: PlayerStatistics) {
 private fun Double.roundedPercent(): Int = Math.round(this).toInt()
 
 private fun Double.oneDecimal(): String = String.format("%.1f", this)
+
+private fun pct(part: Int, total: Int): Int =
+    if (total <= 0) 0 else Math.round(part * 100.0 / total).toInt()
+
+/** Spec-required per-game ratios (req 2.c.ii–vii), shown only for games with recorded data. */
+private fun LazyListScope.detailSections(d: GameDetailStats) {
+    val koTotal = d.koCorrect + d.koIncorrect
+    if (koTotal > 0) item {
+        StatsSectionTitle("Ko zna zna")
+        StatsTableCard(
+            subtitle = "Share of answers",
+            rows = listOf(
+                TableRowData("Correct", "${d.koCorrect}  (${pct(d.koCorrect, koTotal)}%)"),
+                TableRowData("Incorrect", "${d.koIncorrect}  (${pct(d.koIncorrect, koTotal)}%)"),
+            ),
+        )
+    }
+
+    if (d.mbRounds > 0) item {
+        val miss = d.mbRounds - d.mbFound
+        StatsSectionTitle("Moj broj")
+        StatsTableCard(
+            subtitle = "Exact target number found",
+            rows = listOf(
+                TableRowData("Hit", "${d.mbFound} / ${d.mbRounds}  (${pct(d.mbFound, d.mbRounds)}%)"),
+                TableRowData("Miss", "$miss / ${d.mbRounds}  (${pct(miss, d.mbRounds)}%)"),
+            ),
+        )
+    }
+
+    val korakTotal = d.korakSteps.sum()
+    if (korakTotal > 0) item {
+        StatsSectionTitle("Korak po korak")
+        StatsTableCard(
+            subtitle = "Concept guessed at step",
+            rows = d.korakSteps.mapIndexedNotNull { i, c ->
+                if (c == 0) null else TableRowData("Step ${i + 1}", "$c  (${pct(c, korakTotal)}%)")
+            },
+        )
+    }
+
+    val asoTotal = d.asoSolved + d.asoUnsolved
+    if (asoTotal > 0) item {
+        StatsSectionTitle("Asocijacije")
+        StatsTableCard(
+            subtitle = "Columns & final solution",
+            rows = listOf(
+                TableRowData("Solved", "${d.asoSolved}  (${pct(d.asoSolved, asoTotal)}%)"),
+                TableRowData("Unsolved", "${d.asoUnsolved}  (${pct(d.asoUnsolved, asoTotal)}%)"),
+            ),
+        )
+    }
+
+    val skoTotal = d.skockoAttempts.sum()
+    if (skoTotal > 0) item {
+        StatsSectionTitle("Skočko")
+        StatsTableCard(
+            subtitle = "Combination solved on attempt",
+            rows = d.skockoAttempts.mapIndexedNotNull { i, c ->
+                if (c == 0) null else TableRowData("Attempt ${i + 1}", "$c  (${pct(c, skoTotal)}%)")
+            },
+        )
+    }
+
+    if (d.spojniceTotal > 0) item {
+        StatsSectionTitle("Spojnice")
+        StatsTableCard(
+            subtitle = "Successfully connected concepts",
+            rows = listOf(
+                TableRowData(
+                    "Connected",
+                    "${d.spojniceConnected} / ${d.spojniceTotal}  (${pct(d.spojniceConnected, d.spojniceTotal)}%)",
+                ),
+            ),
+        )
+    }
+}
 
 @Composable
 private fun StatsSectionTitle(title: String) {

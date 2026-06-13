@@ -72,4 +72,7 @@ dependencies {
     implementation(platform(libs.koin.bom))
     implementation(libs.koin.android)
     implementation(libs.koin.androidx.compose)
+
+    // QR code generation (friend-invite QR on the profile)
+    implementation("com.google.zxing:core:3.4.0")
 }

@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
+import uns.ac.rs.team23.slagalica.repository.StatisticsRepository
 
 // ─── Simboli ───────────────────────────────────────────────────────────────
 
@@ -70,6 +71,7 @@ data class SkockoState(
  */
 class SkockoViewModel(
     private val matchRepository: MatchRepository,
+    private val statisticsRepository: StatisticsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(SkockoState())
@@ -89,8 +91,40 @@ class SkockoViewModel(
     private var mySeq: Long = 0
     private var advanced = false
     private var roundStarting = false
+    /** Stats guard: round whose outcome was already recorded for the local player. */
+    private var lastStatRound = -1
 
     private val syms = SkockoSymbol.values()
+
+    private fun recordStats(increments: Map<String, Long>) {
+        if (matchId.isBlank() || MatchStore.isFriendly) return
+        viewModelScope.launch { statisticsRepository.recordGameStats(GAME_TYPE, increments) }
+    }
+
+    /**
+     * Records this round's outcome for the local player once it concludes: the attempt the main
+     * player solved on, a successful steal by the opponent, or a miss by the main player.
+     */
+    private fun maybeRecordRoundStats() {
+        val s = _state.value
+        if (s.currentRound == lastStatRound) return
+        val iAmMain = s.activePlayerIsP1 == isHost
+        if (s.roundSolved) {
+            lastStatRound = s.currentRound
+            val lastAtt = s.attempts.lastOrNull() ?: return
+            if (!lastAtt.isOpponentAttempt) {
+                if (iAmMain) {
+                    val n = s.attempts.count { !it.isOpponentAttempt }.coerceIn(1, 6)
+                    recordStats(mapOf("attempt$n" to 1L))
+                }
+            } else if (!iAmMain) {
+                recordStats(mapOf("steal" to 1L))
+            }
+        } else if (s.phase == SkockoPhase.ROUND_END) {
+            lastStatRound = s.currentRound
+            if (iAmMain) recordStats(mapOf("failed" to 1L))
+        }
+    }
 
     fun enter() {
         if (started) return
@@ -165,6 +199,7 @@ class SkockoViewModel(
             handleTimeout()
         }
         if (isHost) processGuestIntent()
+        maybeRecordRoundStats()
     }
 
     // --- Public actions (screen) ---

@@ -48,15 +48,15 @@ val AppModule = module {
 
     // ViewModels
     viewModel { AuthViewModel(get()) }
-    viewModel { KorakPoKorakViewModel(get(), get()) }
-    viewModel { MojBrojViewModel(get(), get()) }
+    viewModel { KorakPoKorakViewModel(get(), get(), get()) }
+    viewModel { MojBrojViewModel(get(), get(), get()) }
     viewModel { LobbyViewModel(get()) }
     viewModelOf(::ChatViewModel)
     viewModelOf(::ChallengeViewModel)
     viewModel { NotificationsViewModel(get(), get()) }
-    viewModel { SkockoViewModel(get()) }
-    viewModel { AsocijacijeViewModel(get(), get()) }
-    viewModel { KoZnaZnaViewModel(get()) }
-    viewModel { SpojniceViewModel(get()) }
+    viewModel { SkockoViewModel(get(), get()) }
+    viewModel { AsocijacijeViewModel(get(), get(), get()) }
+    viewModel { KoZnaZnaViewModel(get(), get()) }
+    viewModel { SpojniceViewModel(get(), get()) }
     viewModel { StatisticsViewModel(get()) }
 }

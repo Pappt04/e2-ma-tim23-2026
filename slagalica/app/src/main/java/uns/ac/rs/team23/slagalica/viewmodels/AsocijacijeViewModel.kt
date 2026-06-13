@@ -14,6 +14,7 @@ import uns.ac.rs.team23.slagalica.models.AsocijacijeQuestion
 import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.repository.GameRepository
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
+import uns.ac.rs.team23.slagalica.repository.StatisticsRepository
 
 enum class AsocijacijePhase {
     ROUND_INTRO,
@@ -66,6 +67,7 @@ data class AsocijacijeState(
 class AsocijacijeViewModel(
     private val gameRepository: GameRepository,
     private val matchRepository: MatchRepository,
+    private val statisticsRepository: StatisticsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(AsocijacijeState())
@@ -85,6 +87,23 @@ class AsocijacijeViewModel(
     private var mySeq: Long = 0
     private var advanced = false
     private var roundStarting = false
+    /** Stats guard: round whose unsolved items were already recorded. */
+    private var lastStatRound = -1
+
+    private fun recordStats(increments: Map<String, Long>) {
+        if (matchId.isBlank() || MatchStore.isFriendly) return
+        viewModelScope.launch { statisticsRepository.recordGameStats(GAME_TYPE, increments) }
+    }
+
+    /** Record how many columns/the final were left unsolved this round (once per round). */
+    private fun maybeRecordRoundStats() {
+        val s = _state.value
+        if (s.phase != AsocijacijePhase.ROUND_END || s.currentRound == lastStatRound) return
+        if (s.columns.isEmpty()) return
+        lastStatRound = s.currentRound
+        val unsolved = s.columns.count { !it.isSolved } + (if (s.isFinalSolved) 0 else 1)
+        if (unsolved > 0) recordStats(mapOf("unsolved" to unsolved.toLong()))
+    }
 
     fun enter() {
         if (started) return
@@ -129,6 +148,7 @@ class AsocijacijeViewModel(
             handleTimeout()
         }
         if (isHost) processGuestIntent()
+        maybeRecordRoundStats()
     }
 
     // --- Public actions (screen) ---
@@ -189,6 +209,8 @@ class AsocijacijeViewModel(
         }
         if (authoritative) applySubmit(targetCode, guess)
         else sendIntent(mapOf("t" to "guess", "tg" to targetCode, "g" to guess))
+        // Spec stat: count each column/final the local player personally solves.
+        if (correct) recordStats(mapOf("solved" to 1L))
         // Local flash for the submitting device; cleared after a short beat.
         _state.update {
             it.copy(guessInput = "", selectedGuessTarget = null, wrongGuessTarget = if (correct) null else target)
