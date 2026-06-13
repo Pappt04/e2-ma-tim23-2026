@@ -26,8 +26,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPhase
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakViewModel
+import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,11 +65,6 @@ fun KorakPoKorakScreen(
                         )
                     }
                 },
-                navigationIcon = {
-                    IconButton(onClick = onFinish) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
                 actions = {
                     if (state.phase == KorakPhase.PlayerTurn || state.phase == KorakPhase.OpponentChance) {
                         Text(
@@ -99,13 +96,27 @@ fun KorakPoKorakScreen(
                 KorakPhase.Loading -> Box(
                     modifier = Modifier.fillMaxSize(),
                     contentAlignment = Alignment.Center,
-                ) { CircularProgressIndicator() }
-                KorakPhase.RoundIntro -> RoundIntroContent(
-                    round = state.currentRound,
-                    activeName = activeName,
-                    maxPoints = 20,
-                    onStart = viewModel::beginRound,
-                )
+                ) {
+                    if (state.errorMessage != null) {
+                        Text(state.errorMessage!!, color = MaterialTheme.colorScheme.error)
+                    } else {
+                        CircularProgressIndicator()
+                    }
+                }
+                KorakPhase.RoundIntro -> {
+                    if (state.errorMessage != null) {
+                        Box(Modifier.fillMaxSize().padding(24.dp), contentAlignment = Alignment.Center) {
+                            Text(state.errorMessage!!, color = MaterialTheme.colorScheme.error)
+                        }
+                    } else {
+                        RoundIntroContent(
+                            round = state.currentRound,
+                            activeName = activeName,
+                            maxPoints = 20,
+                            onStart = viewModel::beginRound,
+                        )
+                    }
+                }
                 KorakPhase.PlayerTurn -> ActiveTurnContent(
                     state = state,
                     turnLabel = "$activeName's turn",
@@ -124,7 +135,9 @@ fun KorakPoKorakScreen(
                     state = state,
                     player1Name = player1Name,
                     player2Name = player2Name,
-                    onNext = viewModel::prepareNextRound,
+                    myReady = if (MatchStore.isHost) state.p1Ready else state.p2Ready,
+                    opponentReady = if (MatchStore.isHost) state.p2Ready else state.p1Ready,
+                    onReady = viewModel::markReady,
                 )
                 KorakPhase.GameOver -> GameOverContent(
                     state = state,

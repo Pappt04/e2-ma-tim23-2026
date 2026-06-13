@@ -72,11 +72,6 @@ fun KoZnaZnaScreen(
                         )
                     }
                 },
-                navigationIcon = {
-                    IconButton(onClick = onFinish) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
             )
         },
     ) { innerPadding ->

@@ -50,10 +50,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.ExprToken
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojPhase
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojState
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojViewModel
+import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 import kotlin.math.sqrt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -105,11 +107,6 @@ fun MojBrojScreen(
                         )
                     }
                 },
-                navigationIcon = {
-                    IconButton(onClick = onFinish) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
-                    }
-                },
                 actions = {
                     val timerText = when (state.phase) {
                         MojBrojPhase.Player1Input, MojBrojPhase.Player2Input -> "${state.playSecondsLeft}s"
@@ -155,11 +152,15 @@ fun MojBrojScreen(
                     state = state,
                     player1Name = player1Name,
                     player2Name = player2Name,
+                    myReady = if (MatchStore.isHost) state.p1Ready else state.p2Ready,
+                    opponentReady = if (MatchStore.isHost) state.p2Ready else state.p1Ready,
+                    onReady = viewModel::markReady,
                 )
                 MojBrojPhase.GameOver -> GameOverContent(
                     state = state,
                     player1Name = player1Name,
                     player2Name = player2Name,
+                    onFinish = onFinish,
                 )
                 else -> WaitingContent("Syncing with $player2Name...")
             }
@@ -294,6 +295,9 @@ private fun RoundEndContent(
     state: MojBrojState,
     player1Name: String,
     player2Name: String,
+    myReady: Boolean,
+    opponentReady: Boolean,
+    onReady: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -306,11 +310,7 @@ private fun RoundEndContent(
             fontWeight = FontWeight.Bold,
         )
         ResultsCard(state = state, player1Name = player1Name, player2Name = player2Name)
-        Text(
-            text = "Next round starting...",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        RoundReadyButton(myReady = myReady, opponentReady = opponentReady, onReady = onReady)
     }
 }
 
@@ -319,6 +319,7 @@ private fun GameOverContent(
     state: MojBrojState,
     player1Name: String,
     player2Name: String,
+    onFinish: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -343,11 +344,9 @@ private fun GameOverContent(
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
-        Text(
-            text = "Next game starting...",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Button(onClick = onFinish, modifier = Modifier.fillMaxWidth()) {
+            Text("Back to Games")
+        }
     }
 }
 
