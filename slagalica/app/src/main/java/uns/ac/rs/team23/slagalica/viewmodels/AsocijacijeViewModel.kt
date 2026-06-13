@@ -10,8 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import uns.ac.rs.team23.slagalica.data.MatchStore
-import uns.ac.rs.team23.slagalica.models.AsocijacijeColumnData
 import uns.ac.rs.team23.slagalica.models.AsocijacijeQuestion
+import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.repository.GameRepository
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 
@@ -52,6 +52,15 @@ data class AsocijacijeState(
     val errorMessage: String? = null,
 )
 
+/**
+ * Real-time, host-authoritative "Asocijacije".
+ *
+ * The host fetches one question and writes the whole [AsocijacijeState] into the game-state
+ * `payload` so both players see the identical board. The host owns the 2-minute deadline and
+ * applies both its own and the guest's moves (reveals/guesses arrive as intents through `p2Input`).
+ * The active player alternates (round 1 → player 1, round 2 → player 2; a wrong guess passes the
+ * turn). `guessInput`/`selectedGuessTarget`/`wrongGuessTarget` are local UI only and never synced.
+ */
 class AsocijacijeViewModel(
     private val gameRepository: GameRepository,
     private val matchRepository: MatchRepository,
@@ -60,96 +69,75 @@ class AsocijacijeViewModel(
     private val _state = MutableStateFlow(AsocijacijeState())
     val state: StateFlow<AsocijacijeState> = _state.asStateFlow()
 
-    private var timerJob: Job? = null
-    private var loadedQuestion: AsocijacijeQuestion? = null
+    private var started = false
+    private var matchId: String = ""
+    private var isHost: Boolean = false
+    private val authoritative: Boolean get() = isHost || matchId.isBlank()
 
-    init {
-        preloadQuestion()
-    }
+    private var observerJob: Job? = null
+    private var loopJob: Job? = null
+    private var latest: GameStateDto? = null
+    private var deadlineAt: Long = 0
+    private var lastHandledDeadline: Long = -1
+    private var lastIntentSeq: Long = -1
+    private var mySeq: Long = 0
+    private var advanced = false
 
-    private fun preloadQuestion() {
-        viewModelScope.launch {
-            gameRepository.getAsocijacijeQuestion()
-                .onSuccess { loadedQuestion = it }
-                .onFailure { _state.update { s -> s.copy(errorMessage = it.message) } }
-        }
-    }
+    fun enter() {
+        if (started) return
+        started = true
+        matchId = MatchStore.matchId
+        isHost = MatchStore.isHost
 
-    fun startRound() {
-        val question = loadedQuestion
-        if (question == null) {
+        if (matchId.isNotBlank()) {
             _state.update { it.copy(phase = AsocijacijePhase.LOADING) }
-            viewModelScope.launch {
-                gameRepository.getAsocijacijeQuestion()
-                    .onSuccess { q ->
-                        loadedQuestion = q
-                        applyQuestion(q)
-                    }
-                    .onFailure { err ->
-                        _state.update { it.copy(phase = AsocijacijePhase.ROUND_INTRO, errorMessage = err.message) }
-                    }
+            observerJob = viewModelScope.launch {
+                matchRepository.observeGameState(matchId, GAME_TYPE).collect { gs ->
+                    latest = gs
+                    if (gs != null) rebuildState(gs)
+                }
             }
-            return
+            if (isHost) hostStartRound(1)
+        } else {
+            hostStartRound(1)
         }
-        applyQuestion(question)
+        startLoop()
     }
 
-    private fun applyQuestion(question: AsocijacijeQuestion) {
-        _state.update { s ->
-            s.copy(
-                phase = AsocijacijePhase.PLAYING,
-                columns = question.columns.map { AsocijacijeColumn(words = it.words, answer = it.answer) },
-                finalAnswer = question.finalAnswer,
-                isFinalSolved = false,
-                activePlayer = if (s.currentRound == 1) 1 else 2,
-                secondsLeft = 120,
-                guessInput = "",
-                waitingForGuess = false,
-                selectedGuessTarget = null,
-                wrongGuessTarget = null,
-                errorMessage = null,
-            )
-        }
-        startTimer()
-    }
-
-    private fun startTimer() {
-        timerJob?.cancel()
-        timerJob = viewModelScope.launch {
-            while (_state.value.secondsLeft > 0 && _state.value.phase == AsocijacijePhase.PLAYING) {
-                delay(1000L)
-                _state.update { it.copy(secondsLeft = it.secondsLeft - 1) }
+    private fun startLoop() {
+        loopJob?.cancel()
+        loopJob = viewModelScope.launch {
+            while (true) {
+                tick()
+                delay(200)
             }
-            if (_state.value.phase == AsocijacijePhase.PLAYING) endRound()
         }
     }
 
-    fun revealField(col: Int, row: Int) {
+    private fun tick() {
         val s = _state.value
-        if (s.phase != AsocijacijePhase.PLAYING) return
-        if (s.waitingForGuess) return
-        if (col !in s.columns.indices) return
-        val column = s.columns[col]
-        if (column.revealedFields[row] || column.isSolved) return
-
-        val newRevealed = column.revealedFields.toMutableList().also { it[row] = true }
-        val newColumns = s.columns.toMutableList().also {
-            it[col] = column.copy(revealedFields = newRevealed)
+        val now = now()
+        if (deadlineAt > 0 && s.phase == AsocijacijePhase.PLAYING) {
+            val left = (((deadlineAt - now) + 999) / 1000).toInt().coerceIn(0, 120)
+            if (left != s.secondsLeft) _state.update { it.copy(secondsLeft = left) }
         }
-        _state.update {
-            it.copy(
-                columns = newColumns,
-                waitingForGuess = true,
-                guessInput = "",
-                selectedGuessTarget = null,
-                wrongGuessTarget = null,
-            )
+        if (authoritative && deadlineAt > 0 && now >= deadlineAt && deadlineAt != lastHandledDeadline) {
+            lastHandledDeadline = deadlineAt
+            handleTimeout()
         }
+        if (isHost) processGuestIntent()
     }
 
+    // --- Public actions (screen) ---
+
+    fun startRound() { /* host-driven */ }
+
+    fun nextRound() { /* host-driven: rounds auto-advance */ }
+
+    /** Local UI only: which cell/answer the active player is typing into. */
     fun selectGuessTarget(target: GuessTarget) {
         val s = _state.value
-        if (s.phase != AsocijacijePhase.PLAYING || !canGuessNow(s)) return
+        if (s.phase != AsocijacijePhase.PLAYING || !localActive(s) || !canGuessNow(s)) return
         when (target) {
             is GuessTarget.Column -> if (s.columns.getOrNull(target.index)?.isSolved == true) return
             GuessTarget.Final -> if (s.isFinalSolved) return
@@ -161,58 +149,71 @@ class AsocijacijeViewModel(
         _state.update { it.copy(guessInput = text.uppercase(), wrongGuessTarget = null) }
     }
 
+    fun revealField(col: Int, row: Int) = act {
+        if (authoritative) applyReveal(col, row) else sendIntent(mapOf("t" to "reveal", "a" to col, "b" to row))
+    }
+
     fun submitGuess() {
         val s = _state.value
-        if (s.phase != AsocijacijePhase.PLAYING || !canGuessNow(s)) return
+        if (s.phase != AsocijacijePhase.PLAYING || !localActive(s) || !canGuessNow(s)) return
         val target = s.selectedGuessTarget ?: return
         val guess = s.guessInput.trim()
         if (guess.isEmpty()) return
-
-        when (target) {
-            is GuessTarget.Column -> {
-                val col = s.columns.getOrNull(target.index) ?: return
-                if (col.isSolved) return
-                if (guess.equals(col.answer, ignoreCase = true)) {
-                    solveColumn(target.index)
-                    return
-                }
-            }
-            GuessTarget.Final -> {
-                if (!s.isFinalSolved && guess.equals(s.finalAnswer, ignoreCase = true)) {
-                    solveFinal()
-                    return
-                }
-            }
+        val targetCode = when (target) {
+            is GuessTarget.Column -> "C${target.index}"
+            GuessTarget.Final -> "F"
         }
+        // Local flash for the submitting device; cleared on next resolve.
+        if (authoritative) applySubmit(targetCode, guess)
+        else sendIntent(mapOf("t" to "guess", "tg" to targetCode, "g" to guess))
+        _state.update { it.copy(guessInput = "", selectedGuessTarget = null) }
+    }
 
-        _state.update {
-            it.copy(
-                wrongGuessTarget = target,
-                waitingForGuess = false,
-                guessInput = "",
-                selectedGuessTarget = null,
-            )
+    fun passGuess() = act {
+        if (authoritative) applyPass() else sendIntent(mapOf("t" to "pass"))
+        _state.update { it.copy(selectedGuessTarget = null, guessInput = "", wrongGuessTarget = null) }
+    }
+
+    private inline fun act(block: () -> Unit) {
+        if (localActive(_state.value)) block()
+    }
+
+    // --- Apply (authoritative) ---
+
+    private fun applyReveal(col: Int, row: Int) {
+        val s = _state.value
+        if (s.phase != AsocijacijePhase.PLAYING || s.waitingForGuess) return
+        if (col !in s.columns.indices) return
+        val column = s.columns[col]
+        if (row !in column.revealedFields.indices || column.revealedFields[row] || column.isSolved) return
+        val newRevealed = column.revealedFields.toMutableList().also { it[row] = true }
+        val newColumns = s.columns.toMutableList().also { it[col] = column.copy(revealedFields = newRevealed) }
+        commit(s.copy(columns = newColumns, waitingForGuess = true), deadlineAt)
+    }
+
+    private fun applySubmit(targetCode: String, guess: String) {
+        val s = _state.value
+        if (s.phase != AsocijacijePhase.PLAYING) return
+        if (targetCode == "F") {
+            if (!s.isFinalSolved && guess.equals(s.finalAnswer, ignoreCase = true)) { solveFinal(); return }
+        } else {
+            val idx = targetCode.removePrefix("C").toIntOrNull() ?: return
+            val col = s.columns.getOrNull(idx) ?: return
+            if (col.isSolved) return
+            if (guess.equals(col.answer, ignoreCase = true)) { solveColumn(idx); return }
         }
+        // Wrong → end this player's turn and pass after a brief beat.
+        commit(s.copy(waitingForGuess = false), deadlineAt)
         viewModelScope.launch {
-            delay(1000L)
-            if (_state.value.phase == AsocijacijePhase.PLAYING) {
-                _state.update { it.copy(wrongGuessTarget = null) }
-                switchPlayer()
-            } else {
-                _state.update { it.copy(wrongGuessTarget = null) }
-            }
+            delay(800L)
+            if (_state.value.phase == AsocijacijePhase.PLAYING) switchPlayer()
         }
     }
 
-    fun passGuess() {
-        _state.update {
-            it.copy(
-                waitingForGuess = false,
-                guessInput = "",
-                selectedGuessTarget = null,
-                wrongGuessTarget = null,
-            )
-        }
+    private fun applyPass() {
+        val s = _state.value
+        if (s.phase != AsocijacijePhase.PLAYING) return
+        commit(s.copy(waitingForGuess = false), deadlineAt)
         switchPlayer()
     }
 
@@ -221,24 +222,12 @@ class AsocijacijeViewModel(
         val column = s.columns[col]
         val unrevealedCount = column.revealedFields.count { !it }
         val colPoints = 2 + unrevealedCount
-
         val newColumns = s.columns.toMutableList().also {
             it[col] = column.copy(isSolved = true, revealedFields = List(4) { true })
         }
         val newP1 = if (s.activePlayer == 1) s.player1Points + colPoints else s.player1Points
         val newP2 = if (s.activePlayer == 2) s.player2Points + colPoints else s.player2Points
-
-        _state.update {
-            it.copy(
-                columns = newColumns,
-                player1Points = newP1,
-                player2Points = newP2,
-                guessInput = "",
-                waitingForGuess = true,
-                selectedGuessTarget = null,
-                wrongGuessTarget = null,
-            )
-        }
+        commit(s.copy(columns = newColumns, player1Points = newP1, player2Points = newP2, waitingForGuess = true), deadlineAt)
         if (newColumns.all { it.isSolved }) endRound()
     }
 
@@ -251,59 +240,220 @@ class AsocijacijeViewModel(
                 points += if (!anyRevealed) 6 else 2 + col.revealedFields.count { !it }
             }
         }
-
         val newP1 = if (s.activePlayer == 1) s.player1Points + points else s.player1Points
         val newP2 = if (s.activePlayer == 2) s.player2Points + points else s.player2Points
-
-        _state.update {
-            it.copy(
-                isFinalSolved = true,
-                player1Points = newP1,
-                player2Points = newP2,
-                guessInput = "",
-                selectedGuessTarget = null,
-                wrongGuessTarget = null,
-            )
-        }
+        commit(s.copy(isFinalSolved = true, player1Points = newP1, player2Points = newP2), deadlineAt)
         endRound()
     }
 
     private fun switchPlayer() {
-        _state.update { it.copy(activePlayer = if (it.activePlayer == 1) 2 else 1) }
+        val s = _state.value
+        commit(s.copy(activePlayer = if (s.activePlayer == 1) 2 else 1, waitingForGuess = false), deadlineAt)
     }
 
     private fun endRound() {
-        timerJob?.cancel()
         val s = _state.value
         if (s.currentRound >= 2) {
-            _state.update { it.copy(phase = AsocijacijePhase.GAME_OVER) }
-            submitMatchScore(s.player1Points)
+            commit(s.copy(phase = AsocijacijePhase.GAME_OVER), 0)
+            if (isHost && !advanced) {
+                advanced = true
+                viewModelScope.launch { matchRepository.advanceMatch(matchId, GAME_TYPE, s.player1Points, s.player2Points) }
+            }
         } else {
-            _state.update { it.copy(phase = AsocijacijePhase.ROUND_END) }
+            commit(s.copy(phase = AsocijacijePhase.ROUND_END), now() + ROUND_END_MILLIS)
         }
     }
 
-    fun nextRound() {
-        _state.update { it.copy(currentRound = 2, phase = AsocijacijePhase.ROUND_INTRO) }
-        loadedQuestion = null
-        preloadQuestion()
-    }
-
-    private fun submitMatchScore(score: Int) {
-        val matchId = MatchStore.matchId
-        if (matchId.isBlank()) return
+    private fun hostStartRound(round: Int) {
+        if (!authoritative) return
         viewModelScope.launch {
-            matchRepository.submitScore(matchId, score)
+            val q = gameRepository.getAsocijacijeQuestion().getOrNull()
+            if (q == null) {
+                _state.update { it.copy(errorMessage = "Failed to load question") }
+                return@launch
+            }
+            val s = buildRoundState(round, q)
+            val deadline = now() + PLAY_MILLIS
+            if (isHost) {
+                deadlineAt = deadline
+                _state.value = s
+                matchRepository.setGameState(
+                    matchId, GAME_TYPE,
+                    mapOf(
+                        "gameType" to GAME_TYPE,
+                        "hostId" to MatchStore.hostId,
+                        "phase" to "RUN",
+                        "round" to round,
+                        "index" to 0,
+                        "turn" to if (round == 1) "p1" else "p2",
+                        "deadlineAt" to deadline,
+                        "payload" to stateToMap(s, deadline),
+                        "p1Input" to emptyMap<String, Any?>(),
+                        "p2Input" to emptyMap<String, Any?>(),
+                        "p1Score" to s.player1Points,
+                        "p2Score" to s.player2Points,
+                    ),
+                )
+            } else {
+                // Local fallback (no match): just drive it directly.
+                deadlineAt = deadline
+                _state.value = s
+            }
         }
     }
 
-    private fun canGuessNow(state: AsocijacijeState): Boolean {
-        if (state.waitingForGuess) return true
-        return !state.columns.any { col -> !col.isSolved && col.revealedFields.any { !it } }
+    private fun buildRoundState(round: Int, q: AsocijacijeQuestion): AsocijacijeState {
+        val prev = _state.value
+        return AsocijacijeState(
+            phase = AsocijacijePhase.PLAYING,
+            currentRound = round,
+            columns = q.columns.map { AsocijacijeColumn(words = it.words, answer = it.answer) },
+            finalAnswer = q.finalAnswer,
+            isFinalSolved = false,
+            activePlayer = if (round == 1) 1 else 2,
+            secondsLeft = 120,
+            player1Points = if (round == 1) 0 else prev.player1Points,
+            player2Points = if (round == 1) 0 else prev.player2Points,
+        )
     }
+
+    private fun handleTimeout() {
+        val s = _state.value
+        when (s.phase) {
+            AsocijacijePhase.PLAYING -> endRound()
+            AsocijacijePhase.ROUND_END -> hostStartRound(2)
+            else -> {}
+        }
+    }
+
+    // --- Commit / sync ---
+
+    private fun commit(s: AsocijacijeState, deadline: Long) {
+        deadlineAt = deadline
+        // Preserve local-only UI fields already in _state.
+        _state.update { cur ->
+            s.copy(
+                guessInput = cur.guessInput,
+                selectedGuessTarget = cur.selectedGuessTarget,
+                wrongGuessTarget = cur.wrongGuessTarget,
+            )
+        }
+        if (!isHost) return
+        viewModelScope.launch {
+            matchRepository.patchGameState(
+                matchId, GAME_TYPE,
+                mapOf(
+                    "payload" to stateToMap(s, deadline),
+                    "deadlineAt" to deadline,
+                    "p1Score" to s.player1Points,
+                    "p2Score" to s.player2Points,
+                ),
+            )
+        }
+    }
+
+    private fun sendIntent(fields: Map<String, Any?>) {
+        mySeq++
+        viewModelScope.launch {
+            matchRepository.patchGameState(
+                matchId, GAME_TYPE,
+                mapOf("p2Input" to (fields + ("seq" to mySeq))),
+            )
+        }
+    }
+
+    private fun processGuestIntent() {
+        val gs = latest ?: return
+        val seq = numberOrNull(gs.p2Input["seq"])?.toLong() ?: return
+        if (seq <= lastIntentSeq) return
+        lastIntentSeq = seq
+        if (_state.value.activePlayer == 1) return // guest acts only when it's player 2's turn
+        when (gs.p2Input["t"] as? String) {
+            "reveal" -> applyReveal(numberOrNull(gs.p2Input["a"]) ?: return, numberOrNull(gs.p2Input["b"]) ?: return)
+            "guess" -> applySubmit(gs.p2Input["tg"] as? String ?: return, gs.p2Input["g"] as? String ?: return)
+            "pass" -> applyPass()
+        }
+    }
+
+    private fun rebuildState(gs: GameStateDto) {
+        val (s, dl) = mapToState(gs.payload) ?: return
+        deadlineAt = dl
+        _state.update { cur ->
+            s.copy(
+                guessInput = cur.guessInput,
+                selectedGuessTarget = cur.selectedGuessTarget,
+                wrongGuessTarget = cur.wrongGuessTarget,
+            )
+        }
+    }
+
+    private fun localActive(s: AsocijacijeState): Boolean =
+        matchId.isBlank() || ((s.activePlayer == 1) == isHost)
+
+    private fun canGuessNow(s: AsocijacijeState): Boolean {
+        if (s.waitingForGuess) return true
+        return !s.columns.any { col -> !col.isSolved && col.revealedFields.any { !it } }
+    }
+
+    // --- Serialization ---
+
+    private fun stateToMap(s: AsocijacijeState, deadline: Long): Map<String, Any?> = mapOf(
+        "phase" to s.phase.name,
+        "round" to s.currentRound,
+        "columns" to s.columns.map {
+            mapOf("words" to it.words, "answer" to it.answer, "revealed" to it.revealedFields, "solved" to it.isSolved)
+        },
+        "final" to s.finalAnswer,
+        "finalSolved" to s.isFinalSolved,
+        "active" to s.activePlayer,
+        "p1" to s.player1Points,
+        "p2" to s.player2Points,
+        "waiting" to s.waitingForGuess,
+        "deadline" to deadline,
+    )
+
+    @Suppress("UNCHECKED_CAST")
+    private fun mapToState(p: Map<String, Any?>): Pair<AsocijacijeState, Long>? {
+        val phaseName = p["phase"] as? String ?: return null
+        val columns = (p["columns"] as? List<*>)?.mapNotNull {
+            val m = it as? Map<String, Any?> ?: return@mapNotNull null
+            val words = (m["words"] as? List<*>)?.map { w -> w.toString() } ?: return@mapNotNull null
+            val answer = m["answer"] as? String ?: return@mapNotNull null
+            val revealed = (m["revealed"] as? List<*>)?.map { r -> r == true } ?: List(4) { false }
+            AsocijacijeColumn(words, answer, revealed, m["solved"] == true)
+        } ?: emptyList()
+        val s = AsocijacijeState(
+            phase = runCatching { AsocijacijePhase.valueOf(phaseName) }.getOrDefault(AsocijacijePhase.PLAYING),
+            currentRound = numberOrNull(p["round"]) ?: 1,
+            columns = columns,
+            finalAnswer = p["final"] as? String ?: "",
+            isFinalSolved = p["finalSolved"] == true,
+            activePlayer = numberOrNull(p["active"]) ?: 1,
+            player1Points = numberOrNull(p["p1"]) ?: 0,
+            player2Points = numberOrNull(p["p2"]) ?: 0,
+            waitingForGuess = p["waiting"] == true,
+        )
+        return s to (numberOrNull(p["deadline"])?.toLong() ?: 0L)
+    }
+
+    private fun numberOrNull(v: Any?): Int? = when (v) {
+        is Long -> v.toInt()
+        is Int -> v
+        is Double -> v.toInt()
+        else -> null
+    }
+
+    private fun now() = System.currentTimeMillis()
 
     override fun onCleared() {
-        timerJob?.cancel()
+        observerJob?.cancel()
+        loopJob?.cancel()
         super.onCleared()
+    }
+
+    companion object {
+        private const val GAME_TYPE = "ASOCIJACIJE"
+        private const val PLAY_MILLIS = 120_000L
+        private const val ROUND_END_MILLIS = 4_000L
     }
 }

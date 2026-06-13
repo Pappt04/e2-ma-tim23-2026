@@ -53,5 +53,5 @@ val AppModule = module {
     viewModel { SkockoViewModel(get()) }
     viewModel { AsocijacijeViewModel(get(), get()) }
     viewModel { KoZnaZnaViewModel(get()) }
-    viewModelOf(::SpojniceViewModel)
+    viewModel { SpojniceViewModel(get()) }
 }
