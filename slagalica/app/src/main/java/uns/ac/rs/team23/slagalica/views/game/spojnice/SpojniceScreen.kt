@@ -55,14 +55,6 @@ fun SpojniceScreen(
 
     LaunchedEffect(Unit) { viewModel.enter() }
 
-    // Both clients reach GAME_OVER together (host-driven); auto-advance to the next game.
-    LaunchedEffect(state.phase) {
-        if (state.phase == SpojnicePhase.GAME_OVER) {
-            delay(4_000)
-            onFinish()
-        }
-    }
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -214,6 +206,11 @@ private fun PlayingPhase(
             )
             Text("Time left: ${state.secondsLeft}s", fontWeight = FontWeight.SemiBold)
         } else {
+            LinearProgressIndicator(
+                progress = { state.secondsLeft / 45f },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text("Starter time left: ${state.secondsLeft}s", fontWeight = FontWeight.SemiBold)
             Text(
                 text = "Starter progress: ${state.starterAttemptsUsedLeft.size} / ${state.pairs.size} left terms tried",
                 fontWeight = FontWeight.SemiBold,

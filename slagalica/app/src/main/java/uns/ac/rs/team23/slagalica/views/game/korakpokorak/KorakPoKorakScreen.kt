@@ -21,7 +21,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -42,16 +41,14 @@ fun KorakPoKorakScreen(
 
     LaunchedEffect(Unit) { viewModel.enter() }
 
-    // Both clients reach GameOver together (host-driven); auto-advance to the next game.
-    LaunchedEffect(state.phase) {
-        if (state.phase == KorakPhase.GameOver) {
-            delay(4_000)
-            onFinish()
-        }
+    val activeName = when (state.phase) {
+        KorakPhase.OpponentChance -> if (state.currentRound == 1) player2Name else player1Name
+        else -> if (state.currentRound == 1) player1Name else player2Name
     }
-
-    val activeName = if (state.currentRound == 1) player1Name else player2Name
-    val opponentName = if (state.currentRound == 1) player2Name else player1Name
+    val opponentName = when (state.phase) {
+        KorakPhase.OpponentChance -> if (state.currentRound == 1) player1Name else player2Name
+        else -> if (state.currentRound == 1) player2Name else player1Name
+    }
 
     Scaffold(
         topBar = {

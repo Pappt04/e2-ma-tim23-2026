@@ -125,6 +125,8 @@ class NotificationsViewModel(
                             friendly = match.isFriendly,
                             myUid = matchRepository.currentUserId() ?: "",
                             hostId = match.player1Id,
+                            player1 = match.player1Username,
+                            player2 = match.player2Username ?: "",
                         )
                     }
                 }

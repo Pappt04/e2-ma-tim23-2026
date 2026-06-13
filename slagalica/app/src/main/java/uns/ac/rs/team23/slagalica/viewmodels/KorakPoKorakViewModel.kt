@@ -116,7 +116,13 @@ class KorakPoKorakViewModel(
 
     fun beginRound() { /* host-driven: round auto-starts */ }
 
-    fun prepareNextRound() { /* host-driven: rounds auto-advance */ }
+    fun prepareNextRound() {
+        if (!authoritative) return
+        if (_state.value.phase == KorakPhase.RoundEnd) {
+            lastHandledDeadline = -1
+            hostStartRound(2)
+        }
+    }
 
     fun onAnswerChange(text: String) {
         _state.update { it.copy(currentAnswer = text, showWrongFeedback = false) }
@@ -319,6 +325,8 @@ class KorakPoKorakViewModel(
     private fun mapToState(p: Map<String, Any?>): Pair<KorakPoKorakState, Long>? {
         val phaseName = p["phase"] as? String ?: return null
         val revealed = (p["revealed"] as? List<*>)?.map { it.toString() } ?: emptyList()
+        val deadline = numberOrNull(p["deadline"])?.toLong() ?: 0L
+        val timeLeft = secsLeft(deadline, 10)
         val s = KorakPoKorakState(
             currentRound = numberOrNull(p["round"]) ?: 1,
             phase = runCatching { KorakPhase.valueOf(phaseName) }.getOrDefault(KorakPhase.PlayerTurn),
@@ -329,9 +337,13 @@ class KorakPoKorakViewModel(
             roundCorrectAnswer = p["correct"] as? String ?: "",
             player1Points = numberOrNull(p["p1"]) ?: 0,
             player2Points = numberOrNull(p["p2"]) ?: 0,
+            timeLeft = timeLeft,
         )
-        return s to (numberOrNull(p["deadline"])?.toLong() ?: 0L)
+        return s to deadline
     }
+
+    private fun secsLeft(deadline: Long, max: Int): Int =
+        if (deadline <= 0) max else (((deadline - now()) + 999) / 1000).toInt().coerceIn(0, max)
 
     private fun numberOrNull(v: Any?): Int? = when (v) {
         is Long -> v.toInt()

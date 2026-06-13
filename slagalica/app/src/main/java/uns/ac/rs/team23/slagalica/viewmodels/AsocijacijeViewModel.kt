@@ -132,7 +132,13 @@ class AsocijacijeViewModel(
 
     fun startRound() { /* host-driven */ }
 
-    fun nextRound() { /* host-driven: rounds auto-advance */ }
+    fun nextRound() {
+        if (!authoritative) return
+        if (_state.value.phase == AsocijacijePhase.ROUND_END) {
+            lastHandledDeadline = -1
+            hostStartRound(2)
+        }
+    }
 
     /** Local UI only: which cell/answer the active player is typing into. */
     fun selectGuessTarget(target: GuessTarget) {
@@ -422,6 +428,7 @@ class AsocijacijeViewModel(
             val revealed = (m["revealed"] as? List<*>)?.map { r -> r == true } ?: List(4) { false }
             AsocijacijeColumn(words, answer, revealed, m["solved"] == true)
         } ?: emptyList()
+        val deadline = numberOrNull(p["deadline"])?.toLong() ?: 0L
         val s = AsocijacijeState(
             phase = runCatching { AsocijacijePhase.valueOf(phaseName) }.getOrDefault(AsocijacijePhase.PLAYING),
             currentRound = numberOrNull(p["round"]) ?: 1,
@@ -429,12 +436,16 @@ class AsocijacijeViewModel(
             finalAnswer = p["final"] as? String ?: "",
             isFinalSolved = p["finalSolved"] == true,
             activePlayer = numberOrNull(p["active"]) ?: 1,
+            secondsLeft = secsLeft(deadline, 120),
             player1Points = numberOrNull(p["p1"]) ?: 0,
             player2Points = numberOrNull(p["p2"]) ?: 0,
             waitingForGuess = p["waiting"] == true,
         )
-        return s to (numberOrNull(p["deadline"])?.toLong() ?: 0L)
+        return s to deadline
     }
+
+    private fun secsLeft(deadline: Long, max: Int): Int =
+        if (deadline <= 0) max else (((deadline - now()) + 999) / 1000).toInt().coerceIn(0, max)
 
     private fun numberOrNull(v: Any?): Int? = when (v) {
         is Long -> v.toInt()
