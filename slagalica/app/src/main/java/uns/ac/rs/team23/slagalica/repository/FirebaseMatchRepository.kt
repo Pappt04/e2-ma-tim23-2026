@@ -24,51 +24,12 @@ class FirebaseMatchRepository(
             val userDoc = firestore.collection("users").document(uid).get().await()
             val username = userDoc.getString("username") ?: ""
 
-            // Try to claim an existing waiting match
-            val waitingSnap = firestore.collection("matches")
-                .whereEqualTo("status", "WAITING_FOR_OPPONENT")
-                .whereEqualTo("isFriendly", friendly)
-                .limit(5)
-                .get()
-                .await()
+            // Clean up any stale waiting match left from a previous crash/session
+            cancelQueue()
 
-            for (doc in waitingSnap.documents) {
-                if (doc.getString("player1Id") == uid) continue
-                try {
-                    var joined: MatchResponseDto? = null
-                    firestore.runTransaction { tx ->
-                        val snap = tx.get(doc.reference)
-                        if (snap.getString("status") != "WAITING_FOR_OPPONENT" ||
-                            snap.getString("player2Id") != null
-                        ) throw Exception("already taken")
-                        tx.update(
-                            doc.reference, mapOf(
-                                "player2Id" to uid,
-                                "player2Username" to username,
-                                "status" to "IN_PROGRESS",
-                                "currentGameType" to GAME_ORDER[0],
-                            )
-                        )
-                        joined = MatchResponseDto(
-                            id = doc.id,
-                            player1Id = snap.getString("player1Id") ?: "",
-                            player1Username = snap.getString("player1Username") ?: "",
-                            player2Id = uid,
-                            player2Username = username,
-                            status = "IN_PROGRESS",
-                            isFriendly = friendly,
-                            currentGameIndex = 0,
-                            currentGameType = GAME_ORDER[0],
-                            player1TotalScore = 0,
-                            player2TotalScore = 0,
-                            winnerId = null,
-                        )
-                    }.await()
-                    return@runCatching joined!!
-                } catch (_: Exception) {
-                    continue
-                }
-            }
+            // Try to claim an existing waiting match (query only by status to avoid composite index)
+            val joined = joinWaitingMatch(uid, username, friendly)
+            if (joined != null) return@runCatching joined
 
             // No match to join — create a new waiting match
             val matchRef = firestore.collection("matches").document()
@@ -104,6 +65,60 @@ class FirebaseMatchRepository(
                 winnerId = null,
             )
         }
+
+    override suspend fun tryJoinWaiting(username: String, friendly: Boolean): Result<MatchResponseDto?> =
+        runCatching {
+            val uid = auth.currentUser?.uid ?: return@runCatching null
+            joinWaitingMatch(uid, username, friendly)
+        }
+
+    private suspend fun joinWaitingMatch(uid: String, username: String, friendly: Boolean): MatchResponseDto? {
+        val waitingSnap = firestore.collection("matches")
+            .whereEqualTo("status", "WAITING_FOR_OPPONENT")
+            .limit(10)
+            .get()
+            .await()
+
+        for (doc in waitingSnap.documents) {
+            if (doc.getString("player1Id") == uid) continue
+            if ((doc.getBoolean("isFriendly") ?: false) != friendly) continue
+            try {
+                var joined: MatchResponseDto? = null
+                firestore.runTransaction { tx ->
+                    val snap = tx.get(doc.reference)
+                    if (snap.getString("status") != "WAITING_FOR_OPPONENT" ||
+                        snap.getString("player2Id") != null
+                    ) throw Exception("already taken")
+                    tx.update(
+                        doc.reference, mapOf(
+                            "player2Id" to uid,
+                            "player2Username" to username,
+                            "status" to "IN_PROGRESS",
+                            "currentGameType" to GAME_ORDER[0],
+                        )
+                    )
+                    joined = MatchResponseDto(
+                        id = doc.id,
+                        player1Id = snap.getString("player1Id") ?: "",
+                        player1Username = snap.getString("player1Username") ?: "",
+                        player2Id = uid,
+                        player2Username = username,
+                        status = "IN_PROGRESS",
+                        isFriendly = friendly,
+                        currentGameIndex = 0,
+                        currentGameType = GAME_ORDER[0],
+                        player1TotalScore = 0,
+                        player2TotalScore = 0,
+                        winnerId = null,
+                    )
+                }.await()
+                if (joined != null) return joined
+            } catch (_: Exception) {
+                continue
+            }
+        }
+        return null
+    }
 
     override suspend fun getCurrentMatch(): Result<MatchResponseDto?> = runCatching {
         val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
