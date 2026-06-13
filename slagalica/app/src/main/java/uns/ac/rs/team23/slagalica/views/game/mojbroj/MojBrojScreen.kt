@@ -37,8 +37,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -65,6 +67,17 @@ fun MojBrojScreen(
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
 
+    LaunchedEffect(Unit) { viewModel.enter() }
+
+    // Auto-advance to the next game once the host has finalized the match.
+    LaunchedEffect(state.phase) {
+        if (state.phase == MojBrojPhase.GameOver) {
+            delay(5_000)
+            onFinish()
+        }
+    }
+
+    // Shake to submit the current expression (spec: Moj broj uses the shake sensor).
     DisposableEffect(Unit) {
         val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -76,7 +89,7 @@ fun MojBrojScreen(
                 val now = System.currentTimeMillis()
                 if (force > 12f && now - lastShake > 800) {
                     lastShake = now
-                    viewModel.onStopPressed()
+                    viewModel.submitExpression()
                 }
             }
             override fun onAccuracyChanged(s: Sensor?, a: Int) {}
@@ -107,7 +120,6 @@ fun MojBrojScreen(
                 },
                 actions = {
                     val timerText = when (state.phase) {
-                        MojBrojPhase.TargetCountdown, MojBrojPhase.NumbersCountdown -> "${state.setupSecondsLeft}s"
                         MojBrojPhase.Player1Input, MojBrojPhase.Player2Input -> "${state.playSecondsLeft}s"
                         else -> null
                     }
@@ -134,58 +146,37 @@ fun MojBrojScreen(
             }
 
             when (state.phase) {
-                MojBrojPhase.RoundIntro -> RoundIntroContent(
-                    round = state.currentRound,
-                    activeName = activeName,
-                    onStart = viewModel::startRound,
-                )
-                MojBrojPhase.TargetCountdown -> SetupContent(
-                    heading = "Generating target number...",
-                    subtext = "Tap STOP or shake to reveal!",
-                    secondsLeft = state.setupSecondsLeft,
-                    onStop = viewModel::onStopPressed,
-                )
-                MojBrojPhase.NumbersCountdown -> SetupContent(
-                    heading = "Target: ${state.targetNumber}",
-                    subtext = "Tap STOP or shake to draw your 6 numbers!",
-                    secondsLeft = state.setupSecondsLeft,
-                    onStop = viewModel::onStopPressed,
-                )
-                MojBrojPhase.Player1Input -> InputContent(
-                    state = state,
-                    turnLabel = "$player1Name's turn",
-                    onAppendToken = viewModel::appendToken,
-                    onDeleteLast = viewModel::deleteLast,
-                    onClear = viewModel::clearExpression,
-                    onSubmit = viewModel::submitExpression,
-                )
-                MojBrojPhase.Player2Input -> InputContent(
-                    state = state,
-                    turnLabel = "$player2Name's turn",
-                    onAppendToken = viewModel::appendToken,
-                    onDeleteLast = viewModel::deleteLast,
-                    onClear = viewModel::clearExpression,
-                    onSubmit = viewModel::submitExpression,
-                )
+                MojBrojPhase.Player1Input, MojBrojPhase.Player2Input ->
+                    if (state.iSubmitted) {
+                        WaitingContent("You submitted ${state.player1Expression} = ${state.player1Answer ?: "—"}.\nWaiting for $player2Name...")
+                    } else {
+                        InputContent(
+                            state = state,
+                            turnLabel = if (state.activeIsMe) "Your round (tie-break advantage)" else "$player2Name's round",
+                            onAppendToken = viewModel::appendToken,
+                            onDeleteLast = viewModel::deleteLast,
+                            onClear = viewModel::clearExpression,
+                            onSubmit = viewModel::submitExpression,
+                        )
+                    }
                 MojBrojPhase.RoundEnd -> RoundEndContent(
                     state = state,
                     player1Name = player1Name,
                     player2Name = player2Name,
-                    onNext = viewModel::prepareNextRound,
                 )
                 MojBrojPhase.GameOver -> GameOverContent(
                     state = state,
                     player1Name = player1Name,
                     player2Name = player2Name,
-                    onFinish = onFinish,
                 )
+                else -> WaitingContent("Syncing with $player2Name...")
             }
         }
     }
 }
 
 @Composable
-private fun RoundIntroContent(round: Int, activeName: String, onStart: () -> Unit) {
+private fun WaitingContent(message: String) {
     Box(
         modifier = Modifier.fillMaxSize().padding(32.dp),
         contentAlignment = Alignment.Center,
@@ -194,72 +185,12 @@ private fun RoundIntroContent(round: Int, activeName: String, onStart: () -> Uni
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            androidx.compose.material3.CircularProgressIndicator()
             Text(
-                text = "Round $round of 2",
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Text(text = "$activeName starts the round", style = MaterialTheme.typography.titleLarge)
-            Text(
-                text = "Build an expression with 6 numbers and (, ), +, −, *, /\nto reach the target number.\nMax 10 pts per round.",
+                text = message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Button(onClick = onStart, modifier = Modifier.fillMaxWidth(0.6f)) {
-                Text("Start Round", fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-private fun SetupContent(
-    heading: String,
-    subtext: String,
-    secondsLeft: Int,
-    onStop: () -> Unit,
-) {
-    Box(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(20.dp),
-        ) {
-            Text(
-                text = heading,
-                style = MaterialTheme.typography.headlineMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = subtext,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-            )
-            Text(
-                text = "${secondsLeft}s",
-                fontSize = 64.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.primary,
-            )
-            Button(
-                onClick = onStop,
-                modifier = Modifier.fillMaxWidth(0.6f).height(64.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-            ) {
-                Text("STOP", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            }
-            Text(
-                text = "or shake the phone",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
     }
@@ -371,7 +302,6 @@ private fun RoundEndContent(
     state: MojBrojState,
     player1Name: String,
     player2Name: String,
-    onNext: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -379,14 +309,16 @@ private fun RoundEndContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = "Round 1 Complete",
+            text = "Round ${state.currentRound} Complete",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
         )
         ResultsCard(state = state, player1Name = player1Name, player2Name = player2Name)
-        Button(onClick = onNext, modifier = Modifier.fillMaxWidth(0.7f)) {
-            Text("Start Round 2", fontWeight = FontWeight.Bold)
-        }
+        Text(
+            text = "Next round starting...",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -395,7 +327,6 @@ private fun GameOverContent(
     state: MojBrojState,
     player1Name: String,
     player2Name: String,
-    onFinish: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
@@ -420,9 +351,11 @@ private fun GameOverContent(
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )
-        Button(onClick = onFinish, modifier = Modifier.fillMaxWidth(0.7f)) {
-            Text("Back to Game", fontWeight = FontWeight.Bold)
-        }
+        Text(
+            text = "Next game starting...",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 

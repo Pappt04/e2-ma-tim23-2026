@@ -119,7 +119,13 @@ class NotificationsViewModel(
                             match.player1Username
                         else
                             match.player2Username ?: match.player1Username
-                        MatchStore.set(match.id, opponentName)
+                        MatchStore.set(
+                            match.id,
+                            opponentName,
+                            friendly = match.isFriendly,
+                            myUid = matchRepository.currentUserId() ?: "",
+                            hostId = match.player1Id,
+                        )
                     }
                 }
             _notifications.update { list -> list.filter { it.id != notificationId } }
