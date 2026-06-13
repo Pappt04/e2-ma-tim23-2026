@@ -23,6 +23,8 @@ data class MatchResponseDto(
     val player1TotalScore: Int,
     val player2TotalScore: Int,
     val winnerId: String?,
+    val player1Ready: Boolean = false,
+    val player2Ready: Boolean = false,
 )
 
 data class MatchInviteResponseDto(

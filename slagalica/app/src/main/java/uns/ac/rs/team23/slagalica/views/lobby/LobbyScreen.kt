@@ -108,7 +108,7 @@ fun LobbyScreen(
                         currentUsername = currentUsername,
                         opponentName = s.opponentName,
                         playerReady = false,
-                        opponentReady = false,
+                        opponentReady = s.opponentReady,
                         onReady = viewModel::clickReady,
                     )
                 }
@@ -118,7 +118,7 @@ fun LobbyScreen(
                         currentUsername = currentUsername,
                         opponentName = s.opponentName,
                         playerReady = true,
-                        opponentReady = false,
+                        opponentReady = s.opponentReady,
                         onReady = {},
                     )
                 }
