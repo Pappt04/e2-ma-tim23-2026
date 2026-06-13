@@ -42,7 +42,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                     when {
                         match.status == "IN_PROGRESS" && match.player2Username != null -> {
                             val opponent = resolveOpponent(match.player1Username, match.player2Username)
-                            onMatchFound(match.id, opponent)
+                            onMatchFound(match.id, opponent, match.player1Id)
                         }
                         match.status == "WAITING_FOR_OPPONENT" -> startPolling()
                         else -> _state.value = LobbyState.Error("Unexpected match state: ${match.status}")
@@ -62,7 +62,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                     .onSuccess { match ->
                         if (match != null && match.status == "IN_PROGRESS" && match.player2Username != null) {
                             val opponent = resolveOpponent(match.player1Username, match.player2Username)
-                            onMatchFound(match.id, opponent)
+                            onMatchFound(match.id, opponent, match.player1Id)
                             pollingJob?.cancel()
                             return@onSuccess
                         }
@@ -75,7 +75,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                         .onSuccess { joined ->
                             if (joined != null) {
                                 val opponent = resolveOpponent(joined.player1Username, joined.player2Username ?: "")
-                                onMatchFound(joined.id, opponent)
+                                onMatchFound(joined.id, opponent, joined.player1Id)
                                 pollingJob?.cancel()
                             }
                         }
@@ -90,8 +90,14 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
     private fun resolveOpponent(player1: String, player2: String): String =
         if (player1 == myUsername) player2 else player1
 
-    private fun onMatchFound(matchId: String, opponentName: String) {
-        MatchStore.set(matchId, opponentName)
+    private fun onMatchFound(matchId: String, opponentName: String, hostId: String) {
+        MatchStore.set(
+            matchId,
+            opponentName,
+            friendly = currentFriendly,
+            myUid = matchRepository.currentUserId() ?: "",
+            hostId = hostId,
+        )
         _state.value = LobbyState.OpponentFound(opponentName)
     }
 
@@ -114,6 +120,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
 
     fun startFriendSearch(friendId: String, username: String, friendly: Boolean = false) {
         myUsername = username
+        currentFriendly = friendly
         _state.value = LobbyState.Searching
         viewModelScope.launch {
             matchRepository.sendFriendInvite(friendId, friendly)
@@ -123,7 +130,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                         _state.value = LobbyState.InviteSent(match.id, opponentName)
                     } else if (match.status == "IN_PROGRESS") {
                         val opponent = resolveOpponent(match.player1Username, match.player2Username ?: "Opponent")
-                        onMatchFound(match.id, opponent)
+                        onMatchFound(match.id, opponent, match.player1Id)
                     } else {
                         _state.value = LobbyState.Error("Unexpected state: ${match.status}")
                     }

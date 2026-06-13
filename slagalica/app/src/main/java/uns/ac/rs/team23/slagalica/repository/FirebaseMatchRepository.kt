@@ -5,7 +5,11 @@ import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.network.dto.MatchInviteResponseDto
 import uns.ac.rs.team23.slagalica.network.dto.MatchResponseDto
 
@@ -17,6 +21,8 @@ class FirebaseMatchRepository(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
 ) : MatchRepository {
+
+    override fun currentUserId(): String? = auth.currentUser?.uid
 
     override suspend fun startRandomMatch(friendly: Boolean): Result<MatchResponseDto> =
         runCatching {
@@ -372,6 +378,130 @@ class FirebaseMatchRepository(
             .update("status", "CANCELLED")
             .await()
     }
+
+    // --- Real-time match & game synchronization ---
+
+    override fun observeMatch(matchId: String): Flow<MatchResponseDto> = callbackFlow {
+        val reg = firestore.collection("matches").document(matchId)
+            .addSnapshotListener { snap, err ->
+                if (err != null) return@addSnapshotListener
+                if (snap != null && snap.exists()) trySend(snap.toMatchResponseDto())
+            }
+        awaitClose { reg.remove() }
+    }
+
+    override fun observeGameState(matchId: String, gameType: String): Flow<GameStateDto?> = callbackFlow {
+        val reg = firestore.collection("matches").document(matchId)
+            .collection("gameState").document(gameType)
+            .addSnapshotListener { snap, err ->
+                if (err != null) return@addSnapshotListener
+                trySend(if (snap != null && snap.exists()) snap.toGameStateDto(gameType) else null)
+            }
+        awaitClose { reg.remove() }
+    }
+
+    override suspend fun setGameState(
+        matchId: String,
+        gameType: String,
+        data: Map<String, Any?>,
+    ): Result<Unit> = runCatching {
+        firestore.collection("matches").document(matchId)
+            .collection("gameState").document(gameType)
+            .set(data)
+            .await()
+    }
+
+    override suspend fun patchGameState(
+        matchId: String,
+        gameType: String,
+        fields: Map<String, Any?>,
+    ): Result<Unit> = runCatching {
+        firestore.collection("matches").document(matchId)
+            .collection("gameState").document(gameType)
+            .set(fields, SetOptions.merge())
+            .await()
+    }
+
+    override suspend fun advanceMatch(
+        matchId: String,
+        gameType: String,
+        p1GameScore: Int,
+        p2GameScore: Int,
+    ): Result<MatchResponseDto> = runCatching {
+        val matchRef = firestore.collection("matches").document(matchId)
+
+        firestore.runTransaction { tx ->
+            val match = tx.get(matchRef)
+            // Ignore if the match is already finished/abandoned.
+            if (match.getString("status") != "IN_PROGRESS") return@runTransaction
+            val gameIndex = GAME_ORDER.indexOf(gameType)
+                .takeIf { it >= 0 } ?: (match.getLong("currentGameIndex") ?: 0L).toInt()
+
+            // Persist the per-game result for this specific game (idempotent).
+            val gameResultRef = matchRef.collection("gameResults").document(gameType)
+            tx.set(
+                gameResultRef,
+                mapOf(
+                    "gameType" to gameType,
+                    "gameIndex" to gameIndex,
+                    "player1Score" to p1GameScore,
+                    "player2Score" to p2GameScore,
+                    "player1Completed" to true,
+                    "player2Completed" to true,
+                ),
+                SetOptions.merge(),
+            )
+
+            val newP1Total = (match.getLong("player1TotalScore") ?: 0L).toInt() + p1GameScore
+            val newP2Total = (match.getLong("player2TotalScore") ?: 0L).toInt() + p2GameScore
+            val nextGameIndex = gameIndex + 1
+
+            if (nextGameIndex >= GAME_ORDER.size) {
+                val winnerId = when {
+                    newP1Total > newP2Total -> match.getString("player1Id")
+                    newP2Total > newP1Total -> match.getString("player2Id")
+                    else -> null
+                }
+                tx.update(
+                    matchRef, mapOf(
+                        "player1TotalScore" to newP1Total,
+                        "player2TotalScore" to newP2Total,
+                        "status" to "COMPLETED",
+                        "winnerId" to winnerId,
+                        "completedAt" to FieldValue.serverTimestamp(),
+                    )
+                )
+            } else {
+                tx.update(
+                    matchRef, mapOf(
+                        "player1TotalScore" to newP1Total,
+                        "player2TotalScore" to newP2Total,
+                        "currentGameIndex" to nextGameIndex,
+                        "currentGameType" to GAME_ORDER[nextGameIndex],
+                    )
+                )
+            }
+        }.await()
+
+        matchRef.get().await().toMatchResponseDto()
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun com.google.firebase.firestore.DocumentSnapshot.toGameStateDto(gameType: String) =
+        GameStateDto(
+            gameType = getString("gameType") ?: gameType,
+            hostId = getString("hostId") ?: "",
+            phase = getString("phase") ?: "",
+            round = (getLong("round") ?: 1L).toInt(),
+            index = (getLong("index") ?: 0L).toInt(),
+            turn = getString("turn"),
+            deadlineAt = getLong("deadlineAt") ?: 0L,
+            payload = (get("payload") as? Map<String, Any?>) ?: emptyMap(),
+            p1Input = (get("p1Input") as? Map<String, Any?>) ?: emptyMap(),
+            p2Input = (get("p2Input") as? Map<String, Any?>) ?: emptyMap(),
+            p1Score = (getLong("p1Score") ?: 0L).toInt(),
+            p2Score = (getLong("p2Score") ?: 0L).toInt(),
+        )
 
     private fun com.google.firebase.firestore.DocumentSnapshot.toMatchResponseDto() =
         MatchResponseDto(

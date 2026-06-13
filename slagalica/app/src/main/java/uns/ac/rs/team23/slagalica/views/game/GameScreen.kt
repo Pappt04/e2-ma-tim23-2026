@@ -87,22 +87,15 @@ fun GameScreen(
         }
     }
 
-    DisposableEffect(matchId, matchRepository) {
-        var pollingJob: Job? = null
+    // Instant, listener-based abandonment detection (replaces the old 3s poll).
+    LaunchedEffect(matchId, matchRepository) {
         if (matchId.isNotBlank() && matchRepository != null) {
-            pollingJob = scope.launch {
-                while (true) {
-                    delay(3_000)
-                    matchRepository.getCurrentMatch().onSuccess { match ->
-                        if (match != null && match.status == "ABANDONED") {
-                            showOpponentLeftDialog = true
-                            return@launch
-                        }
-                    }
+            matchRepository.observeMatch(matchId).collect { match ->
+                if (match.status == "ABANDONED") {
+                    showOpponentLeftDialog = true
                 }
             }
         }
-        onDispose { pollingJob?.cancel() }
     }
 
     if (showOpponentLeftDialog) {

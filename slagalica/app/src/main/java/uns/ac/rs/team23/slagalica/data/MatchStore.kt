@@ -8,12 +8,30 @@ object MatchStore {
     var matchId: String = ""
     var opponentUsername: String = ""
     var isFriendly: Boolean = false
+
+    /** Uid of this device's user. */
+    var myUid: String = ""
+
+    /** Uid of the match host (= player1Id), the authoritative referee for every game. */
+    var hostId: String = ""
+
+    /** This device referees the match when it is player1. */
+    val isHost: Boolean get() = myUid.isNotBlank() && myUid == hostId
+
     var currentGameIndex by mutableStateOf(0)
 
-    fun set(id: String, opponent: String, friendly: Boolean = false) {
+    fun set(
+        id: String,
+        opponent: String,
+        friendly: Boolean = false,
+        myUid: String = "",
+        hostId: String = "",
+    ) {
         matchId = id
         opponentUsername = opponent
         isFriendly = friendly
+        this.myUid = myUid
+        this.hostId = hostId
         currentGameIndex = 0
     }
 
@@ -21,6 +39,8 @@ object MatchStore {
         matchId = ""
         opponentUsername = ""
         isFriendly = false
+        myUid = ""
+        hostId = ""
         currentGameIndex = 0
     }
 

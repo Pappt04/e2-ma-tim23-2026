@@ -22,8 +22,11 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -46,6 +49,16 @@ fun KoZnaZnaScreen(
 ) {
     val state by viewModel.state.collectAsState()
 
+    LaunchedEffect(Unit) { viewModel.enter() }
+
+    // Both clients reach ROUND_END together (driven by the shared doc); auto-advance to the next game.
+    LaunchedEffect(state.phase) {
+        if (state.phase == KoZnaZnaPhase.ROUND_END) {
+            delay(4_000)
+            onFinish()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -53,7 +66,7 @@ fun KoZnaZnaScreen(
                     Column {
                         Text("Ko zna zna", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            text = "$player1Name: ${state.player1Points}   $player2Name (sim): ${state.player2Points}",
+                            text = "$player1Name: ${state.player1Points}   $player2Name: ${state.player2Points}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -73,19 +86,21 @@ fun KoZnaZnaScreen(
                 .padding(innerPadding),
         ) {
             when (state.phase) {
-                KoZnaZnaPhase.ROUND_INTRO -> IntroContent(
-                    onStart = viewModel::startRound,
-                )
-                KoZnaZnaPhase.PLAYING -> PlayingContent(
-                    state = state,
-                    onAnswer = viewModel::submitPlayer1Answer,
-                )
+                KoZnaZnaPhase.ROUND_INTRO -> WaitingContent()
+                KoZnaZnaPhase.PLAYING ->
+                    if (state.questions.isEmpty()) {
+                        WaitingContent()
+                    } else {
+                        PlayingContent(
+                            state = state,
+                            player2Name = player2Name,
+                            onAnswer = viewModel::submitPlayer1Answer,
+                        )
+                    }
                 KoZnaZnaPhase.ROUND_END -> RoundEndContent(
                     state = state,
                     player1Name = player1Name,
                     player2Name = player2Name,
-                    onPlayAgain = viewModel::resetToIntro,
-                    onFinish = onFinish,
                 )
             }
         }
@@ -93,39 +108,23 @@ fun KoZnaZnaScreen(
 }
 
 @Composable
-private fun IntroContent(onStart: () -> Unit) {
+private fun WaitingContent() {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
-        ElevatedCard(modifier = Modifier.fillMaxWidth()) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Text("Round 1", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                Text("Ko zna zna", style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.primary)
-                HorizontalDivider()
-                Text(
-                    text = "5 questions, 4 choices each.\nRound time: 25 seconds.\nEach question: 5 seconds.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                )
-                Text(
-                    text = "Correct: +10, Wrong: -5.\nIf both are correct, faster player gets points.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) {
-                    Text("Start Round")
-                }
-            }
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            CircularProgressIndicator()
+            Text(
+                text = "Syncing with your opponent...",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -133,6 +132,7 @@ private fun IntroContent(onStart: () -> Unit) {
 @Composable
 private fun PlayingContent(
     state: KoZnaZnaState,
+    player2Name: String,
     onAnswer: (Int) -> Unit,
 ) {
     val question = state.questions[state.currentQuestionIndex]
@@ -184,7 +184,10 @@ private fun PlayingContent(
         }
         Spacer(modifier = Modifier.weight(1f))
         Text(
-            text = "Answer within 5 seconds per question. Opponent score in the title bar is simulated (you never see their picks).",
+            text = if (state.player2SelectedIndex != null)
+                "$player2Name has answered."
+            else
+                "Answer within 5 seconds. Waiting for $player2Name...",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -211,8 +214,6 @@ private fun RoundEndContent(
     state: KoZnaZnaState,
     player1Name: String,
     player2Name: String,
-    onPlayAgain: () -> Unit,
-    onFinish: () -> Unit,
 ) {
     val result = when {
         state.player1Points > state.player2Points -> "$player1Name wins"
@@ -245,7 +246,7 @@ private fun RoundEndContent(
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
-                Text("Opponent (simulated total)", style = MaterialTheme.typography.labelMedium)
+                Text("$player2Name", style = MaterialTheme.typography.labelMedium)
                 Text(
                     text = "${state.player2Points} pts",
                     style = MaterialTheme.typography.headlineSmall,
@@ -267,11 +268,10 @@ private fun RoundEndContent(
             }
         }
         Spacer(modifier = Modifier.weight(1f))
-        Button(onClick = onPlayAgain, modifier = Modifier.fillMaxWidth()) {
-            Text("Play Again")
-        }
-        OutlinedButton(onClick = onFinish, modifier = Modifier.fillMaxWidth()) {
-            Text("Back to Games")
-        }
+        Text(
+            text = "Next game starting...",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
