@@ -13,12 +13,14 @@ import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.models.Notification
 import uns.ac.rs.team23.slagalica.models.NotificationType
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
+import uns.ac.rs.team23.slagalica.repository.NotificationRepository
 import uns.ac.rs.team23.slagalica.services.SlagalicaFcmService
 
 enum class NotificationFilter { ALL, UNREAD, READ }
 
 class NotificationsViewModel(
     private val matchRepository: MatchRepository,
+    private val notificationRepository: NotificationRepository,
 ) : ViewModel() {
 
     private val _notifications = MutableStateFlow(emptyList<Notification>())
@@ -27,22 +29,42 @@ class NotificationsViewModel(
     private val _filter = MutableStateFlow(NotificationFilter.ALL)
     val filter: StateFlow<NotificationFilter> = _filter.asStateFlow()
 
-    // notificationId -> seconds remaining for invite countdown
     private val _inviteCountdowns = MutableStateFlow<Map<String, Int>>(emptyMap())
     val inviteCountdowns: StateFlow<Map<String, Int>> = _inviteCountdowns.asStateFlow()
 
     private val countdownJobs = mutableMapOf<String, Job>()
 
     init {
+        loadNotifications()
+        fetchPendingInvites()
         viewModelScope.launch {
             SlagalicaFcmService.events.collect { incoming ->
-                _notifications.update { listOf(incoming) + it }
-                if (incoming.type == NotificationType.INVITE && incoming.inviteId != null) {
-                    startInviteCountdown(incoming.id, incoming.inviteId)
-                }
+                addNotification(incoming)
             }
         }
-        fetchPendingInvites()
+    }
+
+    private fun loadNotifications() {
+        viewModelScope.launch {
+            notificationRepository.getNotifications().onSuccess { saved ->
+                _notifications.update { current ->
+                    val existingIds = current.map { it.id }.toSet()
+                    val newOnes = saved.filter { it.id !in existingIds }
+                    current + newOnes
+                }
+                _notifications.value
+                    .filter { it.type == NotificationType.INVITE && it.inviteId != null && !it.isRead }
+                    .forEach { n -> if (n.inviteId != null) startInviteCountdown(n.id, n.inviteId) }
+            }
+        }
+    }
+
+    private fun addNotification(notification: Notification) {
+        _notifications.update { listOf(notification) + it.filter { n -> n.id != notification.id } }
+        viewModelScope.launch { notificationRepository.saveNotification(notification) }
+        if (notification.type == NotificationType.INVITE && notification.inviteId != null) {
+            startInviteCountdown(notification.id, notification.inviteId)
+        }
     }
 
     private fun fetchPendingInvites() {
@@ -81,7 +103,6 @@ class NotificationsViewModel(
                 delay(1_000)
                 _inviteCountdowns.update { it + (notificationId to sec) }
             }
-            // Auto-reject on timeout
             respondToInvite(inviteId, accept = false, notificationId = notificationId)
         }
     }
@@ -105,24 +126,18 @@ class NotificationsViewModel(
         }
     }
 
-    val filtered get() = _notifications.value.filter {
-        when (_filter.value) {
-            NotificationFilter.ALL -> true
-            NotificationFilter.UNREAD -> !it.isRead
-            NotificationFilter.READ -> it.isRead
-        }
-    }
-
     fun setFilter(f: NotificationFilter) { _filter.value = f }
 
     fun markAsRead(id: String) {
         _notifications.update { list ->
             list.map { if (it.id == id) it.copy(isRead = true) else it }
         }
+        viewModelScope.launch { notificationRepository.markAsRead(id) }
     }
 
     fun markAllAsRead() {
         _notifications.update { list -> list.map { it.copy(isRead = true) } }
+        viewModelScope.launch { notificationRepository.markAllAsRead() }
     }
 
     override fun onCleared() {

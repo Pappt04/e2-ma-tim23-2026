@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uns.ac.rs.team23.slagalica.data.MatchStore
+import uns.ac.rs.team23.slagalica.repository.MatchRepository
 
 // ─── Simboli ───────────────────────────────────────────────────────────────
 
@@ -55,7 +57,9 @@ data class SkockoState(
 
 // ─── ViewModel ──────────────────────────────────────────────────────────────
 
-class SkockoViewModel : ViewModel() {
+class SkockoViewModel(
+    private val matchRepository: MatchRepository,
+) : ViewModel() {
 
     private val _state = MutableStateFlow(SkockoState())
     val state: StateFlow<SkockoState> = _state.asStateFlow()
@@ -169,7 +173,17 @@ class SkockoViewModel : ViewModel() {
                 awaitingRoundEndConfirm = false
             )}
         } else {
+            val s = _state.value
             _state.update { it.copy(phase = SkockoPhase.GAME_OVER) }
+            submitMatchScore(s.player1Points)
+        }
+    }
+
+    private fun submitMatchScore(score: Int) {
+        val matchId = MatchStore.matchId
+        if (matchId.isBlank()) return
+        viewModelScope.launch {
+            matchRepository.submitScore(matchId, score)
         }
     }
 

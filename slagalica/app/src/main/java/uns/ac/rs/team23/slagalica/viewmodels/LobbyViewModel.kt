@@ -30,8 +30,11 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
     private var pollingJob: Job? = null
     private var myUsername: String = ""
 
+    private var currentFriendly: Boolean = false
+
     fun startSearch(username: String, friendly: Boolean = false) {
         myUsername = username
+        currentFriendly = friendly
         _state.value = LobbyState.Searching
         viewModelScope.launch {
             matchRepository.startRandomMatch(friendly)
@@ -52,16 +55,31 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
     private fun startPolling() {
         pollingJob?.cancel()
         pollingJob = viewModelScope.launch {
-            repeat(60) {
+            repeat(60) { attempt ->
                 delay(2_000)
+                // Check if our own waiting match was joined by someone else
                 matchRepository.getCurrentMatch()
                     .onSuccess { match ->
                         if (match != null && match.status == "IN_PROGRESS" && match.player2Username != null) {
                             val opponent = resolveOpponent(match.player1Username, match.player2Username)
                             onMatchFound(match.id, opponent)
                             pollingJob?.cancel()
+                            return@onSuccess
                         }
                     }
+                if (_state.value !is LobbyState.Searching) return@repeat
+
+                // Every 3rd poll, also try to join another waiting match (handles race condition)
+                if (attempt % 3 == 2) {
+                    matchRepository.tryJoinWaiting(myUsername, currentFriendly)
+                        .onSuccess { joined ->
+                            if (joined != null) {
+                                val opponent = resolveOpponent(joined.player1Username, joined.player2Username ?: "")
+                                onMatchFound(joined.id, opponent)
+                                pollingJob?.cancel()
+                            }
+                        }
+                }
             }
             if (_state.value is LobbyState.Searching) {
                 _state.value = LobbyState.Error("No opponent found. Try again.")

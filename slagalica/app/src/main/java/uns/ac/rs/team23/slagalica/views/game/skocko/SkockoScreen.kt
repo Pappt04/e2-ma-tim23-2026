@@ -321,7 +321,7 @@ private fun GameContent(
                 modifier = Modifier
                     .weight(0.28f)
                     .fillMaxHeight(),
-                verticalArrangement = Arrangement.SpaceEvenly,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
@@ -571,9 +571,7 @@ private fun SymbolButton(
     OutlinedButton(
         onClick = onClick,
         enabled = enabled,
-        modifier = Modifier
-            .fillMaxWidth()
-            .aspectRatio(1f),          // kvadratno dugme
+        modifier = Modifier.size(44.dp),
         colors = ButtonDefaults.outlinedButtonColors(
             containerColor = Color.Transparent,
             contentColor = Color(symbol.hexColor),
@@ -589,11 +587,18 @@ private fun SymbolButton(
 @Composable
 private fun SymbolContent(symbol: SkockoSymbol, compact: Boolean) {
     if (symbol == SkockoSymbol.SKOCKO) {
-        Image(
-            painter = painterResource(id = R.drawable.ic_launcher_foreground),
-            contentDescription = "Skočko",
-            modifier = Modifier.size(if (compact) 16.dp else 24.dp),
-        )
+        Box(
+            modifier = Modifier
+                .size(if (compact) 20.dp else 28.dp)
+                .background(Color(0xFF4CAF50), androidx.compose.foundation.shape.CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                contentDescription = "Skočko",
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     } else {
         Text(
             text = symbol.label,

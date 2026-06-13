@@ -22,13 +22,35 @@ import uns.ac.rs.team23.slagalica.models.NotificationType
 class SlagalicaFcmService : FirebaseMessagingService() {
 
     companion object {
-        private const val CHANNEL_ID = "slagalica_notifications"
+        const val CHANNEL_CHAT = "channel_chat"
+        const val CHANNEL_RANKING = "channel_ranking"
+        const val CHANNEL_REWARD = "channel_reward"
+        const val CHANNEL_OTHER = "channel_other"
 
         private val _events = MutableSharedFlow<Notification>(extraBufferCapacity = 64)
         val events: SharedFlow<Notification> = _events.asSharedFlow()
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    override fun onCreate() {
+        super.onCreate()
+        ensureChannelsCreated()
+    }
+
+    private fun ensureChannelsCreated() {
+        val manager = getSystemService(NotificationManager::class.java)
+        listOf(
+            NotificationChannel(CHANNEL_CHAT, "Chat", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Obaveštenja u četu" },
+            NotificationChannel(CHANNEL_RANKING, "Rangiranje", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Obaveštenja o rangiranju" },
+            NotificationChannel(CHANNEL_REWARD, "Nagrade", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "Obaveštenja o nagradama" },
+            NotificationChannel(CHANNEL_OTHER, "Ostalo", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Pozivi za prijatelje i ostala obaveštenja" },
+        ).forEach { manager.createNotificationChannel(it) }
+    }
 
     override fun onNewToken(token: String) {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
@@ -61,31 +83,54 @@ class SlagalicaFcmService : FirebaseMessagingService() {
             isRead = false,
             timestamp = "Just now",
             inviteId = inviteId,
+            createdAtMillis = System.currentTimeMillis(),
         )
 
         _events.tryEmit(notification)
-        showNotification(title, body)
+        showNotification(title, body, notifType)
+        saveToFirestore(notification)
     }
 
-    private fun showNotification(title: String, message: String) {
+    private fun showNotification(title: String, message: String, type: NotificationType) {
         val manager = NotificationManagerCompat.from(this)
         if (!manager.areNotificationsEnabled()) return
 
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "Slagalica Notifications",
-            NotificationManager.IMPORTANCE_DEFAULT,
-        ).apply { description = "Match invites, challenges, and game events" }
-        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+        val channelId = when (type) {
+            NotificationType.CHAT -> CHANNEL_CHAT
+            NotificationType.RANKING -> CHANNEL_RANKING
+            NotificationType.REWARD -> CHANNEL_REWARD
+            else -> CHANNEL_OTHER
+        }
 
-        val notif = NotificationCompat.Builder(this, CHANNEL_ID)
+        val notif = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.slagalica_logo)
             .setContentTitle(title)
             .setContentText(message)
-            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setPriority(
+                if (type == NotificationType.REWARD) NotificationCompat.PRIORITY_HIGH
+                else NotificationCompat.PRIORITY_DEFAULT
+            )
             .setAutoCancel(true)
             .build()
         manager.notify(System.currentTimeMillis().toInt(), notif)
+    }
+
+    private fun saveToFirestore(notification: Notification) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return
+        val ref = FirebaseFirestore.getInstance()
+            .collection("users").document(uid)
+            .collection("notifications").document(notification.id)
+        ref.set(
+            mapOf(
+                "id" to notification.id,
+                "title" to notification.title,
+                "message" to notification.message,
+                "type" to notification.type.name,
+                "isRead" to false,
+                "inviteId" to notification.inviteId,
+                "createdAtMillis" to notification.createdAtMillis,
+            )
+        )
     }
 
     override fun onDestroy() {

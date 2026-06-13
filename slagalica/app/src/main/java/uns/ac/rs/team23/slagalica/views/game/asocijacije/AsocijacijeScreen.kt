@@ -29,14 +29,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.*
 
-// ─── Boje ───────────────────────────────────────────────────────────────────
-
-private val BgBlue        = Color(0xFF0D47A1)
-private val CardWord      = Color(0xFF64B5F6)    // svetlo plava – obična polja
-private val CardColumn    = Color(0xFF1565C0)    // tamno plava – A/B/C/D polja
-private val CardFinalHide = Color(0xFF6A1B9A)    // ljubičasta – finalno (sakriveno)
-private val CardFinalSolv = Color(0xFF6A1B9A)    // ljubičasta – finalno (rešeno)
-private val TextOnDark    = Color.White
 
 // ─── Glavni Screen ───────────────────────────────────────────────────────────
 
@@ -51,15 +43,8 @@ fun AsocijacijeScreen(
     val state by viewModel.state.collectAsState()
 
     Scaffold(
-        containerColor = BgBlue,
         topBar = {
             TopAppBar(
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = Color(0xFF0A3880),
-                    titleContentColor = Color.White,
-                    navigationIconContentColor = Color.White,
-                    actionIconContentColor = Color.White,
-                ),
                 title = {
                     Column {
                         Text("Asocijacije", style = MaterialTheme.typography.titleMedium)
@@ -102,13 +87,13 @@ fun AsocijacijeScreen(
                 LinearProgressIndicator(
                     progress = { state.secondsLeft / 120f },
                     modifier = Modifier.fillMaxWidth(),
-                    color = if (state.secondsLeft <= 15) MaterialTheme.colorScheme.primary else Color(0xFF42A5F5),
-                    trackColor = Color.White.copy(alpha = 0.2f),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
                 )
             }
 
             when (state.phase) {
-                AsocijacijePhase.ROUND_INTRO -> RoundIntroContent(
+                AsocijacijePhase.ROUND_INTRO, AsocijacijePhase.LOADING -> RoundIntroContent(
                     round = state.currentRound,
                     activeName = if (state.currentRound == 1) player1Name else player2Name,
                     onStart = viewModel::startRound,
@@ -234,7 +219,7 @@ private fun PlayingContent(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(Color(0xFF1A237E))
+                .background(MaterialTheme.colorScheme.primaryContainer)
                 .padding(vertical = 6.dp, horizontal = 16.dp),
         ) {
             Text(
@@ -242,7 +227,7 @@ private fun PlayingContent(
                     "$activeName pogađa..."
                 else
                     "$activeName otkriva polje",
-                color = Color.White,
+                color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
             )
@@ -276,10 +261,16 @@ private fun PlayingContent(
                         else -> "RESENJE"
                     },
                     backgroundColor = when {
-                        finalWrong -> Color(0xFFD32F2F)
-                        state.isFinalSolved -> CardFinalSolv
-                        finalSelected -> Color(0xFF8E24AA)
-                        else -> CardFinalHide
+                        finalWrong -> MaterialTheme.colorScheme.error
+                        state.isFinalSolved -> MaterialTheme.colorScheme.tertiary
+                        finalSelected -> MaterialTheme.colorScheme.secondary
+                        else -> MaterialTheme.colorScheme.secondaryContainer
+                    },
+                    textColor = when {
+                        finalWrong -> MaterialTheme.colorScheme.onError
+                        state.isFinalSolved -> MaterialTheme.colorScheme.onTertiary
+                        finalSelected -> MaterialTheme.colorScheme.onSecondary
+                        else -> MaterialTheme.colorScheme.onSecondaryContainer
                     },
                     modifier = Modifier
                         .weight(1f)
@@ -289,12 +280,11 @@ private fun PlayingContent(
                     clickable = finalClickable,
                     onClick = { onSelectTarget(GuessTarget.Final) },
                 )
-                OutlinedButton(
+                Button(
                     onClick = onPass,
                     enabled = canGuessNow,
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color(0xFFC62828),
-                        contentColor = Color.White,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error,
                     ),
                     modifier = Modifier.height(56.dp),
                 ) { Text("Dalje") }
@@ -341,7 +331,8 @@ private fun PairWordRow(
             val fieldLabel = "${('A'.code + col).toChar()}${row + 1}"
             AssocCell(
                 text = if (isRevealed || column.isSolved) column.words[row] else fieldLabel,
-                backgroundColor = CardWord,
+                backgroundColor = MaterialTheme.colorScheme.primaryContainer,
+                textColor = MaterialTheme.colorScheme.onPrimaryContainer,
                 modifier = Modifier
                     .weight(1f)
                     .height(60.dp),
@@ -380,8 +371,12 @@ private fun PairAnswerRow(
                     else -> answerLabel
                 },
                 backgroundColor = when {
-                    wrong -> Color(0xFFD32F2F)
-                    else -> CardColumn
+                    wrong -> MaterialTheme.colorScheme.error
+                    else -> MaterialTheme.colorScheme.primary
+                },
+                textColor = when {
+                    wrong -> MaterialTheme.colorScheme.onError
+                    else -> MaterialTheme.colorScheme.onPrimary
                 },
                 modifier = Modifier
                     .weight(1f)
@@ -401,6 +396,7 @@ private fun AssocCell(
     text: String,
     backgroundColor: Color,
     modifier: Modifier = Modifier,
+    textColor: Color = Color.White,
     fontWeight: FontWeight = FontWeight.SemiBold,
     fontSize: androidx.compose.ui.unit.TextUnit = 11.sp,
     clickable: Boolean = false,
@@ -413,7 +409,7 @@ private fun AssocCell(
             .background(backgroundColor)
             .then(
                 if (clickable) Modifier
-                    .border(2.dp, Color.White.copy(alpha = 0.4f), shape)
+                    .border(2.dp, textColor.copy(alpha = 0.4f), shape)
                     .clickable(onClick = onClick)
                 else Modifier
             ),
@@ -421,7 +417,7 @@ private fun AssocCell(
     ) {
         Text(
             text = text,
-            color = TextOnDark,
+            color = textColor,
             fontWeight = fontWeight,
             fontSize = fontSize,
             textAlign = TextAlign.Center,

@@ -18,4 +18,5 @@ data class Notification(
     val isRead: Boolean = false,
     val timestamp: String = "",
     val inviteId: String? = null,
+    val createdAtMillis: Long = System.currentTimeMillis(),
 )
