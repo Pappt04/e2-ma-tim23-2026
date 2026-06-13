@@ -217,7 +217,7 @@ private fun PlayingPhase(
             Text("Time left: ${state.secondsLeft}s", fontWeight = FontWeight.SemiBold)
         } else {
             LinearProgressIndicator(
-                progress = { state.secondsLeft / 45f },
+                progress = { state.secondsLeft / 30f },
                 modifier = Modifier.fillMaxWidth(),
             )
             Text("Starter time left: ${state.secondsLeft}s", fontWeight = FontWeight.SemiBold)
