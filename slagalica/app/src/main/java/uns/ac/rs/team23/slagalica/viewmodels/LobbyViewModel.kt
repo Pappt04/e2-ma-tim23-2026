@@ -16,8 +16,8 @@ sealed class LobbyState {
     data object Searching : LobbyState()
     data class InviteSent(val inviteId: String, val opponentName: String) : LobbyState()
     data class Error(val message: String) : LobbyState()
-    data class OpponentFound(val opponentName: String) : LobbyState()
-    data class YouAreReady(val opponentName: String) : LobbyState()
+    data class OpponentFound(val opponentName: String, val opponentReady: Boolean = false) : LobbyState()
+    data class YouAreReady(val opponentName: String, val opponentReady: Boolean = false) : LobbyState()
     data class Countdown(val opponentName: String, val seconds: Int) : LobbyState()
     data object Starting : LobbyState()
 }
@@ -28,9 +28,13 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
     val state: StateFlow<LobbyState> = _state.asStateFlow()
 
     private var pollingJob: Job? = null
+    private var observerJob: Job? = null
+    private var countdownJob: Job? = null
     private var myUsername: String = ""
 
     private var currentFriendly: Boolean = false
+    private var opponentReadyLocal: Boolean = false
+    private var myReadyLocal: Boolean = false
 
     fun startSearch(username: String, friendly: Boolean = false) {
         myUsername = username
@@ -57,7 +61,6 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
         pollingJob = viewModelScope.launch {
             repeat(60) { attempt ->
                 delay(2_000)
-                // Check if our own waiting match was joined by someone else
                 matchRepository.getCurrentMatch()
                     .onSuccess { match ->
                         if (match != null && match.status == "IN_PROGRESS" && match.player2Username != null) {
@@ -69,7 +72,6 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                     }
                 if (_state.value !is LobbyState.Searching) return@repeat
 
-                // Every 3rd poll, also try to join another waiting match (handles race condition)
                 if (attempt % 3 == 2) {
                     matchRepository.tryJoinWaiting(myUsername, currentFriendly)
                         .onSuccess { joined ->
@@ -91,6 +93,8 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
         if (player1 == myUsername) player2 else player1
 
     private fun onMatchFound(matchId: String, opponentName: String, hostId: String) {
+        myReadyLocal = false
+        opponentReadyLocal = false
         MatchStore.set(
             matchId,
             opponentName,
@@ -99,6 +103,30 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
             hostId = hostId,
         )
         _state.value = LobbyState.OpponentFound(opponentName)
+        startMatchObserver(matchId, opponentName)
+    }
+
+    private fun startMatchObserver(matchId: String, opponentName: String) {
+        observerJob?.cancel()
+        observerJob = viewModelScope.launch {
+            matchRepository.observeMatch(matchId).collect { match ->
+                val myUid = matchRepository.currentUserId() ?: return@collect
+                val iAmPlayer1 = match.player1Id == myUid
+                val newOpponentReady = if (iAmPlayer1) match.player2Ready else match.player1Ready
+                opponentReadyLocal = newOpponentReady
+
+                val current = _state.value
+                if (current is LobbyState.Countdown || current is LobbyState.Starting) return@collect
+
+                if (myReadyLocal && newOpponentReady) {
+                    startCountdown(opponentName)
+                } else if (myReadyLocal) {
+                    _state.value = LobbyState.YouAreReady(opponentName, newOpponentReady)
+                } else {
+                    _state.value = LobbyState.OpponentFound(opponentName, newOpponentReady)
+                }
+            }
+        }
     }
 
     fun clickReady() {
@@ -107,11 +135,22 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
             is LobbyState.OpponentFound -> s.opponentName
             else -> return
         }
-        _state.value = LobbyState.YouAreReady(opponent)
+        myReadyLocal = true
+        _state.value = LobbyState.YouAreReady(opponent, opponentReadyLocal)
         viewModelScope.launch {
+            matchRepository.markReady(MatchStore.matchId)
+        }
+        if (opponentReadyLocal) {
+            startCountdown(opponent)
+        }
+    }
+
+    private fun startCountdown(opponentName: String) {
+        if (countdownJob != null) return
+        countdownJob = viewModelScope.launch {
             delay(1_500)
             for (i in 3 downTo 1) {
-                _state.value = LobbyState.Countdown(opponent, i)
+                _state.value = LobbyState.Countdown(opponentName, i)
                 delay(1_000)
             }
             _state.value = LobbyState.Starting
@@ -150,6 +189,9 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
 
     fun cancel() {
         pollingJob?.cancel()
+        observerJob?.cancel()
+        countdownJob?.cancel()
+        countdownJob = null
         viewModelScope.launch { matchRepository.cancelQueue() }
         MatchStore.clear()
         _state.value = LobbyState.Idle
@@ -157,6 +199,8 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
 
     override fun onCleared() {
         pollingJob?.cancel()
+        observerJob?.cancel()
+        countdownJob?.cancel()
         super.onCleared()
     }
 }

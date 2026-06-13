@@ -379,6 +379,14 @@ class FirebaseMatchRepository(
             .await()
     }
 
+    override suspend fun markReady(matchId: String): Result<Unit> = runCatching {
+        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val matchRef = firestore.collection("matches").document(matchId)
+        val match = matchRef.get().await()
+        val field = if (match.getString("player1Id") == uid) "player1Ready" else "player2Ready"
+        matchRef.update(field, true).await()
+    }
+
     // --- Real-time match & game synchronization ---
 
     override fun observeMatch(matchId: String): Flow<MatchResponseDto> = callbackFlow {
@@ -517,5 +525,7 @@ class FirebaseMatchRepository(
             player1TotalScore = (getLong("player1TotalScore") ?: 0L).toInt(),
             player2TotalScore = (getLong("player2TotalScore") ?: 0L).toInt(),
             winnerId = getString("winnerId"),
+            player1Ready = getBoolean("player1Ready") ?: false,
+            player2Ready = getBoolean("player2Ready") ?: false,
         )
 }

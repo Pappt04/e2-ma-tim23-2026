@@ -20,6 +20,9 @@ interface MatchRepository {
     suspend fun respondToInvite(inviteId: String, accept: Boolean): Result<MatchResponseDto>
     suspend fun cancelInvite(inviteId: String): Result<Unit>
 
+    /** Mark the current user as ready in the match lobby. */
+    suspend fun markReady(matchId: String): Result<Unit>
+
     // --- Real-time match & game synchronization ---
 
     /** Live updates of the match document (status, scores, current game). */
