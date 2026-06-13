@@ -1,6 +1,7 @@
 package uns.ac.rs.team23.slagalica.repository
 
 import kotlinx.coroutines.flow.Flow
+import uns.ac.rs.team23.slagalica.network.dto.GameResultDto
 import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.network.dto.MatchInviteResponseDto
 import uns.ac.rs.team23.slagalica.network.dto.MatchResponseDto
@@ -27,6 +28,9 @@ interface MatchRepository {
 
     /** Live updates of the match document (status, scores, current game). */
     fun observeMatch(matchId: String): Flow<MatchResponseDto>
+
+    /** Per-game score breakdown written by [advanceMatch]. */
+    fun observeGameResults(matchId: String): Flow<List<GameResultDto>>
 
     /** Live updates of the shared live-state for one game, or null until the host creates it. */
     fun observeGameState(matchId: String, gameType: String): Flow<GameStateDto?>

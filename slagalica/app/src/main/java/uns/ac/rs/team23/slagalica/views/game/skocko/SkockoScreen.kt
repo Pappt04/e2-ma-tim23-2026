@@ -23,10 +23,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.R
+import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.*
+import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
 import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 import androidx.compose.runtime.Composable
 
@@ -97,6 +100,15 @@ fun SkockoScreen(
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.enter() }
+
+    MatchGameAdvanceEffect(thisGameIndex = MatchGameOrder.SKOCKO, onLeaveGame = onFinish)
+
+    LaunchedEffect(state.phase) {
+        if (state.phase == SkockoPhase.GAME_OVER) {
+            delay(3_000)
+            onFinish()
+        }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,

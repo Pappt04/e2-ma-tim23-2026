@@ -36,17 +36,11 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 
-private val GAME_ORDER = listOf(
-    "Ko zna zna",
-    "Spojnice",
-    "Asocijacije",
-    "Skočko",
-    "Korak po korak",
-    "Moj broj",
-)
+private val GAME_ORDER = MatchGameOrder.displayNames
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +51,7 @@ fun GameScreen(
     matchRepository: MatchRepository? = null,
     onForfeit: () -> Unit,
     onAllGamesFinished: () -> Unit = {},
+    onMatchCompleted: () -> Unit = {},
     onNavigateToKoZnaZna: () -> Unit = {},
     onNavigateToSpojnice: () -> Unit = {},
     onNavigateToKorakPoKorak: () -> Unit = {},
@@ -66,6 +61,7 @@ fun GameScreen(
 ) {
     var showForfeitDialog by remember { mutableStateOf(false) }
     var showOpponentLeftDialog by remember { mutableStateOf(false) }
+    var navigatedToResults by remember(matchId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
     val navigators = listOf(
@@ -77,7 +73,7 @@ fun GameScreen(
         onNavigateToMojBroj,
     )
 
-    // Drive navigation from Firebase currentGameIndex (source of truth after advanceMatch).
+    // Drive navigation from Firebase (source of truth after advanceMatch).
     LaunchedEffect(matchId, matchRepository) {
         if (matchId.isBlank() || matchRepository == null) {
             val idx = MatchStore.currentGameIndex
@@ -86,8 +82,16 @@ fun GameScreen(
         }
         matchRepository.observeMatch(matchId).collect { match ->
             MatchStore.currentGameIndex = match.currentGameIndex
-            val idx = match.currentGameIndex
-            if (idx < navigators.size) navigators[idx]() else onAllGamesFinished()
+            when {
+                match.status == "COMPLETED" -> {
+                    if (!navigatedToResults) {
+                        navigatedToResults = true
+                        onMatchCompleted()
+                    }
+                }
+                match.currentGameIndex < navigators.size -> navigators[match.currentGameIndex]()
+                else -> onAllGamesFinished()
+            }
         }
     }
 

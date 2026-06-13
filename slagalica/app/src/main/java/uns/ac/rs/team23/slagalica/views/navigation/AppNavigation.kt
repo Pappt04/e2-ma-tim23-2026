@@ -21,6 +21,7 @@ import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.UserSession
 import uns.ac.rs.team23.slagalica.views.HomeScreen
 import uns.ac.rs.team23.slagalica.views.game.GameScreen
+import uns.ac.rs.team23.slagalica.views.game.MatchResultsScreen
 import uns.ac.rs.team23.slagalica.views.game.asocijacije.AsocijacijeScreen
 import uns.ac.rs.team23.slagalica.views.game.korakpokorak.KorakPoKorakScreen
 import uns.ac.rs.team23.slagalica.views.game.koznazna.KoZnaZnaScreen
@@ -55,6 +56,7 @@ sealed class Screen(val route: String) {
     data object MojBroj : Screen("moj_broj")
     data object Skocko : Screen("skocko")
     data object Asocijacije : Screen("asocijacije")
+    data object MatchResults : Screen("match_results")
     data object Chat : Screen("chat/{region}") {
         fun route(region: String) = "chat/$region"
     }
@@ -241,6 +243,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
                 },
+                onMatchCompleted = {
+                    navController.navigate(Screen.MatchResults.route) {
+                        popUpTo(Screen.Game.route)
+                        launchSingleTop = true
+                    }
+                },
                 onNavigateToKorakPoKorak = { navController.navigate(Screen.KorakPoKorak.route) },
                 onNavigateToKoZnaZna = { navController.navigate(Screen.KoZnaZna.route) },
                 onNavigateToSpojnice = { navController.navigate(Screen.Spojnice.route) },
@@ -301,6 +309,20 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = { navController.popBackStack() },
+            )
+        }
+        composable(Screen.MatchResults.route) {
+            val session = userSession
+            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            MatchResultsScreen(
+                player1Name = MatchStore.player1Username.ifBlank { username },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
+                onDone = {
+                    MatchStore.clear()
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Screen.Chat.route) { backStack ->

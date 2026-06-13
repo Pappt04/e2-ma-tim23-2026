@@ -27,6 +27,13 @@ data class MatchResponseDto(
     val player2Ready: Boolean = false,
 )
 
+data class GameResultDto(
+    val gameType: String,
+    val gameIndex: Int,
+    val player1Score: Int,
+    val player2Score: Int,
+)
+
 data class MatchInviteResponseDto(
     val id: String,
     val inviterUsername: String,
