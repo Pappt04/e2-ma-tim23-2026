@@ -12,6 +12,24 @@ data class GameTypeStatistic(
         get() = if (gamesPlayed == 0) 0.0 else totalPoints.toDouble() / gamesPlayed
 }
 
+/**
+ * Per-game detail counters required by the spec (correct/incorrect ratios, per-step/per-attempt
+ * distributions, etc.). Each game accumulates these in Firestore as the player plays ranked matches.
+ */
+data class GameDetailStats(
+    val koCorrect: Int = 0,
+    val koIncorrect: Int = 0,
+    val mbFound: Int = 0,
+    val mbRounds: Int = 0,
+    val korakSteps: List<Int> = List(7) { 0 },
+    val korakSolved: Int = 0,
+    val asoSolved: Int = 0,
+    val asoUnsolved: Int = 0,
+    val skockoAttempts: List<Int> = List(6) { 0 },
+    val spojniceConnected: Int = 0,
+    val spojniceTotal: Int = 0,
+)
+
 /** A player's overall statistics, derived from completed matches in Firestore. */
 data class PlayerStatistics(
     val totalMatches: Int,
@@ -21,6 +39,7 @@ data class PlayerStatistics(
     val totalPoints: Int,
     val bestMatchScore: Int,
     val perGame: List<GameTypeStatistic>,
+    val detail: GameDetailStats = GameDetailStats(),
 ) {
     val winRate: Double
         get() = if (totalMatches == 0) 0.0 else wins * 100.0 / totalMatches

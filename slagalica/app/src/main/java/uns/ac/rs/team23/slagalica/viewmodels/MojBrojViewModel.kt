@@ -13,6 +13,7 @@ import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.repository.GameRepository
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
+import uns.ac.rs.team23.slagalica.repository.StatisticsRepository
 import uns.ac.rs.team23.slagalica.utils.ExpressionEvaluator
 import kotlin.math.abs
 
@@ -74,6 +75,7 @@ data class MojBrojState(
 class MojBrojViewModel(
     private val gameRepository: GameRepository,
     private val matchRepository: MatchRepository,
+    private val statisticsRepository: StatisticsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(MojBrojState())
@@ -96,6 +98,23 @@ class MojBrojViewModel(
     private var hostStopRequested = false
     /** Host-only guard so each countdown phase advances exactly once. */
     private var lastCountdownKey = ""
+    /** Stats guard: round already recorded into the local player's stats. */
+    private var lastStatRound = -1
+
+    private fun recordStats(increments: Map<String, Long>) {
+        if (matchId.isBlank() || MatchStore.isFriendly) return
+        viewModelScope.launch { statisticsRepository.recordGameStats(GAME_TYPE, increments) }
+    }
+
+    /** Record whether the local player hit the exact target for this round (once per round). */
+    private fun maybeRecordRoundStats() {
+        val s = _state.value
+        if (s.phase != MojBrojPhase.RoundEnd || s.currentRound == lastStatRound) return
+        lastStatRound = s.currentRound
+        val myResult = if (isHost) s.player1Answer else s.player2Answer
+        val found = if (myResult != null && myResult == s.targetNumber) 1L else 0L
+        recordStats(mapOf("rounds" to 1L, "found" to found))
+    }
 
     fun enter() {
         if (started) return
@@ -191,6 +210,7 @@ class MojBrojViewModel(
                 } else {
                     rebuildState()
                 }
+                maybeRecordRoundStats()
                 delay(200)
             }
         }

@@ -1,5 +1,6 @@
 package uns.ac.rs.team23.slagalica.views.profile
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -35,6 +36,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
+import uns.ac.rs.team23.slagalica.utils.QrGenerator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -166,21 +168,33 @@ fun ProfileScreen(
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         Text("Friend Invite QR Code", style = MaterialTheme.typography.titleMedium)
+                        val inviteCode = "slagalica-friend:$username"
+                        val qrBitmap = remember(username) { QrGenerator.generate(inviteCode) }
                         Box(
                             modifier = Modifier
-                                .size(140.dp)
+                                .size(160.dp)
                                 .clip(RoundedCornerShape(12.dp))
-                                .background(MaterialTheme.colorScheme.surfaceVariant),
+                                .background(Color.White)
+                                .padding(8.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text(
-                                text = "QR",
-                                style = MaterialTheme.typography.displayLarge,
-                                fontWeight = FontWeight.Bold,
-                            )
+                            if (qrBitmap != null) {
+                                Image(
+                                    bitmap = qrBitmap,
+                                    contentDescription = "Friend invite QR code",
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            } else {
+                                Text(
+                                    text = "QR",
+                                    style = MaterialTheme.typography.displayLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black,
+                                )
+                            }
                         }
                         Text(
-                            text = "scan://$username",
+                            text = inviteCode,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

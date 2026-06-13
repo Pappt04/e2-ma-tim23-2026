@@ -14,6 +14,7 @@ import uns.ac.rs.team23.slagalica.models.KorakPoKorakQuestion
 import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.repository.GameRepository
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
+import uns.ac.rs.team23.slagalica.repository.StatisticsRepository
 
 enum class KorakPhase { RoundIntro, Loading, PlayerTurn, OpponentChance, RoundEnd, GameOver }
 
@@ -47,6 +48,7 @@ data class KorakPoKorakState(
 class KorakPoKorakViewModel(
     private val gameRepository: GameRepository,
     private val matchRepository: MatchRepository,
+    private val statisticsRepository: StatisticsRepository,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(KorakPoKorakState())
@@ -69,6 +71,14 @@ class KorakPoKorakViewModel(
 
     /** Host-only: the full clue list / answer for the active question. */
     private var hostClues: List<String> = emptyList()
+
+    /** Stats guard so the active player's solve is recorded at most once per round. */
+    private var statSolveRecorded = false
+
+    private fun recordStats(increments: Map<String, Long>) {
+        if (matchId.isBlank() || MatchStore.isFriendly) return
+        viewModelScope.launch { statisticsRepository.recordGameStats(GAME_TYPE, increments) }
+    }
 
     fun enter() {
         if (started) return
@@ -150,6 +160,12 @@ class KorakPoKorakViewModel(
         }
         val opp = s.phase == KorakPhase.OpponentChance
         val points = if (opp) 5 else 20 - 2 * (s.currentStep - 1)
+        // Spec stat: which step the active player guessed the concept at.
+        if (!opp && !statSolveRecorded) {
+            statSolveRecorded = true
+            val step = s.currentStep.coerceIn(1, 7)
+            recordStats(mapOf("step$step" to 1L, "solved" to 1L))
+        }
         _state.update { it.copy(currentAnswer = "", showWrongFeedback = false) }
         if (authoritative) applyFinish(points, opp)
         else sendIntent(mapOf("t" to "solve", "pts" to points, "opp" to opp))
@@ -270,6 +286,7 @@ class KorakPoKorakViewModel(
 
     private fun buildRoundState(round: Int, q: KorakPoKorakQuestion): KorakPoKorakState {
         val prev = _state.value
+        statSolveRecorded = false
         return KorakPoKorakState(
             currentRound = round,
             phase = KorakPhase.PlayerTurn,
