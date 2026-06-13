@@ -9,6 +9,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import uns.ac.rs.team23.slagalica.network.dto.GameResultDto
 import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.network.dto.MatchInviteResponseDto
 import uns.ac.rs.team23.slagalica.network.dto.MatchResponseDto
@@ -394,6 +395,25 @@ class FirebaseMatchRepository(
             .addSnapshotListener { snap, err ->
                 if (err != null) return@addSnapshotListener
                 if (snap != null && snap.exists()) trySend(snap.toMatchResponseDto())
+            }
+        awaitClose { reg.remove() }
+    }
+
+    override fun observeGameResults(matchId: String): Flow<List<GameResultDto>> = callbackFlow {
+        val reg = firestore.collection("matches").document(matchId)
+            .collection("gameResults")
+            .addSnapshotListener { snaps, err ->
+                if (err != null) return@addSnapshotListener
+                val results = snaps?.documents?.mapNotNull { doc ->
+                    val type = doc.getString("gameType") ?: return@mapNotNull null
+                    GameResultDto(
+                        gameType = type,
+                        gameIndex = (doc.getLong("gameIndex") ?: 0L).toInt(),
+                        player1Score = (doc.getLong("player1Score") ?: 0L).toInt(),
+                        player2Score = (doc.getLong("player2Score") ?: 0L).toInt(),
+                    )
+                }?.sortedBy { it.gameIndex } ?: emptyList()
+                trySend(results)
             }
         awaitClose { reg.remove() }
     }

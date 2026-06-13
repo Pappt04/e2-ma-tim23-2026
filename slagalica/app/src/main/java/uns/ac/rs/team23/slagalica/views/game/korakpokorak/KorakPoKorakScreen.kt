@@ -21,14 +21,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPhase
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakViewModel
+import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
 import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -42,6 +45,18 @@ fun KorakPoKorakScreen(
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.enter() }
+
+    MatchGameAdvanceEffect(
+        thisGameIndex = MatchGameOrder.KORAK_PO_KORAK,
+        onLeaveGame = onFinish,
+    )
+
+    LaunchedEffect(state.phase) {
+        if (state.phase == KorakPhase.GameOver) {
+            delay(3_000)
+            onFinish()
+        }
+    }
 
     val activeName = when (state.phase) {
         KorakPhase.OpponentChance -> if (state.currentRound == 1) player2Name else player1Name

@@ -33,10 +33,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaPhase
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaQuestion
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaState
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaViewModel
+import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
 import androidx.compose.runtime.collectAsState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,6 +52,8 @@ fun KoZnaZnaScreen(
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.enter() }
+
+    MatchGameAdvanceEffect(thisGameIndex = MatchGameOrder.KO_ZNA_ZNA, onLeaveGame = onFinish)
 
     // Both clients reach ROUND_END together (driven by the shared doc); auto-advance to the next game.
     LaunchedEffect(state.phase) {

@@ -91,6 +91,7 @@ class MojBrojViewModel(
     private var lastResolvedRound = -1
     private var lastReadySeq = 0L
     private var roundStarting = false
+    private var advanced = false
 
     fun enter() {
         if (started) return
@@ -320,10 +321,16 @@ class MojBrojViewModel(
         if (roundStarting) return
         roundStarting = true
         if (s.currentRound >= TOTAL_ROUNDS) {
+            if (advanced) return
+            advanced = true
             viewModelScope.launch {
                 matchRepository.patchGameState(
                     matchId, GAME_TYPE,
-                    mapOf("phase" to "FINISHED"),
+                    mapOf(
+                        "phase" to "FINISHED",
+                        "p1Score" to s.player1Points,
+                        "p2Score" to s.player2Points,
+                    ),
                 )
                 matchRepository.advanceMatch(matchId, GAME_TYPE, s.player1Points, s.player2Points)
                 _state.update { it.copy(phase = MojBrojPhase.GameOver) }

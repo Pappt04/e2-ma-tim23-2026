@@ -27,8 +27,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.*
+import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
 import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 
 
@@ -45,6 +47,15 @@ fun AsocijacijeScreen(
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.enter() }
+
+    MatchGameAdvanceEffect(thisGameIndex = MatchGameOrder.ASOCIJACIJE, onLeaveGame = onFinish)
+
+    LaunchedEffect(state.phase) {
+        if (state.phase == AsocijacijePhase.GAME_OVER) {
+            kotlinx.coroutines.delay(3_000)
+            onFinish()
+        }
+    }
 
     Scaffold(
         topBar = {

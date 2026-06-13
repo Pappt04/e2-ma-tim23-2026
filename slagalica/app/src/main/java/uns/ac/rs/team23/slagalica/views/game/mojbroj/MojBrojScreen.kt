@@ -50,11 +50,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.ExprToken
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojPhase
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojState
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojViewModel
+import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
 import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 import kotlin.math.sqrt
 
@@ -70,6 +72,18 @@ fun MojBrojScreen(
     val context = LocalContext.current
 
     LaunchedEffect(Unit) { viewModel.enter() }
+
+    MatchGameAdvanceEffect(
+        thisGameIndex = MatchGameOrder.MOJ_BROJ,
+        onLeaveGame = onFinish,
+    )
+
+    LaunchedEffect(state.phase) {
+        if (state.phase == MojBrojPhase.GameOver) {
+            delay(3_000)
+            onFinish()
+        }
+    }
 
     // Shake to submit the current expression (spec: Moj broj uses the shake sensor).
     DisposableEffect(Unit) {

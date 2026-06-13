@@ -39,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.SpojnicePhase
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceState
@@ -58,7 +59,7 @@ fun SpojniceScreen(
 
     LaunchedEffect(Unit) { viewModel.enter() }
 
-    MatchGameAdvanceEffect(thisGameIndex = 1, onLeaveGame = onFinish)
+    MatchGameAdvanceEffect(thisGameIndex = MatchGameOrder.SPOJNICE, onLeaveGame = onFinish)
 
     LaunchedEffect(state.phase) {
         if (state.phase == SpojnicePhase.GAME_OVER) {
