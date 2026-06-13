@@ -14,9 +14,11 @@ import uns.ac.rs.team23.slagalica.repository.FirebaseChatRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseGameRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseMatchRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseNotificationRepository
+import uns.ac.rs.team23.slagalica.repository.FirebaseStatisticsRepository
 import uns.ac.rs.team23.slagalica.repository.GameRepository
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 import uns.ac.rs.team23.slagalica.repository.NotificationRepository
+import uns.ac.rs.team23.slagalica.repository.StatisticsRepository
 import uns.ac.rs.team23.slagalica.viewmodels.AsocijacijeViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.ChallengeViewModel
@@ -28,6 +30,7 @@ import uns.ac.rs.team23.slagalica.viewmodels.MojBrojViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.NotificationsViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.SkockoViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceViewModel
+import uns.ac.rs.team23.slagalica.viewmodels.StatisticsViewModel
 
 val AppModule = module {
     // Firebase singletons
@@ -41,6 +44,7 @@ val AppModule = module {
     single<ChatRepository> { FirebaseChatRepository(get(), get()) }
     single<ChallengeRepository> { FirebaseChallengeRepository(get(), get()) }
     single<NotificationRepository> { FirebaseNotificationRepository(get(), get()) }
+    single<StatisticsRepository> { FirebaseStatisticsRepository(get(), get()) }
 
     // ViewModels
     viewModel { AuthViewModel(get()) }
@@ -54,4 +58,5 @@ val AppModule = module {
     viewModel { AsocijacijeViewModel(get(), get()) }
     viewModel { KoZnaZnaViewModel(get()) }
     viewModel { SpojniceViewModel(get()) }
+    viewModel { StatisticsViewModel(get()) }
 }

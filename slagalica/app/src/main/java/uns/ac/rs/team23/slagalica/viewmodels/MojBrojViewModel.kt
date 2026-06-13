@@ -92,6 +92,11 @@ class MojBrojViewModel(
     private var roundStarting = false
     private var advanced = false
 
+    /** Host-only: the active player asked to stop the draw (round 1, where host is active). */
+    private var hostStopRequested = false
+    /** Host-only guard so each countdown phase advances exactly once. */
+    private var lastCountdownKey = ""
+
     fun enter() {
         if (started) return
         started = true
@@ -120,16 +125,21 @@ class MojBrojViewModel(
             val target = puzzle?.targetNumber ?: (100..999).random()
             val numbers = puzzle?.numbers ?: drawNumbersFallback()
             renderedRound = round
+            hostStopRequested = false
+            lastCountdownKey = ""
+            // Spec: the active player first "stops" to reveal the target, then "stops" to draw the
+            // six numbers (5s auto-reveal each). Target/numbers travel in the payload but the screen
+            // only reveals them as each countdown ends, so the active player still "draws" them.
             matchRepository.setGameState(
                 matchId, GAME_TYPE,
                 mapOf(
                     "gameType" to GAME_TYPE,
                     "hostId" to MatchStore.hostId,
-                    "phase" to "INPUT",
+                    "phase" to "TARGET_COUNTDOWN",
                     "round" to round,
                     "index" to 0,
                     "turn" to if (round == 1) "p1" else "p2",
-                    "deadlineAt" to System.currentTimeMillis() + INPUT_MILLIS,
+                    "deadlineAt" to System.currentTimeMillis() + COUNTDOWN_MILLIS,
                     "payload" to mapOf(
                         "target" to target,
                         "numbers" to numbers,
@@ -145,13 +155,14 @@ class MojBrojViewModel(
             _state.update {
                 it.copy(
                     currentRound = round,
-                    phase = MojBrojPhase.Player1Input,
+                    phase = MojBrojPhase.TargetCountdown,
                     targetNumber = target,
                     drawnNumbers = numbers,
                     tokens = emptyList(),
                     usedIndices = emptySet(),
                     player1Points = p1Score,
                     player2Points = p2Score,
+                    setupSecondsLeft = 5,
                     playSecondsLeft = 60,
                     iSubmitted = false,
                     p1Ready = false,
@@ -172,6 +183,7 @@ class MojBrojViewModel(
             while (true) {
                 if (isHost) {
                     updateHostTimer()
+                    maybeAdvanceCountdown()
                     maybeResolve()
                     syncReadyFromPayload()
                     syncFinishedPhase()
@@ -204,6 +216,69 @@ class MojBrojViewModel(
                     mapOf("payload" to payload),
                 )
             }
+        }
+    }
+
+    // --- Stop the draw (button or shake) ---
+
+    /**
+     * The active player stops the spinning target/numbers. Spec: stopping the numbers is also
+     * driven by the shake sensor. Host (active in round 1) flags it locally; the guest (active in
+     * round 2) signals the host through its input channel. Either way the 5s deadline is a fallback.
+     */
+    fun requestStop() {
+        val s = _state.value
+        if (s.phase != MojBrojPhase.TargetCountdown && s.phase != MojBrojPhase.NumbersCountdown) return
+        if (!s.activeIsMe) return
+        if (isHost) {
+            hostStopRequested = true
+        } else {
+            if (matchId.isBlank()) return
+            viewModelScope.launch {
+                matchRepository.patchGameState(
+                    matchId, GAME_TYPE,
+                    mapOf("p2Input" to mapOf("stop" to true)),
+                )
+            }
+        }
+    }
+
+    /** Host: advance TARGET_COUNTDOWN → NUMBERS_COUNTDOWN → INPUT on stop or 5s timeout. */
+    private fun maybeAdvanceCountdown() {
+        val gs = latest ?: return
+        if (gs.phase != "TARGET_COUNTDOWN" && gs.phase != "NUMBERS_COUNTDOWN") return
+        val key = "${gs.round}:${gs.phase}"
+        if (key == lastCountdownKey) return
+        val now = System.currentTimeMillis()
+        val expired = gs.deadlineAt in 1..now
+        val activeIsP1 = gs.turn != "p2"
+        val activeInput = if (activeIsP1) gs.p1Input else gs.p2Input
+        val stopRequested = if (activeIsP1) hostStopRequested else activeInput["stop"] == true
+        if (!expired && !stopRequested) return
+        lastCountdownKey = key
+        hostStopRequested = false
+
+        val toInput = gs.phase == "NUMBERS_COUNTDOWN"
+        val nextPhase = if (toInput) "INPUT" else "NUMBERS_COUNTDOWN"
+        val nextDeadline = now + if (toInput) INPUT_MILLIS else COUNTDOWN_MILLIS
+        val stopField = if (activeIsP1) "p1Input" else "p2Input"
+        viewModelScope.launch {
+            matchRepository.patchGameState(
+                matchId, GAME_TYPE,
+                mapOf(
+                    "phase" to nextPhase,
+                    "deadlineAt" to nextDeadline,
+                    // Clear the stop signal so it doesn't carry into the next phase.
+                    stopField to emptyMap<String, Any?>(),
+                ),
+            )
+        }
+        _state.update {
+            it.copy(
+                phase = if (toInput) MojBrojPhase.Player1Input else MojBrojPhase.NumbersCountdown,
+                setupSecondsLeft = 5,
+                playSecondsLeft = 60,
+            )
         }
     }
 
@@ -371,9 +446,17 @@ class MojBrojViewModel(
     private fun updateHostTimer() {
         val gs = latest ?: return
         val s = _state.value
-        if (gs.phase != "INPUT" || s.phase != MojBrojPhase.Player1Input) return
-        val left = secsLeft(gs.deadlineAt, 60)
-        if (left != s.playSecondsLeft) _state.update { it.copy(playSecondsLeft = left) }
+        when (gs.phase) {
+            "INPUT" -> {
+                if (s.phase != MojBrojPhase.Player1Input) return
+                val left = secsLeft(gs.deadlineAt, 60)
+                if (left != s.playSecondsLeft) _state.update { it.copy(playSecondsLeft = left) }
+            }
+            "TARGET_COUNTDOWN", "NUMBERS_COUNTDOWN" -> {
+                val left = secsLeft(gs.deadlineAt, 5)
+                if (left != s.setupSecondsLeft) _state.update { it.copy(setupSecondsLeft = left) }
+            }
+        }
     }
 
     /** Spec scoring: exact target → 10; otherwise closer → 5; tie → round owner ([turn]) gets 5. */
@@ -426,11 +509,14 @@ class MojBrojViewModel(
         val activeIsMe = (activeIsP1 && isHost) || (!activeIsP1 && !isHost)
 
         val phase = when (gs.phase) {
+            "TARGET_COUNTDOWN" -> MojBrojPhase.TargetCountdown
+            "NUMBERS_COUNTDOWN" -> MojBrojPhase.NumbersCountdown
             "INPUT" -> MojBrojPhase.Player1Input
             "ROUND_END" -> MojBrojPhase.RoundEnd
             "FINISHED" -> MojBrojPhase.GameOver
             else -> MojBrojPhase.RoundIntro
         }
+        val setupLeft = secsLeft(gs.deadlineAt, 5, now)
 
         _state.update {
             it.copy(
@@ -439,6 +525,7 @@ class MojBrojViewModel(
                 targetNumber = target,
                 drawnNumbers = numbers,
                 playSecondsLeft = secsLeft,
+                setupSecondsLeft = setupLeft,
                 player1Points = gs.p1Score,
                 player2Points = gs.p2Score,
                 player1Answer = numberOrNull(gs.p1Input["result"]),
@@ -491,5 +578,6 @@ class MojBrojViewModel(
         private const val GAME_TYPE = "MOJ_BROJ"
         private const val TOTAL_ROUNDS = 2
         private const val INPUT_MILLIS = 60_000L
+        private const val COUNTDOWN_MILLIS = 5_000L
     }
 }

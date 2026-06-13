@@ -180,10 +180,25 @@ class AsocijacijeViewModel(
             is GuessTarget.Column -> "C${target.index}"
             GuessTarget.Final -> "F"
         }
-        // Local flash for the submitting device; cleared on next resolve.
+        // Resolve correctness locally (the board answers are in state on both devices) purely
+        // to drive the red flash; the authoritative scoring still happens in applySubmit.
+        val correct = when (target) {
+            is GuessTarget.Column ->
+                s.columns.getOrNull(target.index)?.answer?.equals(guess, ignoreCase = true) == true
+            GuessTarget.Final -> s.finalAnswer.equals(guess, ignoreCase = true)
+        }
         if (authoritative) applySubmit(targetCode, guess)
         else sendIntent(mapOf("t" to "guess", "tg" to targetCode, "g" to guess))
-        _state.update { it.copy(guessInput = "", selectedGuessTarget = null) }
+        // Local flash for the submitting device; cleared after a short beat.
+        _state.update {
+            it.copy(guessInput = "", selectedGuessTarget = null, wrongGuessTarget = if (correct) null else target)
+        }
+        if (!correct) {
+            viewModelScope.launch {
+                delay(800L)
+                _state.update { if (it.wrongGuessTarget == target) it.copy(wrongGuessTarget = null) else it }
+            }
+        }
     }
 
     fun passGuess() = act {

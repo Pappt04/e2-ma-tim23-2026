@@ -137,7 +137,7 @@ class SpojniceViewModel(
         val s = _state.value
         val now = now()
         if (deadlineAt > 0 && (s.phase == SpojnicePhase.PLAYING_STARTER || s.phase == SpojnicePhase.PLAYING_OPPONENT)) {
-            val max = if (s.phase == SpojnicePhase.PLAYING_OPPONENT) 30 else 45
+            val max = 30
             val left = secsLeft(deadlineAt, max)
             if (left != s.secondsLeft) _state.update { it.copy(secondsLeft = left) }
         }
@@ -403,8 +403,7 @@ class SpojniceViewModel(
     private fun rebuildState(gs: GameStateDto) {
         val (s, _) = mapToState(gs.payload, gs) ?: return
         deadlineAt = effectiveDeadline(gs, gs.payload)
-        val max = if (s.phase == SpojnicePhase.PLAYING_OPPONENT) 30 else 45
-        _state.value = s.copy(secondsLeft = secsLeft(deadlineAt, max))
+        _state.value = s.copy(secondsLeft = secsLeft(deadlineAt, 30))
     }
 
     // --- Turn helpers ---
@@ -477,7 +476,7 @@ class SpojniceViewModel(
         val selR = numberOrNull(p["selR"]) ?: -1
         val deadline = effectiveDeadline(gs, p)
         val phase = runCatching { SpojnicePhase.valueOf(phaseName) }.getOrDefault(SpojnicePhase.PLAYING_STARTER)
-        val maxSecs = if (phase == SpojnicePhase.PLAYING_OPPONENT) 30 else 45
+        val maxSecs = 30
         val s = SpojniceState(
             currentRound = numberOrNull(p["round"]) ?: 1,
             phase = phase,
@@ -515,7 +514,7 @@ class SpojniceViewModel(
 
     companion object {
         private const val GAME_TYPE = "SPOJNICE"
-        private const val STARTER_MILLIS = 45_000L
+        private const val STARTER_MILLIS = 30_000L
         private const val OPPONENT_MILLIS = 30_000L
         private const val ROUND_END_MILLIS = 4_000L
     }

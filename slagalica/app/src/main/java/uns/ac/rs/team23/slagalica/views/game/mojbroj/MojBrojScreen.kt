@@ -40,6 +40,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.delay
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +62,9 @@ import uns.ac.rs.team23.slagalica.viewmodels.MojBrojViewModel
 import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
 import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 import kotlin.math.sqrt
+
+/** Values flashed during the spinning draw animation (matches the spec's number pools). */
+private val spinPool = listOf(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 25, 50, 75, 100)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,7 +91,8 @@ fun MojBrojScreen(
         }
     }
 
-    // Shake to submit the current expression (spec: Moj broj uses the shake sensor).
+    // Spec: stopping the spinning numbers is driven by the shake sensor. A shake during a
+    // countdown stops the draw (the ViewModel ignores it outside the active player's countdown).
     DisposableEffect(Unit) {
         val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         val accel = sm.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
@@ -97,7 +104,7 @@ fun MojBrojScreen(
                 val now = System.currentTimeMillis()
                 if (force > 12f && now - lastShake > 800) {
                     lastShake = now
-                    viewModel.submitExpression()
+                    viewModel.requestStop()
                 }
             }
             override fun onAccuracyChanged(s: Sensor?, a: Int) {}
@@ -149,6 +156,18 @@ fun MojBrojScreen(
             }
 
             when (state.phase) {
+                MojBrojPhase.TargetCountdown -> CountdownContent(
+                    state = state,
+                    activeName = activeName,
+                    isTarget = true,
+                    onStop = viewModel::requestStop,
+                )
+                MojBrojPhase.NumbersCountdown -> CountdownContent(
+                    state = state,
+                    activeName = activeName,
+                    isTarget = false,
+                    onStop = viewModel::requestStop,
+                )
                 MojBrojPhase.Player1Input, MojBrojPhase.Player2Input ->
                     if (state.iSubmitted) {
                         WaitingContent("You submitted ${state.player1Expression} = ${state.player1Answer ?: "—"}.\nWaiting for $player2Name...")
@@ -199,6 +218,99 @@ private fun WaitingContent(message: String) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
+        }
+    }
+}
+
+@Composable
+private fun CountdownContent(
+    state: MojBrojState,
+    activeName: String,
+    isTarget: Boolean,
+    onStop: () -> Unit,
+) {
+    // Local-only spinning animation; the real values are revealed when the draw stops.
+    var spinTarget by remember { mutableStateOf((100..999).random()) }
+    var spinNumbers by remember { mutableStateOf(List(6) { spinPool.random() }) }
+    LaunchedEffect(isTarget) {
+        while (true) {
+            if (isTarget) spinTarget = (100..999).random()
+            else spinNumbers = List(6) { spinPool.random() }
+            delay(80)
+        }
+    }
+
+    Box(
+        modifier = Modifier.fillMaxSize().padding(24.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+        ) {
+            Text(
+                text = if (isTarget) "Drawing the target number" else "Drawing the six numbers",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+
+            // Once the target is fixed (numbers phase), show it for real above the spinning numbers.
+            if (!isTarget) {
+                Text("Target", style = MaterialTheme.typography.labelMedium)
+                Text(
+                    text = "${state.targetNumber}",
+                    style = MaterialTheme.typography.displaySmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+                HorizontalDivider(modifier = Modifier.fillMaxWidth())
+            }
+
+            if (isTarget) {
+                Text(
+                    text = "$spinTarget",
+                    style = MaterialTheme.typography.displayLarge,
+                    fontWeight = FontWeight.Bold,
+                )
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    spinNumbers.forEach { n ->
+                        Text(
+                            text = "$n",
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary,
+                        )
+                    }
+                }
+            }
+
+            Text(
+                text = "Auto in ${state.setupSecondsLeft}s",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+
+            if (state.activeIsMe) {
+                Button(
+                    onClick = onStop,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                ) {
+                    Text("STOP", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+                Text(
+                    text = "…or shake your phone to stop",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                Text(
+                    text = "$activeName is drawing…",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }

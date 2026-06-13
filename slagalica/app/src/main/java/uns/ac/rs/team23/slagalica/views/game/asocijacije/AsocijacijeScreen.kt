@@ -213,9 +213,12 @@ private fun PlayingContent(
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    LaunchedEffect(state.selectedGuessTarget) {
-        if (state.selectedGuessTarget != null) {
-            focusRequester.requestFocus()
+    LaunchedEffect(state.selectedGuessTarget, canGuessNow) {
+        if (state.selectedGuessTarget != null && canGuessNow) {
+            // The field is composed in the same frame; give it a beat to attach
+            // before focusing, and never let an unattached requester crash the game.
+            kotlinx.coroutines.delay(50)
+            runCatching { focusRequester.requestFocus() }
             keyboardController?.show()
         } else {
             keyboardController?.hide()
@@ -307,17 +310,37 @@ private fun PlayingContent(
                 PairWordRow(state = state, leftCol = 2, rightCol = 3, row = row, onReveal = onReveal)
             }
         }
-        OutlinedTextField(
-            value = state.guessInput,
-            onValueChange = onGuessChange,
-            enabled = state.selectedGuessTarget != null && canGuessNow,
-            singleLine = true,
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            keyboardActions = KeyboardActions(onDone = { onSubmit() }),
-            modifier = Modifier
-                .size(1.dp)
-                .focusRequester(focusRequester),
-        )
+        // Visible input bar — shown only when the local player can type a guess.
+        if (state.selectedGuessTarget != null && canGuessNow) {
+            val targetLabel = when (val target = state.selectedGuessTarget) {
+                is GuessTarget.Column -> "kolonu ${('A'.code + target.index).toChar()}"
+                else -> "finalno rešenje"
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                OutlinedTextField(
+                    value = state.guessInput,
+                    onValueChange = onGuessChange,
+                    label = { Text("Pogađaš $targetLabel") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onSubmit() }),
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
+                )
+                Button(
+                    onClick = onSubmit,
+                    enabled = state.guessInput.isNotBlank(),
+                    modifier = Modifier.height(56.dp),
+                ) { Text("Potvrdi") }
+            }
+        }
     }
 }
 
