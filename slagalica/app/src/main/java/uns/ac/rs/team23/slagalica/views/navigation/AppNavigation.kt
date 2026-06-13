@@ -255,10 +255,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             KorakPoKorakScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
-                onFinish = {
-                    MatchStore.currentGameIndex++
-                    navController.popBackStack()
-                },
+                onFinish = { navController.popBackStack() },
             )
         }
         composable(Screen.KoZnaZna.route) {
@@ -267,10 +264,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             KoZnaZnaScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
-                onFinish = {
-                    MatchStore.currentGameIndex++
-                    navController.popBackStack()
-                },
+                onFinish = { navController.popBackStack() },
             )
         }
         composable(Screen.Spojnice.route) {
@@ -279,10 +273,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             SpojniceScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
-                onFinish = {
-                    MatchStore.currentGameIndex++
-                    navController.popBackStack()
-                },
+                onFinish = { navController.popBackStack() },
             )
         }
         composable(Screen.MojBroj.route) {
@@ -291,10 +282,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             MojBrojScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
-                onFinish = {
-                    MatchStore.currentGameIndex++
-                    navController.popBackStack()
-                },
+                onFinish = { navController.popBackStack() },
             )
         }
         composable(Screen.Skocko.route) {
@@ -303,10 +291,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             SkockoScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
-                onFinish = {
-                    MatchStore.currentGameIndex++
-                    navController.popBackStack()
-                },
+                onFinish = { navController.popBackStack() },
             )
         }
         composable(Screen.Asocijacije.route) {
@@ -315,10 +300,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             AsocijacijeScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
-                onFinish = {
-                    MatchStore.currentGameIndex++
-                    navController.popBackStack()
-                },
+                onFinish = { navController.popBackStack() },
             )
         }
         composable(Screen.Chat.route) { backStack ->

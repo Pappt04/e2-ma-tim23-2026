@@ -27,7 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.*
+import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 
 
 // ─── Glavni Screen ───────────────────────────────────────────────────────────
@@ -57,11 +59,6 @@ fun AsocijacijeScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = Color.White.copy(alpha = 0.75f),
                         )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onFinish) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Nazad")
                     }
                 },
                 actions = {
@@ -114,7 +111,9 @@ fun AsocijacijeScreen(
                     state = state,
                     player1Name = player1Name,
                     player2Name = player2Name,
-                    onNextRound = viewModel::nextRound,
+                    myReady = if (MatchStore.isHost) state.p1Ready else state.p2Ready,
+                    opponentReady = if (MatchStore.isHost) state.p2Ready else state.p1Ready,
+                    onReady = viewModel::markReady,
                 )
                 AsocijacijePhase.GAME_OVER -> GameOverContent(
                     state = state,
@@ -437,12 +436,12 @@ private fun RoundEndContent(
     state: AsocijacijeState,
     player1Name: String,
     player2Name: String,
-    onNextRound: () -> Unit,
+    myReady: Boolean,
+    opponentReady: Boolean,
+    onReady: () -> Unit,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
         ElevatedCard(modifier = Modifier.fillMaxWidth()) {
@@ -452,7 +451,7 @@ private fun RoundEndContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    "Runda 1 završena!",
+                    "Runda ${state.currentRound} završena!",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
@@ -471,12 +470,7 @@ private fun RoundEndContent(
                     ScoreColumn(player1Name, state.player1Points)
                     ScoreColumn(player2Name, state.player2Points)
                 }
-                Button(
-                    onClick = onNextRound,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Počni rundu 2")
-                }
+                RoundReadyButton(myReady = myReady, opponentReady = opponentReady, onReady = onReady)
             }
         }
     }

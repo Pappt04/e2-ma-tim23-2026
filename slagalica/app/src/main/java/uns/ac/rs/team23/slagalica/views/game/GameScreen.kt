@@ -68,8 +68,6 @@ fun GameScreen(
     var showOpponentLeftDialog by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
-    val gameIndex = MatchStore.currentGameIndex
-
     val navigators = listOf(
         onNavigateToKoZnaZna,
         onNavigateToSpojnice,
@@ -79,11 +77,17 @@ fun GameScreen(
         onNavigateToMojBroj,
     )
 
-    LaunchedEffect(gameIndex) {
-        if (gameIndex < navigators.size) {
-            navigators[gameIndex]()
-        } else {
-            onAllGamesFinished()
+    // Drive navigation from Firebase currentGameIndex (source of truth after advanceMatch).
+    LaunchedEffect(matchId, matchRepository) {
+        if (matchId.isBlank() || matchRepository == null) {
+            val idx = MatchStore.currentGameIndex
+            if (idx < navigators.size) navigators[idx]() else onAllGamesFinished()
+            return@LaunchedEffect
+        }
+        matchRepository.observeMatch(matchId).collect { match ->
+            MatchStore.currentGameIndex = match.currentGameIndex
+            val idx = match.currentGameIndex
+            if (idx < navigators.size) navigators[idx]() else onAllGamesFinished()
         }
     }
 
@@ -154,8 +158,8 @@ fun GameScreen(
                 fontWeight = FontWeight.SemiBold,
             )
             GAME_ORDER.forEachIndexed { index, name ->
-                val isDone = index < gameIndex
-                val isCurrent = index == gameIndex
+                val isDone = index < MatchStore.currentGameIndex
+                val isCurrent = index == MatchStore.currentGameIndex
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(

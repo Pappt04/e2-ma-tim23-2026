@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.Button
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -20,19 +19,19 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakState
+import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 
 @Composable
 fun RoundEndContent(
     state: KorakPoKorakState,
     player1Name: String,
     player2Name: String,
-    onNext: () -> Unit,
+    myReady: Boolean,
+    opponentReady: Boolean,
+    onReady: () -> Unit,
 ) {
     Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .padding(24.dp),
+        modifier = Modifier.fillMaxSize().padding(24.dp),
         contentAlignment = Alignment.Center,
     ) {
         LazyColumn(
@@ -41,7 +40,7 @@ fun RoundEndContent(
         ) {
             item {
                 Text(
-                    text = "Round 1 Complete",
+                    text = "Round ${state.currentRound} Complete",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                 )
@@ -67,7 +66,6 @@ fun RoundEndContent(
             }
 
             item {
-                // Show all clues
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     state.revealedClues.forEachIndexed { i, clue ->
                         ClueCard(stepNumber = i + 1, clue = clue, highlight = false)
@@ -75,17 +73,16 @@ fun RoundEndContent(
                 }
             }
 
-            item {
-                Spacer(modifier = Modifier.height(8.dp))
-            }
+            item { Spacer(modifier = Modifier.height(8.dp)) }
 
             item {
-                Button(
-                    onClick = onNext,
+                RoundReadyButton(
+                    myReady = myReady,
+                    opponentReady = opponentReady,
+                    onReady = onReady,
                     modifier = Modifier.fillMaxWidth(0.7f),
-                ) { Text("Start Round 2") }
+                )
             }
         }
     }
 }
-
