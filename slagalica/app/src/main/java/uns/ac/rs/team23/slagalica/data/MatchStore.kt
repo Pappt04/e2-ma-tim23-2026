@@ -7,6 +7,10 @@ import androidx.compose.runtime.setValue
 object MatchStore {
     var matchId: String = ""
     var opponentUsername: String = ""
+    /** Match player1 (host) display name — same on both devices. */
+    var player1Username: String = ""
+    /** Match player2 (guest) display name — same on both devices. */
+    var player2Username: String = ""
     var isFriendly: Boolean = false
 
     /** Uid of this device's user. */
@@ -26,9 +30,13 @@ object MatchStore {
         friendly: Boolean = false,
         myUid: String = "",
         hostId: String = "",
+        player1: String = "",
+        player2: String = "",
     ) {
         matchId = id
         opponentUsername = opponent
+        player1Username = player1
+        player2Username = player2
         isFriendly = friendly
         this.myUid = myUid
         this.hostId = hostId
@@ -38,6 +46,8 @@ object MatchStore {
     fun clear() {
         matchId = ""
         opponentUsername = ""
+        player1Username = ""
+        player2Username = ""
         isFriendly = false
         myUid = ""
         hostId = ""

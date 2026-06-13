@@ -69,14 +69,6 @@ fun MojBrojScreen(
 
     LaunchedEffect(Unit) { viewModel.enter() }
 
-    // Auto-advance to the next game once the host has finalized the match.
-    LaunchedEffect(state.phase) {
-        if (state.phase == MojBrojPhase.GameOver) {
-            delay(5_000)
-            onFinish()
-        }
-    }
-
     // Shake to submit the current expression (spec: Moj broj uses the shake sensor).
     DisposableEffect(Unit) {
         val sm = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager

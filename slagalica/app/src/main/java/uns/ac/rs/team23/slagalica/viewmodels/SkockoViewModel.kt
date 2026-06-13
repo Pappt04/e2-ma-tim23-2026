@@ -168,7 +168,13 @@ class SkockoViewModel(
 
     fun startRound() { /* host-driven: rounds auto-start; no-op kept for screen compatibility */ }
 
-    fun nextRound() { /* host-driven: rounds auto-advance */ }
+    fun nextRound() {
+        if (!authoritative) return
+        if (_state.value.phase == SkockoPhase.ROUND_END) {
+            lastHandledDeadline = -1
+            startRoundInternal(2)
+        }
+    }
 
     fun confirmRoundEnd() = act {
         if (authoritative) applyConfirm() else sendIntent("confirm")
@@ -433,21 +439,28 @@ class SkockoViewModel(
             SkockoAttempt(ss, numberOrNull(m["cp"]) ?: 0, numberOrNull(m["cs"]) ?: 0, m["opp"] == true)
         } ?: emptyList()
         val input = (p["input"] as? List<*>)?.map { sym(numberOrNull(it)) } ?: List(4) { null }
+        val deadline = numberOrNull(p["deadline"])?.toLong() ?: 0L
+        val phase = runCatching { SkockoPhase.valueOf(phaseName) }.getOrDefault(SkockoPhase.PLAYER_TURN)
+        val maxSecs = if (phase == SkockoPhase.OPPONENT_STEAL) 10 else 30
         val s = SkockoState(
-            phase = runCatching { SkockoPhase.valueOf(phaseName) }.getOrDefault(SkockoPhase.PLAYER_TURN),
+            phase = phase,
             currentRound = numberOrNull(p["round"]) ?: 1,
             activePlayerIsP1 = p["activeP1"] != false,
             solution = solution,
             attempts = attempts,
             currentInput = if (input.size == 4) input else List(4) { null },
+            secondsLeft = secsLeft(deadline, maxSecs),
             player1Points = numberOrNull(p["p1"]) ?: 0,
             player2Points = numberOrNull(p["p2"]) ?: 0,
             roundSolved = p["solved"] == true,
             showSolution = p["show"] == true,
             awaitingRoundEndConfirm = p["confirm"] == true,
         )
-        return s to (numberOrNull(p["deadline"])?.toLong() ?: 0L)
+        return s to deadline
     }
+
+    private fun secsLeft(deadline: Long, max: Int): Int =
+        if (deadline <= 0) max else (((deadline - now()) + 999) / 1000).toInt().coerceIn(0, max)
 
     private fun numberOrNull(v: Any?): Int? = when (v) {
         is Long -> v.toInt()

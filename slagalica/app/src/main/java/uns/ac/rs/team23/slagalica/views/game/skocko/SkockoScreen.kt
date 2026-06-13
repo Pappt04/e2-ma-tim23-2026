@@ -96,14 +96,6 @@ fun SkockoScreen(
 
     LaunchedEffect(Unit) { viewModel.enter() }
 
-    // Both clients reach GAME_OVER together (host-driven); auto-advance to the next game.
-    LaunchedEffect(state.phase) {
-        if (state.phase == SkockoPhase.GAME_OVER) {
-            kotlinx.coroutines.delay(4_000)
-            onFinish()
-        }
-    }
-
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
         topBar = {

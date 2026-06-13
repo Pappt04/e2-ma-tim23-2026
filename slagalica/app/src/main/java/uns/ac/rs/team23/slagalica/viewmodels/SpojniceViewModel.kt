@@ -133,8 +133,9 @@ class SpojniceViewModel(
     private fun tick() {
         val s = _state.value
         val now = now()
-        if (deadlineAt > 0 && s.phase == SpojnicePhase.PLAYING_OPPONENT) {
-            val left = (((deadlineAt - now) + 999) / 1000).toInt().coerceIn(0, 30)
+        if (deadlineAt > 0 && (s.phase == SpojnicePhase.PLAYING_STARTER || s.phase == SpojnicePhase.PLAYING_OPPONENT)) {
+            val max = if (s.phase == SpojnicePhase.PLAYING_OPPONENT) 30 else 45
+            val left = secsLeft(deadlineAt, max)
             if (left != s.secondsLeft) _state.update { it.copy(secondsLeft = left) }
         }
         if (authoritative && deadlineAt > 0 && now >= deadlineAt && deadlineAt != lastHandledDeadline) {
@@ -148,7 +149,13 @@ class SpojniceViewModel(
 
     fun startRound() { /* host-driven: round auto-starts */ }
 
-    fun nextRound() { /* host-driven: rounds auto-advance */ }
+    fun nextRound() {
+        if (!authoritative) return
+        if (_state.value.phase == SpojnicePhase.ROUND_END) {
+            lastHandledDeadline = -1
+            startRoundInternal(2)
+        }
+    }
 
     fun selectLeft(index: Int) = act {
         if (authoritative) applySelectLeft(index) else sendIntent("L", index)
@@ -431,10 +438,14 @@ class SpojniceViewModel(
         val used = (p["used"] as? List<*>)?.mapNotNull { numberOrNull(it) }?.toSet() ?: emptySet()
         val selL = numberOrNull(p["selL"]) ?: -1
         val selR = numberOrNull(p["selR"]) ?: -1
+        val deadline = numberOrNull(p["deadline"])?.toLong() ?: 0L
+        val phase = runCatching { SpojnicePhase.valueOf(phaseName) }.getOrDefault(SpojnicePhase.PLAYING_STARTER)
+        val maxSecs = if (phase == SpojnicePhase.PLAYING_OPPONENT) 30 else 45
         val s = SpojniceState(
             currentRound = numberOrNull(p["round"]) ?: 1,
-            phase = runCatching { SpojnicePhase.valueOf(phaseName) }.getOrDefault(SpojnicePhase.PLAYING_STARTER),
+            phase = phase,
             starterIsPlayer1 = p["starterP1"] != false,
+            secondsLeft = secsLeft(deadline, maxSecs),
             player1Points = numberOrNull(p["p1"]) ?: 0,
             player2Points = numberOrNull(p["p2"]) ?: 0,
             pairs = pairs,
@@ -445,8 +456,11 @@ class SpojniceViewModel(
             selectedRightIndex = if (selR >= 0) selR else null,
             infoMessage = p["info"] as? String ?: "",
         )
-        return s to (numberOrNull(p["deadline"])?.toLong() ?: 0L)
+        return s to deadline
     }
+
+    private fun secsLeft(deadline: Long, max: Int): Int =
+        if (deadline <= 0) max else (((deadline - now()) + 999) / 1000).toInt().coerceIn(0, max)
 
     private fun numberOrNull(v: Any?): Int? = when (v) {
         is Long -> v.toInt()

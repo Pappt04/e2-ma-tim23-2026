@@ -253,8 +253,8 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             KorakPoKorakScreen(
-                player1Name = username,
-                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                player1Name = MatchStore.player1Username.ifBlank { username },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = {
                     MatchStore.currentGameIndex++
                     navController.popBackStack()
@@ -265,8 +265,8 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             KoZnaZnaScreen(
-                player1Name = username,
-                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                player1Name = MatchStore.player1Username.ifBlank { username },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = {
                     MatchStore.currentGameIndex++
                     navController.popBackStack()
@@ -277,8 +277,8 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             SpojniceScreen(
-                player1Name = username,
-                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                player1Name = MatchStore.player1Username.ifBlank { username },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = {
                     MatchStore.currentGameIndex++
                     navController.popBackStack()
@@ -289,8 +289,8 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             MojBrojScreen(
-                player1Name = username,
-                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                player1Name = MatchStore.player1Username.ifBlank { username },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = {
                     MatchStore.currentGameIndex++
                     navController.popBackStack()
@@ -301,8 +301,8 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             SkockoScreen(
-                player1Name = username,
-                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                player1Name = MatchStore.player1Username.ifBlank { username },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = {
                     MatchStore.currentGameIndex++
                     navController.popBackStack()
@@ -313,8 +313,8 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             AsocijacijeScreen(
-                player1Name = username,
-                player2Name = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                player1Name = MatchStore.player1Username.ifBlank { username },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = {
                     MatchStore.currentGameIndex++
                     navController.popBackStack()

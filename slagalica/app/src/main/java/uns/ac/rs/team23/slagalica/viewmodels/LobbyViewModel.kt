@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import uns.ac.rs.team23.slagalica.data.MatchStore
+import uns.ac.rs.team23.slagalica.network.dto.MatchResponseDto
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 
 sealed class LobbyState {
@@ -45,8 +46,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                 .onSuccess { match ->
                     when {
                         match.status == "IN_PROGRESS" && match.player2Username != null -> {
-                            val opponent = resolveOpponent(match.player1Username, match.player2Username)
-                            onMatchFound(match.id, opponent, match.player1Id)
+                            onMatchFound(match)
                         }
                         match.status == "WAITING_FOR_OPPONENT" -> startPolling()
                         else -> _state.value = LobbyState.Error("Unexpected match state: ${match.status}")
@@ -64,8 +64,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                 matchRepository.getCurrentMatch()
                     .onSuccess { match ->
                         if (match != null && match.status == "IN_PROGRESS" && match.player2Username != null) {
-                            val opponent = resolveOpponent(match.player1Username, match.player2Username)
-                            onMatchFound(match.id, opponent, match.player1Id)
+                            onMatchFound(match)
                             pollingJob?.cancel()
                             return@onSuccess
                         }
@@ -76,8 +75,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                     matchRepository.tryJoinWaiting(myUsername, currentFriendly)
                         .onSuccess { joined ->
                             if (joined != null) {
-                                val opponent = resolveOpponent(joined.player1Username, joined.player2Username ?: "")
-                                onMatchFound(joined.id, opponent, joined.player1Id)
+                                onMatchFound(joined)
                                 pollingJob?.cancel()
                             }
                         }
@@ -92,18 +90,21 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
     private fun resolveOpponent(player1: String, player2: String): String =
         if (player1 == myUsername) player2 else player1
 
-    private fun onMatchFound(matchId: String, opponentName: String, hostId: String) {
+    private fun onMatchFound(match: MatchResponseDto) {
         myReadyLocal = false
         opponentReadyLocal = false
+        val opponent = resolveOpponent(match.player1Username, match.player2Username ?: "")
         MatchStore.set(
-            matchId,
-            opponentName,
+            match.id,
+            opponent,
             friendly = currentFriendly,
             myUid = matchRepository.currentUserId() ?: "",
-            hostId = hostId,
+            hostId = match.player1Id,
+            player1 = match.player1Username,
+            player2 = match.player2Username ?: "",
         )
-        _state.value = LobbyState.OpponentFound(opponentName)
-        startMatchObserver(matchId, opponentName)
+        _state.value = LobbyState.OpponentFound(opponent)
+        startMatchObserver(match.id, opponent)
     }
 
     private fun startMatchObserver(matchId: String, opponentName: String) {
@@ -168,8 +169,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                         val opponentName = match.player2Username ?: "Friend"
                         _state.value = LobbyState.InviteSent(match.id, opponentName)
                     } else if (match.status == "IN_PROGRESS") {
-                        val opponent = resolveOpponent(match.player1Username, match.player2Username ?: "Opponent")
-                        onMatchFound(match.id, opponent, match.player1Id)
+                        onMatchFound(match)
                     } else {
                         _state.value = LobbyState.Error("Unexpected state: ${match.status}")
                     }

@@ -285,14 +285,6 @@ class MojBrojViewModel(
         val activeIsP1 = gs.turn != "p2"
         val activeIsMe = (activeIsP1 && isHost) || (!activeIsP1 && !isHost)
 
-        val myScore = if (isHost) gs.p1Score else gs.p2Score
-        val theirScore = if (isHost) gs.p2Score else gs.p1Score
-        val myResult = numberOrNull(myInput["result"])
-        val theirInput = if (isHost) gs.p2Input else gs.p1Input
-        val theirResult = numberOrNull(theirInput["result"])
-        val myExpr = myInput["expr"] as? String ?: ""
-        val theirExpr = theirInput["expr"] as? String ?: ""
-
         val phase = when (gs.phase) {
             "INPUT" -> MojBrojPhase.Player1Input
             "ROUND_END" -> MojBrojPhase.RoundEnd
@@ -307,12 +299,12 @@ class MojBrojViewModel(
                 targetNumber = target,
                 drawnNumbers = numbers,
                 playSecondsLeft = secsLeft,
-                player1Points = myScore,
-                player2Points = theirScore,
-                player1Answer = myResult,
-                player2Answer = theirResult,
-                player1Expression = myExpr,
-                player2Expression = theirExpr,
+                player1Points = gs.p1Score,
+                player2Points = gs.p2Score,
+                player1Answer = numberOrNull(gs.p1Input["result"]),
+                player2Answer = numberOrNull(gs.p2Input["result"]),
+                player1Expression = gs.p1Input["expr"] as? String ?: "",
+                player2Expression = gs.p2Input["expr"] as? String ?: "",
                 iSubmitted = iSubmitted,
                 activeIsMe = activeIsMe,
             )
