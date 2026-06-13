@@ -39,9 +39,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
+import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.SpojnicePhase
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceState
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceViewModel
+import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
+import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -55,6 +58,15 @@ fun SpojniceScreen(
 
     LaunchedEffect(Unit) { viewModel.enter() }
 
+    MatchGameAdvanceEffect(thisGameIndex = 1, onLeaveGame = onFinish)
+
+    LaunchedEffect(state.phase) {
+        if (state.phase == SpojnicePhase.GAME_OVER) {
+            delay(3_000)
+            onFinish()
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -66,11 +78,6 @@ fun SpojniceScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onFinish) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
             )
@@ -106,7 +113,9 @@ fun SpojniceScreen(
                 state = state,
                 player1Name = player1Name,
                 player2Name = player2Name,
-                onNextRound = viewModel::nextRound,
+                myReady = if (MatchStore.isHost) state.p1Ready else state.p2Ready,
+                opponentReady = if (MatchStore.isHost) state.p2Ready else state.p1Ready,
+                onReady = viewModel::markReady,
                 modifier = Modifier.padding(innerPadding),
             )
             SpojnicePhase.GAME_OVER -> GameOver(
@@ -176,9 +185,9 @@ private fun PlayingPhase(
     val starterName = if (state.starterIsPlayer1) player1Name else player2Name
     val opponentName = if (state.starterIsPlayer1) player2Name else player1Name
     val phaseTitle = if (isStarterPhase) {
-        "Starter turn — $starterName"
+        "Turn -> $starterName"
     } else {
-        "Opponent turn — $opponentName (30s)"
+        "Turn -> $opponentName"
     }
 
     Column(
@@ -325,20 +334,20 @@ private fun RoundEnd(
     state: SpojniceState,
     player1Name: String,
     player2Name: String,
-    onNextRound: () -> Unit,
+    myReady: Boolean,
+    opponentReady: Boolean,
+    onReady: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(20.dp),
+        modifier = modifier.fillMaxSize().padding(20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Text("Round ${state.currentRound} finished", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
         ScoreCard(player1Name, state.player1Points, player2Name, state.player2Points)
         Spacer(modifier = Modifier.weight(1f))
-        Button(onClick = onNextRound, modifier = Modifier.fillMaxWidth()) { Text("Start Round 2") }
+        RoundReadyButton(myReady = myReady, opponentReady = opponentReady, onReady = onReady)
     }
 }
 

@@ -25,7 +25,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.R
+import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.*
+import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 import androidx.compose.runtime.Composable
 
 
@@ -112,11 +114,6 @@ fun SkockoScreen(
                         )
                     }
                 },
-                navigationIcon = {
-                    IconButton(onClick = onFinish) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Nazad")
-                    }
-                },
                 actions = {
                     if (state.phase == SkockoPhase.PLAYER_TURN ||
                         state.phase == SkockoPhase.OPPONENT_STEAL
@@ -159,6 +156,7 @@ fun SkockoScreen(
                         state = state,
                         activeName = activeName,
                         isSteal = isSteal,
+                        isMyTurn = viewModel.isMyTurn(),
                         onAddSymbol = viewModel::addSymbol,
                         onRemoveAt  = viewModel::removeSymbolAt,
                         onSubmit    = viewModel::submitAttempt,
@@ -169,7 +167,9 @@ fun SkockoScreen(
                     state = state,
                     player1Name = player1Name,
                     player2Name = player2Name,
-                    onNext = viewModel::nextRound,
+                    myReady = if (MatchStore.isHost) state.p1Ready else state.p2Ready,
+                    opponentReady = if (MatchStore.isHost) state.p2Ready else state.p1Ready,
+                    onReady = viewModel::markReady,
                 )
                 SkockoPhase.GAME_OVER -> GameOverContent(
                     state = state,
@@ -221,6 +221,7 @@ private fun GameContent(
     state: SkockoState,
     activeName: String,
     isSteal: Boolean,
+    isMyTurn: Boolean,
     onAddSymbol: (SkockoSymbol) -> Unit,
     onRemoveAt: (Int) -> Unit,
     onSubmit: () -> Unit,
@@ -334,7 +335,7 @@ private fun GameContent(
                 SkockoSymbol.values().forEach { symbol ->
                     SymbolButton(
                         symbol = symbol,
-                        enabled = state.currentInput.any { it == null } && !state.awaitingRoundEndConfirm,
+                        enabled = isMyTurn && state.currentInput.any { it == null } && !state.awaitingRoundEndConfirm,
                         onClick = { onAddSymbol(symbol) },
                     )
                 }
@@ -342,15 +343,19 @@ private fun GameContent(
         }
 
         // ── Dno: OK dugme ─────────────────────────────────────────────────
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
-            Button(
-                onClick = {
-                    if (state.awaitingRoundEndConfirm) onConfirmRoundEnd() else onSubmit()
-                },
-                enabled = if (state.awaitingRoundEndConfirm) true else state.currentInput.none { it == null },
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) {
-                Text("OK", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        val showOk = state.awaitingRoundEndConfirm || isMyTurn
+        if (showOk) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                Button(
+                    onClick = {
+                        if (state.awaitingRoundEndConfirm) onConfirmRoundEnd() else onSubmit()
+                    },
+                    enabled = if (state.awaitingRoundEndConfirm) true
+                    else isMyTurn && state.currentInput.none { it == null },
+                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                ) {
+                    Text("OK", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
             }
         }
     }
@@ -361,7 +366,9 @@ private fun RoundEndContent(
     state: SkockoState,
     player1Name: String,
     player2Name: String,
-    onNext: () -> Unit,
+    myReady: Boolean,
+    opponentReady: Boolean,
+    onReady: () -> Unit,
 ) {
     Column(
         modifier = Modifier.fillMaxSize().padding(20.dp),
@@ -401,15 +408,12 @@ private fun RoundEndContent(
 
         Spacer(Modifier.weight(1f))
 
-        Button(
-            onClick = onNext,
+        RoundReadyButton(
+            myReady = myReady,
+            opponentReady = opponentReady,
+            onReady = onReady,
             modifier = Modifier.fillMaxWidth(0.7f),
-        ) {
-            Text(
-                text = if (state.currentRound == 1) "Runda 2 →" else "Završi igru",
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        )
     }
 }
 

@@ -44,6 +44,8 @@ data class SpojniceState(
     val selectedLeftIndex: Int? = null,
     val selectedRightIndex: Int? = null,
     val infoMessage: String = "",
+    val p1Ready: Boolean = false,
+    val p2Ready: Boolean = false,
 )
 
 /**
@@ -74,6 +76,7 @@ class SpojniceViewModel(
     private var lastIntentSeq: Long = -1
     private var mySeq: Long = 0
     private var advanced = false
+    private var roundStarting = false
 
     fun enter() {
         if (started) return
@@ -85,7 +88,7 @@ class SpojniceViewModel(
             observerJob = viewModelScope.launch {
                 matchRepository.observeGameState(matchId, GAME_TYPE).collect { gs ->
                     latest = gs
-                    if (gs != null) rebuildState(gs)
+                    if (gs != null && !isHost) rebuildState(gs)
                 }
             }
             if (isHost) hostInit()
@@ -149,13 +152,21 @@ class SpojniceViewModel(
 
     fun startRound() { /* host-driven: round auto-starts */ }
 
-    fun nextRound() {
-        if (!authoritative) return
-        if (_state.value.phase == SpojnicePhase.ROUND_END) {
-            lastHandledDeadline = -1
-            startRoundInternal(2)
+    fun markReady() {
+        val s = _state.value
+        if (s.phase != SpojnicePhase.ROUND_END) return
+        if (isHost) {
+            if (s.p1Ready) return
+            commit(s.copy(p1Ready = true), 0)
+            checkBothReady()
+        } else {
+            if (s.p2Ready) return
+            _state.update { it.copy(p2Ready = true) }
+            sendIntent("ready", -1)
         }
     }
+
+    fun nextRound() = markReady()
 
     fun selectLeft(index: Int) = act {
         if (authoritative) applySelectLeft(index) else sendIntent("L", index)
@@ -281,18 +292,32 @@ class SpojniceViewModel(
 
     private fun finishRoundAfterPlay() {
         val s = _state.value
-        val nextPhase = if (s.currentRound == 1) SpojnicePhase.ROUND_END else SpojnicePhase.GAME_OVER
         commit(
-            s.copy(phase = nextPhase, infoMessage = "Round ${s.currentRound} finished"),
-            now() + ROUND_END_MILLIS,
+            s.copy(phase = SpojnicePhase.ROUND_END, infoMessage = "Round ${s.currentRound} finished",
+                p1Ready = false, p2Ready = false),
+            0,
         )
-        if (nextPhase == SpojnicePhase.GAME_OVER && isHost && !advanced) {
-            advanced = true
-            viewModelScope.launch { matchRepository.advanceMatch(matchId, GAME_TYPE, s.player1Points, s.player2Points) }
+    }
+
+    private fun checkBothReady() {
+        val s = _state.value
+        if (s.phase != SpojnicePhase.ROUND_END || !s.p1Ready || !s.p2Ready) return
+        if (roundStarting) return
+        roundStarting = true
+        if (s.currentRound < 2) {
+            startRoundInternal(2)
+        } else {
+            commit(s.copy(phase = SpojnicePhase.GAME_OVER), 0)
+            if (isHost && !advanced) {
+                advanced = true
+                viewModelScope.launch { matchRepository.advanceMatch(matchId, GAME_TYPE, s.player1Points, s.player2Points) }
+            }
         }
+        roundStarting = false
     }
 
     private fun startRoundInternal(round: Int) {
+        lastHandledDeadline = -1
         commit(freshRound(round), now() + STARTER_MILLIS)
     }
 
@@ -317,15 +342,13 @@ class SpojniceViewModel(
         when (s.phase) {
             SpojnicePhase.PLAYING_STARTER -> beginOpponentPhase()
             SpojnicePhase.PLAYING_OPPONENT -> finishRoundAfterPlay()
-            SpojnicePhase.ROUND_END -> startRoundInternal(2)
             else -> {}
         }
     }
 
-    // --- Commit / sync ---
-
     private fun commit(s: SpojniceState, deadline: Long) {
         deadlineAt = deadline
+        if (deadline > now()) lastHandledDeadline = -1
         _state.value = s
         if (!isHost) return
         viewModelScope.launch {
@@ -357,19 +380,31 @@ class SpojniceViewModel(
         val seq = numberOrNull(gs.p2Input["seq"])?.toLong() ?: return
         if (seq <= lastIntentSeq) return
         lastIntentSeq = seq
-        if (activeIsP1(_state.value)) return // not the guest's turn
         val type = gs.p2Input["type"] as? String ?: return
-        val a = numberOrNull(gs.p2Input["a"]) ?: return
         when (type) {
-            "L" -> applySelectLeft(a)
-            "R" -> applySelectRight(a)
+            "ready" -> {
+                val s = _state.value
+                if (s.phase == SpojnicePhase.ROUND_END && !s.p2Ready) {
+                    commit(s.copy(p2Ready = true), 0)
+                    checkBothReady()
+                }
+            }
+            "L" -> {
+                if (activeIsP1(_state.value)) return
+                applySelectLeft(numberOrNull(gs.p2Input["a"]) ?: -1)
+            }
+            "R" -> {
+                if (activeIsP1(_state.value)) return
+                applySelectRight(numberOrNull(gs.p2Input["a"]) ?: -1)
+            }
         }
     }
 
     private fun rebuildState(gs: GameStateDto) {
-        val (s, dl) = mapToState(gs.payload) ?: return
-        deadlineAt = dl
-        _state.value = s
+        val (s, _) = mapToState(gs.payload, gs) ?: return
+        deadlineAt = effectiveDeadline(gs, gs.payload)
+        val max = if (s.phase == SpojnicePhase.PLAYING_OPPONENT) 30 else 45
+        _state.value = s.copy(secondsLeft = secsLeft(deadlineAt, max))
     }
 
     // --- Turn helpers ---
@@ -416,11 +451,13 @@ class SpojniceViewModel(
         "selL" to (s.selectedLeftIndex ?: -1),
         "selR" to (s.selectedRightIndex ?: -1),
         "info" to s.infoMessage,
+        "p1Ready" to s.p1Ready,
+        "p2Ready" to s.p2Ready,
         "deadline" to deadline,
     )
 
     @Suppress("UNCHECKED_CAST")
-    private fun mapToState(p: Map<String, Any?>): Pair<SpojniceState, Long>? {
+    private fun mapToState(p: Map<String, Any?>, gs: GameStateDto): Pair<SpojniceState, Long>? {
         val phaseName = p["phase"] as? String ?: return null
         val pairs = (p["pairs"] as? List<*>)?.mapNotNull {
             val m = it as? Map<String, Any?> ?: return@mapNotNull null
@@ -438,7 +475,7 @@ class SpojniceViewModel(
         val used = (p["used"] as? List<*>)?.mapNotNull { numberOrNull(it) }?.toSet() ?: emptySet()
         val selL = numberOrNull(p["selL"]) ?: -1
         val selR = numberOrNull(p["selR"]) ?: -1
-        val deadline = numberOrNull(p["deadline"])?.toLong() ?: 0L
+        val deadline = effectiveDeadline(gs, p)
         val phase = runCatching { SpojnicePhase.valueOf(phaseName) }.getOrDefault(SpojnicePhase.PLAYING_STARTER)
         val maxSecs = if (phase == SpojnicePhase.PLAYING_OPPONENT) 30 else 45
         val s = SpojniceState(
@@ -455,12 +492,11 @@ class SpojniceViewModel(
             selectedLeftIndex = if (selL >= 0) selL else null,
             selectedRightIndex = if (selR >= 0) selR else null,
             infoMessage = p["info"] as? String ?: "",
+            p1Ready = p["p1Ready"] == true,
+            p2Ready = p["p2Ready"] == true,
         )
         return s to deadline
     }
-
-    private fun secsLeft(deadline: Long, max: Int): Int =
-        if (deadline <= 0) max else (((deadline - now()) + 999) / 1000).toInt().coerceIn(0, max)
 
     private fun numberOrNull(v: Any?): Int? = when (v) {
         is Long -> v.toInt()
