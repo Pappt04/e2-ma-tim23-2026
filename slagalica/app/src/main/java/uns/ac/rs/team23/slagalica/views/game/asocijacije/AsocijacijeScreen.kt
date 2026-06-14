@@ -30,6 +30,7 @@ import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.*
+import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
 import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
 import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 
@@ -42,6 +43,7 @@ fun AsocijacijeScreen(
     player1Name: String,
     player2Name: String,
     onFinish: () -> Unit,
+    onForfeit: () -> Unit = {},
     viewModel: AsocijacijeViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -84,6 +86,7 @@ fun AsocijacijeScreen(
                             modifier = Modifier.padding(end = 16.dp),
                         )
                     }
+                    ForfeitAction(onForfeit)
                 },
             )
         },

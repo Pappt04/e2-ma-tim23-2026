@@ -264,6 +264,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = { navController.popBackStack() },
+                onForfeit = {
+                    MatchStore.clear()
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Screen.KoZnaZna.route) {
@@ -273,6 +279,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = { navController.popBackStack() },
+                onForfeit = {
+                    MatchStore.clear()
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Screen.Spojnice.route) {
@@ -282,6 +294,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = { navController.popBackStack() },
+                onForfeit = {
+                    MatchStore.clear()
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Screen.MojBroj.route) {
@@ -291,6 +309,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = { navController.popBackStack() },
+                onForfeit = {
+                    MatchStore.clear()
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Screen.Skocko.route) {
@@ -300,6 +324,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = { navController.popBackStack() },
+                onForfeit = {
+                    MatchStore.clear()
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Screen.Asocijacije.route) {
@@ -309,6 +339,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 player1Name = MatchStore.player1Username.ifBlank { username },
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onFinish = { navController.popBackStack() },
+                onForfeit = {
+                    MatchStore.clear()
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Home.route) { inclusive = true }
+                    }
+                },
             )
         }
         composable(Screen.MatchResults.route) {
