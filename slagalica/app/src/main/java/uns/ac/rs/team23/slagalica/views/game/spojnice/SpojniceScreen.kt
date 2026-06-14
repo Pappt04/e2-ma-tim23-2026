@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
+import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
 import uns.ac.rs.team23.slagalica.viewmodels.SpojnicePhase
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceState
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceViewModel
@@ -53,6 +54,7 @@ fun SpojniceScreen(
     player1Name: String,
     player2Name: String,
     onFinish: () -> Unit,
+    onForfeit: () -> Unit = {},
     viewModel: SpojniceViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -81,6 +83,7 @@ fun SpojniceScreen(
                         )
                     }
                 },
+                actions = { ForfeitAction(onForfeit) },
             )
         },
     ) { innerPadding ->

@@ -34,6 +34,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
+import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaPhase
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaQuestion
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaState
@@ -47,6 +48,7 @@ fun KoZnaZnaScreen(
     player1Name: String,
     player2Name: String,
     onFinish: () -> Unit,
+    onForfeit: () -> Unit = {},
     viewModel: KoZnaZnaViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
@@ -76,6 +78,7 @@ fun KoZnaZnaScreen(
                         )
                     }
                 },
+                actions = { ForfeitAction(onForfeit) },
             )
         },
     ) { innerPadding ->

@@ -127,7 +127,15 @@ fun GameScreen(
             text = { Text("You will lose the match and all stars earned in this game.") },
             confirmButton = {
                 Button(
-                    onClick = onForfeit,
+                    onClick = {
+                        showForfeitDialog = false
+                        scope.launch {
+                            if (matchId.isNotBlank() && matchRepository != null) {
+                                matchRepository.abandonMatch(matchId)
+                            }
+                            onForfeit()
+                        }
+                    },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 ) { Text("Forfeit") }
             },
