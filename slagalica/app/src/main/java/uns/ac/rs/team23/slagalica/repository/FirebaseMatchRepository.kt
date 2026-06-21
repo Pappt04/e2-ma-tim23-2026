@@ -9,6 +9,10 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.firestore.DocumentReference
+import com.google.firebase.firestore.DocumentSnapshot
+import com.google.firebase.firestore.Transaction
+import uns.ac.rs.team23.slagalica.models.leagueLevelForStars
 import uns.ac.rs.team23.slagalica.network.dto.GameResultDto
 import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.network.dto.MatchInviteResponseDto
@@ -164,6 +168,16 @@ class FirebaseMatchRepository(
                 val gameResultRef = matchRef.collection("gameResults").document(currentGameType)
                 val gameResult = tx.get(gameResultRef)
 
+                // Pre-read both players (reads before writes) for end-of-match star awards.
+                val isFriendly = match.getBoolean("isFriendly") ?: false
+                val p1Id = match.getString("player1Id")
+                val p2Id = match.getString("player2Id")
+                val usersCol = firestore.collection("users")
+                val p1Ref = p1Id?.let { usersCol.document(it) }
+                val p2Ref = p2Id?.let { usersCol.document(it) }
+                val p1Snap = if (!isFriendly && p1Ref != null) tx.get(p1Ref) else null
+                val p2Snap = if (!isFriendly && p2Ref != null) tx.get(p2Ref) else null
+
                 val scoreField = if (isPlayer1) "player1Score" else "player2Score"
                 val completedField = if (isPlayer1) "player1Completed" else "player2Completed"
 
@@ -208,6 +222,9 @@ class FirebaseMatchRepository(
                                 "completedAt" to FieldValue.serverTimestamp(),
                             )
                         )
+                        if (p1Snap != null && p2Snap != null && p1Ref != null && p2Ref != null) {
+                            awardStars(tx, p1Ref, p1Snap, p2Ref, p2Snap, newP1Total, newP2Total)
+                        }
                     } else {
                         tx.update(
                             matchRef, mapOf(
@@ -465,6 +482,17 @@ class FirebaseMatchRepository(
             val gameIndex = GAME_ORDER.indexOf(gameType)
                 .takeIf { it >= 0 } ?: (match.getLong("currentGameIndex") ?: 0L).toInt()
 
+            // Pre-read both players (reads must precede writes) so we can award
+            // stars when this game completes the match (ranked matches only).
+            val isFriendly = match.getBoolean("isFriendly") ?: false
+            val p1Id = match.getString("player1Id")
+            val p2Id = match.getString("player2Id")
+            val usersCol = firestore.collection("users")
+            val p1Ref = p1Id?.let { usersCol.document(it) }
+            val p2Ref = p2Id?.let { usersCol.document(it) }
+            val p1Snap = if (!isFriendly && p1Ref != null) tx.get(p1Ref) else null
+            val p2Snap = if (!isFriendly && p2Ref != null) tx.get(p2Ref) else null
+
             // Persist the per-game result for this specific game (idempotent).
             val gameResultRef = matchRef.collection("gameResults").document(gameType)
             tx.set(
@@ -499,6 +527,9 @@ class FirebaseMatchRepository(
                         "completedAt" to FieldValue.serverTimestamp(),
                     )
                 )
+                if (p1Snap != null && p2Snap != null && p1Ref != null && p2Ref != null) {
+                    awardStars(tx, p1Ref, p1Snap, p2Ref, p2Snap, newP1Total, newP2Total)
+                }
             } else {
                 tx.update(
                     matchRef, mapOf(
@@ -512,6 +543,48 @@ class FirebaseMatchRepository(
         }.await()
 
         matchRef.get().await().toMatchResponseDto()
+    }
+
+    /**
+     * Award stars at the end of a ranked match (spec "Igranje partija"):
+     * winner +10, loser -10, plus +1 per 40 points for both; total stars clamped
+     * at 0. Earned (positive) stars also feed [cycleStars] (regional monthly
+     * leaderboard) and totalStarsEarned, and the league level is recomputed.
+     * User docs must already be read in the same transaction (reads-before-writes).
+     */
+    private fun awardStars(
+        tx: Transaction,
+        p1Ref: DocumentReference,
+        p1Snap: DocumentSnapshot,
+        p2Ref: DocumentReference,
+        p2Snap: DocumentSnapshot,
+        p1Total: Int,
+        p2Total: Int,
+    ) {
+        val (p1Base, p2Base) = when {
+            p1Total > p2Total -> 10 to -10
+            p2Total > p1Total -> -10 to 10
+            else -> 0 to 0
+        }
+        applyStarDelta(tx, p1Ref, p1Snap, p1Base + p1Total / 40)
+        applyStarDelta(tx, p2Ref, p2Snap, p2Base + p2Total / 40)
+    }
+
+    private fun applyStarDelta(tx: Transaction, ref: DocumentReference, snap: DocumentSnapshot, delta: Int) {
+        val old = (snap.getLong("stars") ?: 0L).toInt()
+        val newStars = (old + delta).coerceAtLeast(0)
+        val earned = delta.coerceAtLeast(0)
+        val oldCycle = (snap.getLong("cycleStars") ?: 0L).toInt()
+        val oldTotal = (snap.getLong("totalStarsEarned") ?: 0L).toInt()
+        tx.update(
+            ref,
+            mapOf(
+                "stars" to newStars,
+                "cycleStars" to oldCycle + earned,
+                "totalStarsEarned" to oldTotal + earned,
+                "leagueLevel" to leagueLevelForStars(newStars),
+            ),
+        )
     }
 
     @Suppress("UNCHECKED_CAST")

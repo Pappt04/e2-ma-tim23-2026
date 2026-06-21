@@ -7,6 +7,8 @@ data class UserProfile(
     val region: String = "",
     val tokens: Int = 5,
     val stars: Int = 0,
+    /** Stars earned during the current monthly cycle (reset at rollover). */
+    val cycleStars: Int = 0,
     val leagueLevel: Int = 0,
     val avatarIndex: Int = 0,
     val isEmailVerified: Boolean = false,

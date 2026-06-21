@@ -53,13 +53,18 @@ fun LobbyScreen(
     currentUsername: String,
     onNavigateBack: () -> Unit,
     onGameStart: () -> Unit,
+    friendId: String? = null,
     viewModel: LobbyViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
 
     LaunchedEffect(Unit) {
         if (viewModel.state.value is LobbyState.Idle) {
-            viewModel.startSearch(currentUsername)
+            if (!friendId.isNullOrBlank()) {
+                viewModel.startFriendInvite(friendId, currentUsername)
+            } else {
+                viewModel.startSearch(currentUsername)
+            }
         }
     }
 

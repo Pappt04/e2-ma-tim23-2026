@@ -178,6 +178,53 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
         }
     }
 
+    /**
+     * Invite a specific friend to a ranked match, then wait for them to accept.
+     * When the invitee accepts, [respondToInvite] creates a match with the
+     * inviter as player1, which [getCurrentMatch] then picks up.
+     */
+    fun startFriendInvite(friendId: String, username: String) {
+        myUsername = username
+        currentFriendly = false
+        _state.value = LobbyState.Searching
+        viewModelScope.launch {
+            matchRepository.sendFriendInvite(friendId, false)
+                .onSuccess { match ->
+                    when (match.status) {
+                        "INVITE_SENT" -> {
+                            _state.value = LobbyState.InviteSent(match.id, match.player2Username ?: "Prijatelj")
+                            startInviteAcceptPolling(match.id)
+                        }
+                        "IN_PROGRESS" -> onMatchFound(match)
+                        else -> _state.value = LobbyState.Error("Unexpected state: ${match.status}")
+                    }
+                }
+                .onFailure { _state.value = LobbyState.Error(it.message ?: "Failed to send invite") }
+        }
+    }
+
+    private fun startInviteAcceptPolling(inviteId: String) {
+        pollingJob?.cancel()
+        pollingJob = viewModelScope.launch {
+            repeat(30) {
+                delay(1_000)
+                matchRepository.getCurrentMatch().onSuccess { match ->
+                    if (match != null && match.status == "IN_PROGRESS" && match.player2Username != null) {
+                        onMatchFound(match)
+                        pollingJob?.cancel()
+                        return@onSuccess
+                    }
+                }
+                if (_state.value !is LobbyState.InviteSent) return@repeat
+            }
+            if (_state.value is LobbyState.InviteSent) {
+                matchRepository.cancelInvite(inviteId)
+                MatchStore.clear()
+                _state.value = LobbyState.Error("Prijatelj nije prihvatio poziv.")
+            }
+        }
+    }
+
     fun cancelInvite() {
         val s = _state.value as? LobbyState.InviteSent ?: return
         viewModelScope.launch {

@@ -37,7 +37,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import androidx.compose.material.icons.filled.EmojiEvents
 import androidx.compose.material.icons.filled.Forum
+import androidx.compose.material.icons.filled.Group
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.Notifications
 
@@ -52,6 +55,9 @@ fun HomeScreen(
     onNavigateToProfile: () -> Unit,
     onNavigateToChat: () -> Unit = {},
     onNavigateToChallenge: () -> Unit = {},
+    onNavigateToFriends: () -> Unit = {},
+    onNavigateToRegion: () -> Unit = {},
+    onNavigateToLeague: () -> Unit = {},
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -126,6 +132,39 @@ fun HomeScreen(
                         onClick = {
                             scope.launch { drawerState.close() }
                             onNavigateToNotifications()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(0.dp),
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Group, contentDescription = null) },
+                        label = { Text("Friends") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToFriends()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(0.dp),
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.Map, contentDescription = null) },
+                        label = { Text("Regions") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToRegion()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(0.dp),
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.EmojiEvents, contentDescription = null) },
+                        label = { Text("Leagues") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToLeague()
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(0.dp),

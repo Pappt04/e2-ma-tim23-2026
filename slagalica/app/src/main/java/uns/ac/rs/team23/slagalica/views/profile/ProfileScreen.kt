@@ -3,6 +3,7 @@ package uns.ac.rs.team23.slagalica.views.profile
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -19,6 +20,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Star
@@ -37,6 +39,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.utils.QrGenerator
+import uns.ac.rs.team23.slagalica.views.common.AvatarWithFrame
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -58,15 +61,15 @@ fun ProfileScreen(
     stars: Int = 0,
     leagueLevel: Int = 0,
     region: String = "",
+    avatarIndex: Int = 0,
+    frameRank: Int = 0,
+    onAvatarChange: (Int) -> Unit = {},
     onNavigateBack: () -> Unit,
     onNavigateToStatistics: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
+    onNavigateToLeague: () -> Unit = {},
     onLogout: () -> Unit,
 ) {
-    var avatarVariant by remember { mutableIntStateOf(0) }
-    val avatarColors = listOf(Color(0xFF42A5F5), Color(0xFFAB47BC), Color(0xFF66BB6A), Color(0xFFFF7043))
-    val selectedAvatarColor = avatarColors[avatarVariant % avatarColors.size]
-
     Scaffold(
         topBar = {
             TopAppBar(
@@ -95,24 +98,14 @@ fun ProfileScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(96.dp)
-                                .clip(CircleShape)
-                                .background(selectedAvatarColor)
-                                .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.AccountCircle,
-                                contentDescription = "Avatar",
-                                tint = Color.White,
-                                modifier = Modifier.size(72.dp),
-                            )
-                        }
+                        AvatarWithFrame(
+                            avatarIndex = avatarIndex,
+                            size = 96.dp,
+                            frameRank = frameRank,
+                        )
 
                         OutlinedButton(onClick = {
-                            avatarVariant = (avatarVariant + 1) % avatarColors.size
+                            onAvatarChange((avatarIndex + 1) % 4)
                         }) {
                             Icon(Icons.Default.Edit, contentDescription = null)
                             Spacer(modifier = Modifier.padding(3.dp))
@@ -138,7 +131,9 @@ fun ProfileScreen(
                         ProfileInfoRow("Token Count", tokens.toString())
                         ProfileInfoRow("Total Stars", stars.toString())
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(onClick = onNavigateToLeague),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
@@ -151,6 +146,11 @@ fun ProfileScreen(
                                 )
                                 Spacer(modifier = Modifier.padding(3.dp))
                                 Text(LEAGUE_NAMES.getOrElse(leagueLevel) { "League $leagueLevel" })
+                                Spacer(modifier = Modifier.padding(3.dp))
+                                Icon(
+                                    Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                    contentDescription = null,
+                                )
                             }
                         }
                         ProfileInfoRow("Region", region)

@@ -43,6 +43,7 @@ class FirebaseAuthRepository(
                     "region" to region,
                     "tokens" to 5,
                     "stars" to 0,
+                    "cycleStars" to 0,
                     "totalStarsEarned" to 0,
                     "leagueLevel" to 0,
                     "avatarIndex" to 0,
@@ -50,6 +51,7 @@ class FirebaseAuthRepository(
                     "createdAt" to Timestamp.now(),
                     "lastTokenGranted" to today,
                     "fcmToken" to "",
+                    "onlineAt" to System.currentTimeMillis(),
                 )
             )
             // Store email here so login-by-username doesn't need a second pre-auth read
@@ -96,6 +98,7 @@ class FirebaseAuthRepository(
                 "region" to "",
                 "tokens" to 0,
                 "stars" to 0,
+                "cycleStars" to 0,
                 "totalStarsEarned" to 0,
                 "leagueLevel" to 0,
                 "avatarIndex" to 0,
@@ -134,6 +137,20 @@ class FirebaseAuthRepository(
         user.updatePassword(newPassword).await()
     }
 
+    override suspend fun updateAvatar(avatarIndex: Int): Result<Unit> = runCatching {
+        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        firestore.collection("users").document(uid)
+            .update("avatarIndex", avatarIndex)
+            .await()
+    }
+
+    override suspend fun updatePresence(): Result<Unit> = runCatching {
+        val uid = auth.currentUser?.uid ?: return@runCatching
+        firestore.collection("users").document(uid)
+            .update("onlineAt", System.currentTimeMillis())
+            .await()
+    }
+
     private suspend fun readProfile(uid: String): UserProfile {
         val doc = firestore.collection("users").document(uid).get().await()
         return UserProfile(
@@ -143,6 +160,7 @@ class FirebaseAuthRepository(
             region = doc.getString("region") ?: "",
             tokens = (doc.getLong("tokens") ?: 5L).toInt(),
             stars = (doc.getLong("stars") ?: 0L).toInt(),
+            cycleStars = (doc.getLong("cycleStars") ?: 0L).toInt(),
             leagueLevel = (doc.getLong("leagueLevel") ?: 0L).toInt(),
             avatarIndex = (doc.getLong("avatarIndex") ?: 0L).toInt(),
             isEmailVerified = doc.getBoolean("isGuest") == true || auth.currentUser?.isEmailVerified == true,
