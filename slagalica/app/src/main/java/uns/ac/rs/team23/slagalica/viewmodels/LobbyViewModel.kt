@@ -104,6 +104,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
             player2 = match.player2Username ?: "",
         )
         _state.value = LobbyState.OpponentFound(opponent)
+        viewModelScope.launch { matchRepository.setInMatch(true) }
         startMatchObserver(match.id, opponent)
     }
 
@@ -239,7 +240,10 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
         observerJob?.cancel()
         countdownJob?.cancel()
         countdownJob = null
-        viewModelScope.launch { matchRepository.cancelQueue() }
+        viewModelScope.launch {
+            matchRepository.cancelQueue()
+            matchRepository.setInMatch(false)
+        }
         MatchStore.clear()
         _state.value = LobbyState.Idle
     }

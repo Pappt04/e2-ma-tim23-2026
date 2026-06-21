@@ -57,7 +57,7 @@ val AppModule = module {
     single { CycleManager(get()) }
 
     // ViewModels
-    viewModel { AuthViewModel(get(), get()) }
+    viewModel { AuthViewModel(get(), get(), get()) }
     viewModel { FriendsViewModel(get(), get()) }
     viewModel { RegionViewModel(get(), get()) }
     viewModel { KorakPoKorakViewModel(get(), get(), get()) }

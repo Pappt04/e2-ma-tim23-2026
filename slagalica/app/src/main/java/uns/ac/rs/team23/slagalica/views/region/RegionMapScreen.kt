@@ -4,14 +4,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
@@ -21,7 +20,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -33,6 +31,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -41,6 +40,7 @@ import org.koin.androidx.compose.koinViewModel
 import org.osmdroid.config.Configuration
 import org.osmdroid.tileprovider.tilesource.TileSourceFactory
 import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
 import uns.ac.rs.team23.slagalica.models.RegionStanding
@@ -56,24 +56,41 @@ fun RegionMapScreen(
     val ui by viewModel.ui.collectAsState()
     val context = LocalContext.current
 
-    // osmdroid needs a user-agent set before any tiles are requested.
-    remember { Configuration.getInstance().userAgentValue = context.packageName }
-
+    // osmdroid init: load config + set a user agent before any tiles are requested.
     val mapView = remember {
+        Configuration.getInstance().load(
+            context,
+            context.getSharedPreferences("osmdroid", android.content.Context.MODE_PRIVATE),
+        )
+        Configuration.getInstance().userAgentValue = context.packageName
         MapView(context).apply {
             setTileSource(TileSourceFactory.MAPNIK)
             setMultiTouchControls(true)
-            controller.setZoom(7.0)
-            controller.setCenter(GeoPoint(44.0, 20.9))
+            zoomController.setVisibility(CustomZoomButtonsController.Visibility.SHOW_AND_FADEOUT)
+            setHorizontalMapRepetitionEnabled(false)
+            setVerticalMapRepetitionEnabled(false)
+            // Constrain scroll to Serbia's neighbourhood so the map can't be lost.
+            setScrollableAreaLimitDouble(org.osmdroid.util.BoundingBox(46.3, 23.2, 41.7, 18.6))
+            setMinZoomLevel(6.0)
+            setMaxZoomLevel(18.0)
+            // Zoom/center must be applied AFTER the first layout, otherwise osmdroid
+            // ignores them and renders the whole world / ocean.
+            addOnFirstLayoutListener { _, _, _, _, _ ->
+                controller.setZoom(7.0)
+                controller.setCenter(GeoPoint(44.05, 20.9))
+            }
         }
     }
 
     DisposableEffect(Unit) {
         mapView.onResume()
-        onDispose { mapView.onDetach() }
+        onDispose {
+            mapView.onPause()
+            mapView.onDetach()
+        }
     }
 
-    // Re-draw markers whenever player points change.
+    // Redraw player markers whenever the data changes.
     DisposableEffect(ui.playerPoints) {
         mapView.overlays.clear()
         ui.playerPoints.forEach { point ->
@@ -104,34 +121,44 @@ fun RegionMapScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState()),
+                .padding(innerPadding),
         ) {
-            AndroidView(
-                factory = { mapView },
+            // Clip the map to its box: osmdroid's pinch-zoom scale animation otherwise
+            // paints outside its bounds and overlaps the list below.
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(300.dp),
-            )
+                    .height(300.dp)
+                    .clipToBounds(),
+            ) {
+                AndroidView(
+                    factory = { mapView },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
 
-            Column(
+            LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(1f)
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    "Mesečna rang lista regiona",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    "Broj zvezda osvojenih u tekućem mesečnom ciklusu (resetuje se na kraju ciklusa).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-
-                ui.standings.forEachIndexed { index, standing ->
+                item {
+                    Text(
+                        "Mesečna rang lista regiona",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+                item {
+                    Text(
+                        "Broj zvezda osvojenih u tekućem mesečnom ciklusu (resetuje se na kraju ciklusa).",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                itemsIndexed(ui.standings, key = { _, s -> s.region.id }) { index, standing ->
                     RegionRow(
                         position = index + 1,
                         standing = standing,
@@ -139,14 +166,6 @@ fun RegionMapScreen(
                         frameRank = viewModel.frameRankFor(standing.region.id),
                         onClick = { viewModel.selectRegion(standing.region.id) },
                     )
-                }
-
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = viewModel::forceEndCycle,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text("Simuliraj kraj ciklusa (demo)")
                 }
             }
         }
@@ -169,13 +188,6 @@ fun RegionMapScreen(
                 }
             },
         )
-    }
-
-    ui.info?.let { msg ->
-        androidx.compose.runtime.LaunchedEffect(msg) {
-            android.widget.Toast.makeText(context, msg, android.widget.Toast.LENGTH_SHORT).show()
-            viewModel.clearInfo()
-        }
     }
 }
 
@@ -218,12 +230,13 @@ private fun RegionRow(
                         fontWeight = if (isMyRegion) FontWeight.Bold else FontWeight.Normal,
                     )
                     if (medal.isNotEmpty()) {
-                        Spacer(Modifier.width(6.dp))
-                        Text(medal)
+                        Text("  $medal")
                     }
                     if (isMyRegion) {
-                        Spacer(Modifier.width(6.dp))
-                        Text("(vaš region)", style = MaterialTheme.typography.labelSmall)
+                        Text(
+                            "  (vaš region)",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
                     }
                 }
                 Text(

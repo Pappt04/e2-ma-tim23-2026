@@ -13,7 +13,7 @@ import kotlin.math.floor
  * Blaze plan, so the rollover runs on the client instead: the first client past
  * a month boundary claims the rollover via a guarded transaction and finalizes
  * the cycle (top-3 region frames, 30% star penalty for unranked players, reset
- * of cycleStars). [forceRollover] lets a demo trigger it on demand.
+ * of cycleStars). It is fully automatic, driven by the real calendar month.
  */
 class CycleManager(
     private val firestore: FirebaseFirestore,
@@ -25,10 +25,14 @@ class CycleManager(
 
     private fun cyclesRef() = firestore.collection("meta").document("cycles")
 
-    /** Runs the rollover once if the stored month is older than the current month. */
+    /**
+     * Runs the rollover once when the stored month is older than the current month.
+     * On a brand-new database (no stored month) it only bootstraps the marker and
+     * does not finalize anything.
+     */
     suspend fun maybeRollover(): Result<Boolean> = runCatching {
         val current = currentMonthlyId()
-        val claimed = firestore.runTransaction { tx ->
+        val shouldFinalize = firestore.runTransaction { tx ->
             val doc = tx.get(cyclesRef())
             val stored = doc.getString("currentMonthlyId")
             if (stored == current) return@runTransaction false
@@ -37,20 +41,16 @@ class CycleManager(
                 mapOf("currentMonthlyId" to current, "processing" to true),
                 com.google.firebase.firestore.SetOptions.merge(),
             )
-            true
+            // Only close a cycle if a previous (older) month was actually recorded.
+            stored != null
         }.await()
 
-        if (claimed == true) {
+        if (shouldFinalize == true) {
             finalizeCycle(current)
             true
         } else {
             false
         }
-    }
-
-    /** Demo helper: finalize the current cycle immediately regardless of the date. */
-    suspend fun forceRollover(): Result<Unit> = runCatching {
-        finalizeCycle(currentMonthlyId())
     }
 
     private suspend fun finalizeCycle(currentMonthlyId: String) {

@@ -146,8 +146,15 @@ class FirebaseAuthRepository(
 
     override suspend fun updatePresence(): Result<Unit> = runCatching {
         val uid = auth.currentUser?.uid ?: return@runCatching
+        // inMatch is derived from the active-match holder, which is cleared on every
+        // match exit (finish/forfeit), so presence self-heals each heartbeat.
         firestore.collection("users").document(uid)
-            .update("onlineAt", System.currentTimeMillis())
+            .update(
+                mapOf(
+                    "onlineAt" to System.currentTimeMillis(),
+                    "inMatch" to uns.ac.rs.team23.slagalica.data.MatchStore.matchId.isNotBlank(),
+                )
+            )
             .await()
     }
 
