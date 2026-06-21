@@ -7,7 +7,10 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.tasks.await
+import uns.ac.rs.team23.slagalica.models.Notification
+import uns.ac.rs.team23.slagalica.models.NotificationType
 import uns.ac.rs.team23.slagalica.network.dto.ChatMessageDto
+import java.util.UUID
 
 class FirebaseChatRepository(
     private val auth: FirebaseAuth,
@@ -31,6 +34,10 @@ class FirebaseChatRepository(
             val uid = user.uid
             val userDoc = firestore.collection("users").document(uid).get().await()
             val username = userDoc.getString("username") ?: user.displayName ?: "Korisnik"
+            val userRegion = userDoc.getString("region") ?: ""
+            if (userRegion != region) {
+                throw Exception("Možete pisati samo u četu svog regiona")
+            }
 
             val now = com.google.firebase.Timestamp.now()
             val data = mapOf(
@@ -44,6 +51,8 @@ class FirebaseChatRepository(
                 .collection("messages")
                 .add(data)
                 .await()
+
+            notifyRegionPeers(uid, region, username, content)
 
             ChatMessageDto(
                 id = ref.id,
@@ -70,6 +79,28 @@ class FirebaseChatRepository(
             }
         }
         awaitClose { registration.remove() }
+    }
+
+    private suspend fun notifyRegionPeers(senderUid: String, region: String, sender: String, preview: String) {
+        val peers = firestore.collection("users")
+            .whereEqualTo("region", region)
+            .whereEqualTo("isGuest", false)
+            .get()
+            .await()
+        val body = preview.take(80)
+        peers.documents.forEach { doc ->
+            if (doc.id == senderUid) return@forEach
+            FirestoreNotificationWriter.push(
+                firestore,
+                doc.id,
+                Notification(
+                    id = UUID.randomUUID().toString(),
+                    title = "Nova poruka u $region",
+                    message = "$sender: $body",
+                    type = NotificationType.CHAT,
+                ),
+            )
+        }
     }
 
     private fun com.google.firebase.firestore.DocumentSnapshot.toChatMessageDto(): ChatMessageDto? {

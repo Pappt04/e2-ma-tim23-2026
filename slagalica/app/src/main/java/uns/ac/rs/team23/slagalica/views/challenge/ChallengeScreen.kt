@@ -18,11 +18,15 @@ import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.network.dto.ChallengeResponseDto
 import uns.ac.rs.team23.slagalica.viewmodels.ChallengeViewModel
 
+private enum class ChallengeAction { Join, Play, Waiting, Full }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChallengeScreen(
     region: String,
+    username: String,
     onNavigateBack: () -> Unit,
+    onPlayAttempt: () -> Unit,
     viewModel: ChallengeViewModel = koinViewModel(),
 ) {
     LaunchedEffect(region) { viewModel.init(region) }
@@ -74,13 +78,23 @@ fun ChallengeScreen(
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
+                    val uid = viewModel.myUid
                     items(challenges, key = { it.id }) { c ->
                         if (c.status == "COMPLETED") {
                             CompletedChallengeCard(challenge = c)
                         } else {
+                            val me = c.participants.find { it.id == uid }
+                            val action = when {
+                                me == null && c.participants.size < 4 -> ChallengeAction.Join
+                                me != null && me.gamesCompleted < 6 -> ChallengeAction.Play
+                                me != null -> ChallengeAction.Waiting
+                                else -> ChallengeAction.Full
+                            }
                             ChallengeCard(
                                 challenge = c,
+                                action = action,
                                 onJoin = { viewModel.joinChallenge(c.id) {} },
+                                onPlay = { viewModel.startAttempt(c, username) { onPlayAttempt() } },
                             )
                         }
                     }
@@ -176,7 +190,12 @@ private fun CompletedChallengeCard(challenge: ChallengeResponseDto) {
 }
 
 @Composable
-private fun ChallengeCard(challenge: ChallengeResponseDto, onJoin: () -> Unit) {
+private fun ChallengeCard(
+    challenge: ChallengeResponseDto,
+    action: ChallengeAction,
+    onJoin: () -> Unit,
+    onPlay: () -> Unit,
+) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Row(
@@ -200,12 +219,16 @@ private fun ChallengeCard(challenge: ChallengeResponseDto, onJoin: () -> Unit) {
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                if (challenge.status == "OPEN" && challenge.participants.size < 4) {
-                    Button(onClick = onJoin) { Text("Join") }
-                } else {
-                    AssistChip(
+                when (action) {
+                    ChallengeAction.Join -> Button(onClick = onJoin) { Text("Join") }
+                    ChallengeAction.Play -> Button(onClick = onPlay) { Text("Play") }
+                    ChallengeAction.Waiting -> AssistChip(
                         onClick = {},
-                        label = { Text(challenge.status) },
+                        label = { Text("Waiting…") },
+                    )
+                    ChallengeAction.Full -> AssistChip(
+                        onClick = {},
+                        label = { Text("Full") },
                     )
                 }
             }

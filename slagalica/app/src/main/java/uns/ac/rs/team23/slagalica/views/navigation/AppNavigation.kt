@@ -15,19 +15,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
+import uns.ac.rs.team23.slagalica.data.ChallengeStore
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 import uns.ac.rs.team23.slagalica.repository.RegionRepository
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.LeagueChangeEvent
+import uns.ac.rs.team23.slagalica.viewmodels.ChallengeViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.LobbyViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.UserSession
 import uns.ac.rs.team23.slagalica.views.HomeScreen
@@ -44,6 +48,7 @@ import uns.ac.rs.team23.slagalica.views.game.skocko.SkockoScreen
 import uns.ac.rs.team23.slagalica.views.game.spojnice.SpojniceScreen
 import uns.ac.rs.team23.slagalica.views.chat.ChatScreen
 import uns.ac.rs.team23.slagalica.views.challenge.ChallengeScreen
+import uns.ac.rs.team23.slagalica.views.leaderboard.LeaderboardScreen
 import uns.ac.rs.team23.slagalica.views.lobby.LobbyScreen
 import uns.ac.rs.team23.slagalica.views.NotificationsScreen
 import uns.ac.rs.team23.slagalica.views.profile.ChangePasswordScreen
@@ -80,6 +85,7 @@ sealed class Screen(val route: String) {
     data object Friends : Screen("friends")
     data object Region : Screen("region")
     data object League : Screen("league")
+    data object Leaderboard : Screen("leaderboard")
     data object LobbyFriend : Screen("lobby_friend/{friendId}") {
         fun route(friendId: String) = "lobby_friend/$friendId"
     }
@@ -160,6 +166,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onNavigateToFriends = { navController.navigate(Screen.Friends.route) },
                 onNavigateToRegion = { navController.navigate(Screen.Region.route) },
                 onNavigateToLeague = { navController.navigate(Screen.League.route) },
+                onNavigateToLeaderboard = { navController.navigate(Screen.Leaderboard.route) },
             )
         }
         composable(Screen.Profile.route) {
@@ -260,6 +267,8 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Gost"
             val matchRepo: MatchRepository = koinInject()
+            val challengeViewModel: ChallengeViewModel = koinViewModel()
+            val scope = rememberCoroutineScope()
             GameScreen(
                 playerName = username,
                 opponentName = MatchStore.opponentUsername.ifBlank { "Protivnik" },
@@ -267,20 +276,39 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 matchRepository = matchRepo,
                 onForfeit = {
                     MatchStore.clear()
+                    ChallengeStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
                 },
                 onAllGamesFinished = {
                     MatchStore.clear()
+                    ChallengeStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
                 },
                 onMatchCompleted = {
-                    navController.navigate(Screen.MatchResults.route) {
-                        popUpTo(Screen.Game.route)
-                        launchSingleTop = true
+                    if (ChallengeStore.isActive) {
+                        val challengeId = ChallengeStore.activeChallengeId
+                        val matchId = MatchStore.matchId
+                        val region = ChallengeStore.region
+                        scope.launch {
+                            challengeViewModel.submitAttempt(challengeId, matchId) {
+                                ChallengeStore.clear()
+                                MatchStore.clear()
+                                authViewModel.refreshProfile()
+                                navController.navigate(Screen.Challenge.route(region)) {
+                                    popUpTo(Screen.Home.route) { inclusive = false }
+                                }
+                            }
+                        }
+                    } else {
+                        authViewModel.refreshProfile()
+                        navController.navigate(Screen.MatchResults.route) {
+                            popUpTo(Screen.Game.route)
+                            launchSingleTop = true
+                        }
                     }
                 },
                 onNavigateToKorakPoKorak = { navController.navigate(Screen.KorakPoKorak.route) },
@@ -389,6 +417,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
                 onDone = {
                     MatchStore.clear()
+                    authViewModel.refreshProfile()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -407,9 +436,17 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.Challenge.route) { backStack ->
             val region = backStack.arguments?.getString("region") ?: ""
+            val session = userSession
+            val username = if (session is UserSession.LoggedIn) session.username else ""
             ChallengeScreen(
                 region = region,
+                username = username,
                 onNavigateBack = { navController.popBackStack() },
+                onPlayAttempt = {
+                    navController.navigate(Screen.Game.route) {
+                        popUpTo(Screen.Challenge.route)
+                    }
+                },
             )
         }
         composable(Screen.Friends.route) {
@@ -448,6 +485,17 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                     stars = userProfile?.stars ?: 0,
                     onNavigateBack = { navController.popBackStack() },
                 )
+            } else {
+                Box(Modifier.fillMaxSize())
+            }
+        }
+        composable(Screen.Leaderboard.route) {
+            val session = userSession
+            LaunchedEffect(session) {
+                if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
+            }
+            if (session is UserSession.LoggedIn) {
+                LeaderboardScreen(onNavigateBack = { navController.popBackStack() })
             } else {
                 Box(Modifier.fillMaxSize())
             }

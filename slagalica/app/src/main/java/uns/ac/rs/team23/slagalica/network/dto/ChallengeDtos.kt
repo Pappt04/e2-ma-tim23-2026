@@ -20,6 +20,7 @@ data class ChallengeParticipantDto(
 
 data class ChallengeResponseDto(
     val id: String,
+    val creatorId: String,
     val creatorUsername: String,
     val region: String,
     val stakedStars: Int,

@@ -12,6 +12,8 @@ import kotlinx.coroutines.tasks.await
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.Transaction
+import uns.ac.rs.team23.slagalica.models.Notification
+import uns.ac.rs.team23.slagalica.models.NotificationType
 import uns.ac.rs.team23.slagalica.models.leagueLevelForStars
 import uns.ac.rs.team23.slagalica.network.dto.GameResultDto
 import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
@@ -42,7 +44,10 @@ class FirebaseMatchRepository(
             val joined = joinWaitingMatch(uid, username, friendly)
             if (joined != null) return@runCatching joined
 
-            // No match to join — create a new waiting match
+            // No match to join — create a new waiting match (ranked costs 1 token up front)
+            if (!friendly) {
+                deductToken(firestore.collection("users").document(uid))
+            }
             val matchRef = firestore.collection("matches").document()
             matchRef.set(
                 mapOf(
@@ -77,6 +82,45 @@ class FirebaseMatchRepository(
             )
         }
 
+    override suspend fun startSoloMatch(): Result<MatchResponseDto> = runCatching {
+        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val userDoc = firestore.collection("users").document(uid).get().await()
+        val username = userDoc.getString("username") ?: ""
+
+        val matchRef = firestore.collection("matches").document()
+        matchRef.set(
+            mapOf(
+                "player1Id" to uid,
+                "player1Username" to username,
+                "player2Id" to null,
+                "player2Username" to "Izazov",
+                "status" to "IN_PROGRESS",
+                "isFriendly" to true,
+                "currentGameIndex" to 0,
+                "currentGameType" to GAME_ORDER[0],
+                "player1TotalScore" to 0,
+                "player2TotalScore" to 0,
+                "winnerId" to null,
+                "createdAt" to FieldValue.serverTimestamp(),
+            )
+        ).await()
+
+        MatchResponseDto(
+            id = matchRef.id,
+            player1Id = uid,
+            player1Username = username,
+            player2Id = null,
+            player2Username = "Izazov",
+            status = "IN_PROGRESS",
+            isFriendly = true,
+            currentGameIndex = 0,
+            currentGameType = GAME_ORDER[0],
+            player1TotalScore = 0,
+            player2TotalScore = 0,
+            winnerId = null,
+        )
+    }
+
     override suspend fun tryJoinWaiting(username: String, friendly: Boolean): Result<MatchResponseDto?> =
         runCatching {
             val uid = auth.currentUser?.uid ?: return@runCatching null
@@ -100,6 +144,10 @@ class FirebaseMatchRepository(
                     if (snap.getString("status") != "WAITING_FOR_OPPONENT" ||
                         snap.getString("player2Id") != null
                     ) throw Exception("already taken")
+                    val isFriendly = snap.getBoolean("isFriendly") ?: false
+                    if (!isFriendly) {
+                        deductToken(tx, firestore.collection("users").document(uid))
+                    }
                     tx.update(
                         doc.reference, mapOf(
                             "player2Id" to uid,
@@ -244,16 +292,40 @@ class FirebaseMatchRepository(
     override suspend fun abandonMatch(matchId: String): Result<MatchResponseDto> = runCatching {
         val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
         val matchRef = firestore.collection("matches").document(matchId)
-        val match = matchRef.get().await()
-        val opponentId = if (match.getString("player1Id") == uid)
-            match.getString("player2Id") else match.getString("player1Id")
-        matchRef.update(
-            mapOf(
-                "status" to "ABANDONED",
-                "winnerId" to opponentId,
-                "completedAt" to FieldValue.serverTimestamp(),
+        val usersCol = firestore.collection("users")
+
+        firestore.runTransaction { tx ->
+            val match = tx.get(matchRef)
+            if (match.getString("status") != "IN_PROGRESS") return@runTransaction
+
+            val isFriendly = match.getBoolean("isFriendly") ?: false
+            val p1Id = match.getString("player1Id")
+            val p2Id = match.getString("player2Id")
+            val opponentId = if (p1Id == uid) p2Id else p1Id
+
+            tx.update(
+                matchRef,
+                mapOf(
+                    "status" to "ABANDONED",
+                    "winnerId" to opponentId,
+                    "completedAt" to FieldValue.serverTimestamp(),
+                ),
             )
-        ).await()
+
+            if (!isFriendly && opponentId != null && p1Id != null && p2Id != null) {
+                val p1Ref = usersCol.document(p1Id)
+                val p2Ref = usersCol.document(p2Id)
+                val p1Snap = tx.get(p1Ref)
+                val p2Snap = tx.get(p2Ref)
+                val p1Total = (match.getLong("player1TotalScore") ?: 0L).toInt()
+                val p2Total = (match.getLong("player2TotalScore") ?: 0L).toInt()
+                awardStarsForcedWinner(
+                    tx, p1Ref, p1Snap, p2Ref, p2Snap, p1Total, p2Total,
+                    winnerIsP1 = opponentId == p1Id,
+                )
+            }
+        }.await()
+
         matchRef.get().await().toMatchResponseDto()
     }
 
@@ -279,6 +351,7 @@ class FirebaseMatchRepository(
         val friendUsername = friendDoc.getString("username") ?: "Prijatelj"
 
         val inviteRef = firestore.collection("matchInvites").document()
+        val inviteId = inviteRef.id
         inviteRef.set(
             mapOf(
                 "inviterId" to uid,
@@ -291,8 +364,20 @@ class FirebaseMatchRepository(
             )
         ).await()
 
+        FirestoreNotificationWriter.push(
+            firestore,
+            friendId,
+            Notification(
+                id = "invite_$inviteId",
+                title = "Poziv za partiju",
+                message = "$username te poziva na ${if (friendly) "prijateljsku" else "rangiranu"} partiju",
+                type = NotificationType.INVITE,
+                inviteId = inviteId,
+            ),
+        )
+
         MatchResponseDto(
-            id = inviteRef.id,
+            id = inviteId,
             player1Id = uid,
             player1Username = username,
             player2Id = friendId,
@@ -356,24 +441,33 @@ class FirebaseMatchRepository(
         }
 
         val matchRef = firestore.collection("matches").document()
-        matchRef.set(
-            mapOf(
-                "player1Id" to inviterId,
-                "player1Username" to inviterUsername,
-                "player2Id" to uid,
-                "player2Username" to inviteeUsername,
-                "status" to "IN_PROGRESS",
-                "isFriendly" to isFriendly,
-                "currentGameIndex" to 0,
-                "currentGameType" to GAME_ORDER[0],
-                "player1TotalScore" to 0,
-                "player2TotalScore" to 0,
-                "winnerId" to null,
-                "createdAt" to FieldValue.serverTimestamp(),
-            )
-        ).await()
+        val inviterRef = firestore.collection("users").document(inviterId)
+        val inviteeRef = firestore.collection("users").document(uid)
 
-        inviteRef.update(mapOf("status" to "ACCEPTED", "matchId" to matchRef.id)).await()
+        firestore.runTransaction { tx ->
+            if (!isFriendly) {
+                deductToken(tx, inviterRef)
+                deductToken(tx, inviteeRef)
+            }
+            tx.set(
+                matchRef,
+                mapOf(
+                    "player1Id" to inviterId,
+                    "player1Username" to inviterUsername,
+                    "player2Id" to uid,
+                    "player2Username" to inviteeUsername,
+                    "status" to "IN_PROGRESS",
+                    "isFriendly" to isFriendly,
+                    "currentGameIndex" to 0,
+                    "currentGameType" to GAME_ORDER[0],
+                    "player1TotalScore" to 0,
+                    "player2TotalScore" to 0,
+                    "winnerId" to null,
+                    "createdAt" to FieldValue.serverTimestamp(),
+                ),
+            )
+            tx.update(inviteRef, mapOf("status" to "ACCEPTED", "matchId" to matchRef.id))
+        }.await()
 
         MatchResponseDto(
             id = matchRef.id,
@@ -575,21 +669,55 @@ class FirebaseMatchRepository(
         applyStarDelta(tx, p2Ref, p2Snap, p2Base + p2Total / 40)
     }
 
+    /** Abandoner always loses; [winnerIsP1] is the player who stayed. */
+    private fun awardStarsForcedWinner(
+        tx: Transaction,
+        p1Ref: DocumentReference,
+        p1Snap: DocumentSnapshot,
+        p2Ref: DocumentReference,
+        p2Snap: DocumentSnapshot,
+        p1Total: Int,
+        p2Total: Int,
+        winnerIsP1: Boolean,
+    ) {
+        val (p1Base, p2Base) = if (winnerIsP1) 10 to -10 else -10 to 10
+        applyStarDelta(tx, p1Ref, p1Snap, p1Base + p1Total / 40)
+        applyStarDelta(tx, p2Ref, p2Snap, p2Base + p2Total / 40)
+    }
+
     private fun applyStarDelta(tx: Transaction, ref: DocumentReference, snap: DocumentSnapshot, delta: Int) {
         val old = (snap.getLong("stars") ?: 0L).toInt()
         val newStars = (old + delta).coerceAtLeast(0)
         val earned = delta.coerceAtLeast(0)
         val oldCycle = (snap.getLong("cycleStars") ?: 0L).toInt()
+        val oldWeekly = (snap.getLong("weeklyCycleStars") ?: 0L).toInt()
         val oldTotal = (snap.getLong("totalStarsEarned") ?: 0L).toInt()
+        val newTotal = oldTotal + earned
+        val tokenBonus = newTotal / 50 - oldTotal / 50
+        val oldTokens = (snap.getLong("tokens") ?: 0L).toInt()
         tx.update(
             ref,
             mapOf(
                 "stars" to newStars,
                 "cycleStars" to oldCycle + earned,
-                "totalStarsEarned" to oldTotal + earned,
+                "weeklyCycleStars" to oldWeekly + earned,
+                "totalStarsEarned" to newTotal,
+                "tokens" to oldTokens + tokenBonus,
                 "leagueLevel" to leagueLevelForStars(newStars),
             ),
         )
+    }
+
+    /** Ranked match entry fee — must run inside a transaction (reads before writes). */
+    private fun deductToken(tx: Transaction, userRef: DocumentReference) {
+        val snap = tx.get(userRef)
+        val tokens = (snap.getLong("tokens") ?: 0L).toInt()
+        if (tokens < 1) throw Exception("Nemate dovoljno žetona za rangiranu partiju")
+        tx.update(userRef, "tokens", tokens - 1)
+    }
+
+    private suspend fun deductToken(userRef: DocumentReference) {
+        firestore.runTransaction { tx -> deductToken(tx, userRef) }.await()
     }
 
     @Suppress("UNCHECKED_CAST")

@@ -14,12 +14,14 @@ import uns.ac.rs.team23.slagalica.repository.FirebaseChallengeRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseChatRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseFriendRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseGameRepository
+import uns.ac.rs.team23.slagalica.repository.FirebaseLeaderboardRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseMatchRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseNotificationRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseRegionRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseStatisticsRepository
 import uns.ac.rs.team23.slagalica.repository.FriendRepository
 import uns.ac.rs.team23.slagalica.repository.GameRepository
+import uns.ac.rs.team23.slagalica.repository.LeaderboardRepository
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 import uns.ac.rs.team23.slagalica.repository.NotificationRepository
 import uns.ac.rs.team23.slagalica.repository.RegionRepository
@@ -30,6 +32,7 @@ import uns.ac.rs.team23.slagalica.viewmodels.ChallengeViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.ChatViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaViewModel
+import uns.ac.rs.team23.slagalica.viewmodels.LeaderboardViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.LobbyViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.FriendsViewModel
@@ -54,6 +57,7 @@ val AppModule = module {
     single<StatisticsRepository> { FirebaseStatisticsRepository(get(), get()) }
     single<FriendRepository> { FirebaseFriendRepository(get(), get()) }
     single<RegionRepository> { FirebaseRegionRepository(get(), get()) }
+    single<LeaderboardRepository> { FirebaseLeaderboardRepository(get()) }
     single { CycleManager(get()) }
 
     // ViewModels
@@ -71,4 +75,5 @@ val AppModule = module {
     viewModel { KoZnaZnaViewModel(get(), get()) }
     viewModel { SpojniceViewModel(get(), get()) }
     viewModel { StatisticsViewModel(get()) }
+    viewModel { LeaderboardViewModel(get()) }
 }

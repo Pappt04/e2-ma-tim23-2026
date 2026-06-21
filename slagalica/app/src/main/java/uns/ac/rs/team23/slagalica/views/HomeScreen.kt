@@ -58,6 +58,7 @@ fun HomeScreen(
     onNavigateToFriends: () -> Unit = {},
     onNavigateToRegion: () -> Unit = {},
     onNavigateToLeague: () -> Unit = {},
+    onNavigateToLeaderboard: () -> Unit = {},
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -197,7 +198,7 @@ fun HomeScreen(
                         selected = false,
                         onClick = {
                             scope.launch { drawerState.close() }
-                            // TODO: navigate to leaderboard
+                            onNavigateToLeaderboard()
                         },
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(0.dp),
