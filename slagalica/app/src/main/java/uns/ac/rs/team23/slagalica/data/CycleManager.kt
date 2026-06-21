@@ -23,6 +23,14 @@ class CycleManager(
 
     private fun currentMonthlyId(): String = LocalDate.now().toString().substring(0, 7) // YYYY-MM
 
+    /** ISO week id, e.g. 2026-W25 */
+    private fun currentWeeklyId(): String {
+        val now = LocalDate.now()
+        val week = now.get(java.time.temporal.IsoFields.WEEK_OF_WEEK_BASED_YEAR)
+        val year = now.get(java.time.temporal.IsoFields.WEEK_BASED_YEAR)
+        return "$year-W$week"
+    }
+
     private fun cyclesRef() = firestore.collection("meta").document("cycles")
 
     /**
@@ -31,6 +39,12 @@ class CycleManager(
      * does not finalize anything.
      */
     suspend fun maybeRollover(): Result<Boolean> = runCatching {
+        val monthlyRolled = maybeMonthlyRollover()
+        maybeWeeklyRollover()
+        monthlyRolled
+    }
+
+    private suspend fun maybeMonthlyRollover(): Boolean {
         val current = currentMonthlyId()
         val shouldFinalize = firestore.runTransaction { tx ->
             val doc = tx.get(cyclesRef())
@@ -45,11 +59,39 @@ class CycleManager(
             stored != null
         }.await()
 
-        if (shouldFinalize == true) {
+        return if (shouldFinalize == true) {
             finalizeCycle(current)
             true
         } else {
             false
+        }
+    }
+
+    /** Reset weeklyCycleStars when the ISO week changes (leaderboard cycle). */
+    private suspend fun maybeWeeklyRollover() {
+        val currentWeek = currentWeeklyId()
+        val shouldReset = firestore.runTransaction { tx ->
+            val doc = tx.get(cyclesRef())
+            val stored = doc.getString("currentWeeklyId")
+            if (stored == currentWeek) return@runTransaction false
+            tx.set(
+                cyclesRef(),
+                mapOf("currentWeeklyId" to currentWeek),
+                com.google.firebase.firestore.SetOptions.merge(),
+            )
+            stored != null
+        }.await()
+        if (shouldReset != true) return
+
+        val users = firestore.collection("users")
+            .whereEqualTo("isGuest", false)
+            .get()
+            .await()
+            .documents
+        users.chunked(400).forEach { chunk ->
+            val batch = firestore.batch()
+            chunk.forEach { doc -> batch.update(doc.reference, "weeklyCycleStars", 0) }
+            batch.commit().await()
         }
     }
 

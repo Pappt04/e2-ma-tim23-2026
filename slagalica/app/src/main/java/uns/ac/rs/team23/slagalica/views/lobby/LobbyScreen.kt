@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,6 +37,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,14 +61,15 @@ fun LobbyScreen(
     viewModel: LobbyViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    var modeChosen by remember(friendId) { mutableStateOf(friendId != null) }
+    var friendly by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        if (viewModel.state.value is LobbyState.Idle) {
-            if (!friendId.isNullOrBlank()) {
-                viewModel.startFriendInvite(friendId, currentUsername)
-            } else {
-                viewModel.startSearch(currentUsername)
-            }
+    LaunchedEffect(modeChosen, friendly) {
+        if (!modeChosen || viewModel.state.value !is LobbyState.Idle) return@LaunchedEffect
+        if (!friendId.isNullOrBlank()) {
+            viewModel.startFriendInvite(friendId, currentUsername)
+        } else {
+            viewModel.startSearch(currentUsername, friendly)
         }
     }
 
@@ -93,8 +98,26 @@ fun LobbyScreen(
             contentAlignment = Alignment.Center,
         ) {
             when (val s = state) {
-                is LobbyState.Idle, is LobbyState.Error -> {
-                    SearchingContent()
+                is LobbyState.Idle -> {
+                    if (!modeChosen && friendId.isNullOrBlank()) {
+                        ModePicker(
+                            friendly = friendly,
+                            onFriendlyChange = { friendly = it },
+                            onStart = { modeChosen = true },
+                            onCancel = onNavigateBack,
+                        )
+                    } else if (!modeChosen) {
+                        SearchingContent()
+                    } else {
+                        SearchingContent()
+                    }
+                }
+
+                is LobbyState.Error -> {
+                    ErrorContent(message = s.message, onRetry = {
+                        viewModel.cancel()
+                        modeChosen = false
+                    })
                 }
 
                 is LobbyState.Searching -> {
@@ -172,6 +195,63 @@ private fun InviteSentContent(opponentName: String, onCancel: () -> Unit) {
         ) {
             Text("Cancel")
         }
+    }
+}
+
+@Composable
+private fun ModePicker(
+    friendly: Boolean,
+    onFriendlyChange: (Boolean) -> Unit,
+    onStart: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        Text(
+            text = "Tip partije",
+            style = MaterialTheme.typography.titleLarge,
+            fontWeight = FontWeight.Bold,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            FilterChip(
+                selected = !friendly,
+                onClick = { onFriendlyChange(false) },
+                label = { Text("Rangirana (1 žeton)") },
+            )
+            FilterChip(
+                selected = friendly,
+                onClick = { onFriendlyChange(true) },
+                label = { Text("Prijateljska") },
+            )
+        }
+        Text(
+            text = if (friendly) {
+                "Prijateljska partija ne troši žetone i ne utiče na zvezde."
+            } else {
+                "Rangirana partija košta 1 žeton. Pobeda i poraz utiču na zvezde."
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(0.85f),
+        )
+        Button(onClick = onStart, modifier = Modifier.fillMaxWidth(0.7f)) {
+            Text("Traži protivnika")
+        }
+        OutlinedButton(onClick = onCancel) { Text("Nazad") }
+    }
+}
+
+@Composable
+private fun ErrorContent(message: String, onRetry: () -> Unit) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        Text(message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+        Button(onClick = onRetry) { Text("Pokušaj ponovo") }
     }
 }
 

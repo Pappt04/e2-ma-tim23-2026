@@ -11,6 +11,13 @@ interface MatchRepository {
     fun currentUserId(): String?
 
     suspend fun startRandomMatch(friendly: Boolean): Result<MatchResponseDto>
+
+    /**
+     * Create a friendly, single-player match the caller hosts (no opponent ever joins). Used by
+     * challenge attempts: the games resolve each round on their deadlines, so the host plays all
+     * 6 games solo with zero star/token/stats side-effects (friendly matches skip those).
+     */
+    suspend fun startSoloMatch(): Result<MatchResponseDto>
     suspend fun tryJoinWaiting(username: String, friendly: Boolean): Result<MatchResponseDto?>
     suspend fun sendFriendInvite(friendId: String, friendly: Boolean): Result<MatchResponseDto>
     suspend fun getCurrentMatch(): Result<MatchResponseDto?>

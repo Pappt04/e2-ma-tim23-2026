@@ -7,6 +7,8 @@ import com.google.firebase.auth.UserProfileChangeRequest
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import uns.ac.rs.team23.slagalica.models.UserProfile
+import uns.ac.rs.team23.slagalica.models.dailyTokensForLeague
+import java.time.LocalDate
 
 class FirebaseAuthRepository(
     private val auth: FirebaseAuth,
@@ -44,6 +46,7 @@ class FirebaseAuthRepository(
                     "tokens" to 5,
                     "stars" to 0,
                     "cycleStars" to 0,
+                    "weeklyCycleStars" to 0,
                     "totalStarsEarned" to 0,
                     "leagueLevel" to 0,
                     "avatarIndex" to 0,
@@ -82,6 +85,7 @@ class FirebaseAuthRepository(
                 throw Exception("Email adresa nije potvrđena. Proverite poštu i kliknite na link.")
             }
 
+            grantDailyTokensIfNeeded(user.uid)
             readProfile(user.uid)
         }
 
@@ -99,6 +103,7 @@ class FirebaseAuthRepository(
                 "tokens" to 0,
                 "stars" to 0,
                 "cycleStars" to 0,
+                "weeklyCycleStars" to 0,
                 "totalStarsEarned" to 0,
                 "leagueLevel" to 0,
                 "avatarIndex" to 0,
@@ -118,6 +123,9 @@ class FirebaseAuthRepository(
 
     override suspend fun getProfile(): Result<UserProfile> = runCatching {
         val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        if (auth.currentUser?.isAnonymous != true) {
+            grantDailyTokensIfNeeded(uid)
+        }
         readProfile(uid)
     }
 
@@ -156,6 +164,21 @@ class FirebaseAuthRepository(
                 )
             )
             .await()
+    }
+
+    private suspend fun grantDailyTokensIfNeeded(uid: String) {
+        val ref = firestore.collection("users").document(uid)
+        val today = LocalDate.now().toString()
+        firestore.runTransaction { tx ->
+            val doc = tx.get(ref)
+            if (doc.getBoolean("isGuest") == true) return@runTransaction
+            val last = doc.getString("lastTokenGranted") ?: ""
+            if (last >= today) return@runTransaction
+            val league = (doc.getLong("leagueLevel") ?: 0L).toInt()
+            val grant = dailyTokensForLeague(league)
+            val tokens = (doc.getLong("tokens") ?: 0L).toInt() + grant
+            tx.update(ref, mapOf("tokens" to tokens, "lastTokenGranted" to today))
+        }.await()
     }
 
     private suspend fun readProfile(uid: String): UserProfile {
