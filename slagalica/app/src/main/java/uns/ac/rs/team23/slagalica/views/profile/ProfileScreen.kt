@@ -38,6 +38,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
+import uns.ac.rs.team23.slagalica.models.leagueIconFor
 import uns.ac.rs.team23.slagalica.utils.QrGenerator
 import uns.ac.rs.team23.slagalica.views.common.AvatarWithFrame
 import androidx.compose.runtime.Composable
@@ -139,10 +140,9 @@ fun ProfileScreen(
                         ) {
                             Text("League", fontWeight = FontWeight.SemiBold)
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    Icons.Default.Star,
-                                    contentDescription = null,
-                                    tint = Color(0xFFFFC107),
+                                Text(
+                                    leagueIconFor(leagueLevel),
+                                    style = MaterialTheme.typography.titleMedium,
                                 )
                                 Spacer(modifier = Modifier.padding(3.dp))
                                 Text(LEAGUE_NAMES.getOrElse(leagueLevel) { "League $leagueLevel" })

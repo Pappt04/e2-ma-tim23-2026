@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.util.UUID
 import uns.ac.rs.team23.slagalica.data.CycleManager
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.models.Notification
@@ -22,6 +21,8 @@ import uns.ac.rs.team23.slagalica.models.NotificationType
 import uns.ac.rs.team23.slagalica.models.UserProfile
 import uns.ac.rs.team23.slagalica.repository.AuthRepository
 import uns.ac.rs.team23.slagalica.repository.NotificationRepository
+import uns.ac.rs.team23.slagalica.services.ClientDbListeners
+import uns.ac.rs.team23.slagalica.services.PendingRewardEvent
 
 sealed class AuthState {
     data object Idle : AuthState()
@@ -45,6 +46,7 @@ class AuthViewModel(
     private val authRepository: AuthRepository,
     private val notificationRepository: NotificationRepository,
     private val cycleManager: CycleManager,
+    private val clientDbListeners: ClientDbListeners,
 ) : ViewModel() {
 
     private val _userSession = MutableStateFlow<UserSession>(UserSession.NotLoggedIn)
@@ -56,6 +58,9 @@ class AuthViewModel(
     private val _leagueChange = MutableSharedFlow<LeagueChangeEvent>(extraBufferCapacity = 4)
     val leagueChange: SharedFlow<LeagueChangeEvent> = _leagueChange.asSharedFlow()
 
+    /** Cycle-end token rewards (client-side, replaces Cloud Function). */
+    val pendingReward: SharedFlow<PendingRewardEvent> = clientDbListeners.pendingReward
+
     init {
         // Firebase Auth persists state across restarts — restore from current user
         val current = FirebaseAuth.getInstance().currentUser
@@ -66,6 +71,7 @@ class AuthViewModel(
                 val username = current.displayName ?: ""
                 val email = current.email ?: ""
                 _userSession.value = UserSession.LoggedIn(username, email)
+                clientDbListeners.start(current.uid)
                 refreshProfile()
             }
         }
@@ -115,10 +121,11 @@ class AuthViewModel(
         viewModelScope.launch {
             notificationRepository.saveNotification(
                 Notification(
-                    id = UUID.randomUUID().toString(),
+                    id = "league_${updated.leagueLevel}_${System.currentTimeMillis()}",
                     title = if (event.promoted) "Napredovali ste u ligi!" else "Pali ste u nižu ligu",
                     message = "Sada se nalazite u ligi: $leagueName",
                     type = NotificationType.RANKING,
+                    suppressPush = true,
                 )
             )
             _leagueChange.emit(event)
@@ -150,6 +157,7 @@ class AuthViewModel(
                     val session = UserSession.LoggedIn(profile.username, profile.email)
                     _userSession.value = session
                     _userProfile.value = profile
+                    FirebaseAuth.getInstance().currentUser?.uid?.let { clientDbListeners.start(it) }
                     _loginState.value = AuthState.Success
                 }
                 .onFailure { _loginState.value = AuthState.Error(it.message ?: "Greška pri logovanju") }
@@ -294,10 +302,16 @@ class AuthViewModel(
     }
 
     fun logout() {
+        clientDbListeners.stop()
         viewModelScope.launch {
             authRepository.logout()
         }
         _userSession.value = UserSession.NotLoggedIn
         _userProfile.value = null
+    }
+
+    override fun onCleared() {
+        clientDbListeners.stop()
+        super.onCleared()
     }
 }

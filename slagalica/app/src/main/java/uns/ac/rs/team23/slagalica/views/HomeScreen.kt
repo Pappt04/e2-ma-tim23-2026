@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Group
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MilitaryTech
 import androidx.compose.material.icons.filled.Notifications
+import uns.ac.rs.team23.slagalica.views.game.common.MatchPlayerHud
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -246,11 +247,18 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding)
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                    .padding(innerPadding),
             ) {
+                if (isRegistered) {
+                    MatchPlayerHud(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
                 Text(
                     text = "Welcome, $username!",
                     style = MaterialTheme.typography.headlineSmall,
@@ -274,6 +282,7 @@ fun HomeScreen(
                     Icon(Icons.Default.PlayArrow, contentDescription = null)
                     Spacer(modifier = Modifier.padding(4.dp))
                     Text("Play")
+                }
                 }
             }
         }

@@ -19,4 +19,6 @@ data class Notification(
     val timestamp: String = "",
     val inviteId: String? = null,
     val createdAtMillis: Long = System.currentTimeMillis(),
+    /** When true, Firestore listener won't re-post a system notification (local-only). */
+    val suppressPush: Boolean = false,
 )

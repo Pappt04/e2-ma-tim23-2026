@@ -30,6 +30,8 @@ import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
+import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
+import uns.ac.rs.team23.slagalica.views.game.common.MatchPlayerHud
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPhase
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakViewModel
 import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
@@ -52,6 +54,7 @@ fun KorakPoKorakScreen(
         thisGameIndex = MatchGameOrder.KORAK_PO_KORAK,
         onLeaveGame = onFinish,
     )
+    BlockGameBackNavigation()
 
     LaunchedEffect(state.phase) {
         if (state.phase == KorakPhase.GameOver) {
@@ -102,6 +105,7 @@ fun KorakPoKorakScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
+            MatchPlayerHud(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
             if (state.phase == KorakPhase.PlayerTurn || state.phase == KorakPhase.OpponentChance) {
                 LinearProgressIndicator(
                     progress = { state.timeLeft / 10f },

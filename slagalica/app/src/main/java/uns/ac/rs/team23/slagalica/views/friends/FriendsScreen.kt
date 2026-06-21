@@ -253,7 +253,7 @@ private fun FriendCard(
                 Button(onClick = onPlay, enabled = friend.isPlayable) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
-                    Text("Igraj")
+                    Text(if (friend.inMatch) "U igri" else if (!friend.sessionActive) "Offline" else "Igraj")
                 }
                 IconButton(onClick = onRemove) {
                     Icon(Icons.Default.Delete, contentDescription = "Ukloni", tint = MaterialTheme.colorScheme.error)

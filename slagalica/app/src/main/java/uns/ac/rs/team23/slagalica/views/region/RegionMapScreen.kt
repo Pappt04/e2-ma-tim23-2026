@@ -14,6 +14,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material.icons.filled.SportsEsports
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,6 +54,7 @@ import uns.ac.rs.team23.slagalica.viewmodels.RegionViewModel
 @Composable
 fun RegionMapScreen(
     onNavigateBack: () -> Unit,
+    onNavigateToChallenge: () -> Unit = {},
     viewModel: RegionViewModel = koinViewModel(),
 ) {
     val ui by viewModel.ui.collectAsState()
@@ -115,6 +119,13 @@ fun RegionMapScreen(
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Nazad")
                     }
                 },
+            )
+        },
+        floatingActionButton = {
+            ExtendedFloatingActionButton(
+                onClick = onNavigateToChallenge,
+                icon = { Icon(Icons.Default.SportsEsports, contentDescription = null) },
+                text = { Text("Izazov") },
             )
         },
     ) { innerPadding ->

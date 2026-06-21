@@ -102,6 +102,8 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
             hostId = match.player1Id,
             player1 = match.player1Username,
             player2 = match.player2Username ?: "",
+            player1Id = match.player1Id,
+            player2Id = match.player2Id.orEmpty(),
         )
         _state.value = LobbyState.OpponentFound(opponent)
         viewModelScope.launch { matchRepository.setInMatch(true) }
@@ -186,10 +188,10 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
      */
     fun startFriendInvite(friendId: String, username: String) {
         myUsername = username
-        currentFriendly = false
+        currentFriendly = true
         _state.value = LobbyState.Searching
         viewModelScope.launch {
-            matchRepository.sendFriendInvite(friendId, false)
+            matchRepository.sendFriendInvite(friendId, true)
                 .onSuccess { match ->
                     when (match.status) {
                         "INVITE_SENT" -> {

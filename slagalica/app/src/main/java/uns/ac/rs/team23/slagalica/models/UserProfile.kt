@@ -24,6 +24,10 @@ val LEAGUE_NAMES = listOf(
     "Peta liga",
 )
 
+val LEAGUE_ICONS = listOf("🐣", "🥉", "🥈", "🥇", "💎", "👑")
+
+fun leagueIconFor(level: Int): String = LEAGUE_ICONS.getOrElse(level) { "🏅" }
+
 val LEAGUE_STAR_THRESHOLDS = listOf(0, 100, 200, 400, 800, 1600)
 
 fun leagueLevelForStars(stars: Int): Int {

@@ -55,6 +55,7 @@ class FirebaseAuthRepository(
                     "lastTokenGranted" to today,
                     "fcmToken" to "",
                     "onlineAt" to System.currentTimeMillis(),
+                    "sessionActive" to true,
                 )
             )
             // Store email here so login-by-username doesn't need a second pre-auth read
@@ -86,6 +87,9 @@ class FirebaseAuthRepository(
             }
 
             grantDailyTokensIfNeeded(user.uid)
+            firestore.collection("users").document(user.uid)
+                .update("sessionActive", true)
+                .await()
             readProfile(user.uid)
         }
 
@@ -118,6 +122,12 @@ class FirebaseAuthRepository(
     }
 
     override suspend fun logout(): Result<Unit> = runCatching {
+        val uid = auth.currentUser?.uid
+        if (uid != null) {
+            firestore.collection("users").document(uid)
+                .update("sessionActive", false)
+                .await()
+        }
         auth.signOut()
     }
 
@@ -164,6 +174,12 @@ class FirebaseAuthRepository(
                 )
             )
             .await()
+    }
+
+    override suspend fun refreshDailyTokensIfNeeded(): Result<Unit> = runCatching {
+        val uid = auth.currentUser?.uid ?: return@runCatching
+        if (auth.currentUser?.isAnonymous == true) return@runCatching
+        grantDailyTokensIfNeeded(uid)
     }
 
     private suspend fun grantDailyTokensIfNeeded(uid: String) {

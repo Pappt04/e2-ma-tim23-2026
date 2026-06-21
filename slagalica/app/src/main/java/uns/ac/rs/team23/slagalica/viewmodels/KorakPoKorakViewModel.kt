@@ -123,6 +123,19 @@ class KorakPoKorakViewModel(
             handleTimeout()
         }
         if (isHost) processGuestIntent()
+        maybeFastForwardAbandoned()
+    }
+
+    private fun maybeFastForwardAbandoned() {
+        if (!authoritative || !MatchStore.opponentAbandoned) return
+        val s = _state.value
+        when {
+            s.phase == KorakPhase.OpponentChance -> applyFinish(0, scoredByOpponent = false)
+            s.phase == KorakPhase.RoundEnd -> {
+                if (!s.p2Ready) commit(s.copy(p2Ready = true), 0)
+                checkBothReady()
+            }
+        }
     }
 
     // --- Public actions (screen) ---

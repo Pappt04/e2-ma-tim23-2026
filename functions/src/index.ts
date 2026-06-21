@@ -31,6 +31,7 @@ export const onUserCreated = functions.auth.user().onCreate(async (user) => {
     createdAt: now,
     lastTokenGranted: today,
     fcmToken: "",
+    sessionActive: true,
   });
 });
 
@@ -124,6 +125,31 @@ export const onQueueEntryCreated = functions.database
         },
       });
     }
+  });
+
+// ─── Firestore trigger: push FCM when in-app notification is written ───────────
+
+export const onUserNotificationCreated = functions.firestore
+  .document("users/{userId}/notifications/{notificationId}")
+  .onCreate(async (snap, context) => {
+    const userId = context.params.userId;
+    const data = snap.data();
+    const userDoc = await db.collection("users").doc(userId).get();
+    const token = userDoc.data()?.fcmToken as string | undefined;
+    if (!token) return;
+
+    const type = (data.type as string) || "OTHER";
+    const channelType = type.toUpperCase();
+    await admin.messaging().send({
+      token,
+      data: {
+        type: channelType,
+        title: (data.title as string) || "Slagalica",
+        body: (data.message as string) || "",
+        notificationId: (data.id as string) || snap.id,
+        inviteId: (data.inviteId as string) || "",
+      },
+    });
   });
 
 // ─── Callable: submit match score ─────────────────────────────────────────────

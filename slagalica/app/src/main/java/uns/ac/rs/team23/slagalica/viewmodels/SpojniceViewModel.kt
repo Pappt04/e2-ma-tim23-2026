@@ -165,7 +165,20 @@ class SpojniceViewModel(
             handleTimeout()
         }
         if (isHost) processGuestIntent()
+        maybeFastForwardAbandoned()
         maybeRecordStats()
+    }
+
+    private fun maybeFastForwardAbandoned() {
+        if (!authoritative || !MatchStore.opponentAbandoned) return
+        val s = _state.value
+        when {
+            s.phase == SpojnicePhase.PLAYING_OPPONENT -> finishRoundAfterPlay()
+            s.phase == SpojnicePhase.ROUND_END && !s.p2Ready -> {
+                commit(s.copy(p2Ready = true), 0)
+                checkBothReady()
+            }
+        }
     }
 
     // --- Public actions (screen) ---

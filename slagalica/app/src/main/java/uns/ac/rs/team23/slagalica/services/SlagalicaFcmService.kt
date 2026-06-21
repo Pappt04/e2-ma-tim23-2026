@@ -29,6 +29,11 @@ class SlagalicaFcmService : FirebaseMessagingService() {
 
         private val _events = MutableSharedFlow<Notification>(extraBufferCapacity = 64)
         val events: SharedFlow<Notification> = _events.asSharedFlow()
+
+        /** Used by [LocalNotificationDispatcher] and FCM when a push arrives. */
+        fun emitNotification(notification: Notification) {
+            _events.tryEmit(notification)
+        }
     }
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -88,7 +93,6 @@ class SlagalicaFcmService : FirebaseMessagingService() {
 
         _events.tryEmit(notification)
         showNotification(title, body, notifType)
-        saveToFirestore(notification)
     }
 
     private fun showNotification(title: String, message: String, type: NotificationType) {

@@ -19,6 +19,15 @@ object MatchStore {
     /** Uid of the match host (= player1Id), the authoritative referee for every game. */
     var hostId: String = ""
 
+    var player1Id: String = ""
+    var player2Id: String = ""
+
+    /** Set when the opponent leaves; remaining player continues the match. */
+    var abandonedById: String = ""
+
+    val opponentAbandoned: Boolean
+        get() = abandonedById.isNotBlank() && abandonedById != myUid
+
     /** This device referees the match when it is player1. */
     val isHost: Boolean get() = myUid.isNotBlank() && myUid == hostId
 
@@ -32,6 +41,8 @@ object MatchStore {
         hostId: String = "",
         player1: String = "",
         player2: String = "",
+        player1Id: String = "",
+        player2Id: String = "",
     ) {
         matchId = id
         opponentUsername = opponent
@@ -40,6 +51,9 @@ object MatchStore {
         isFriendly = friendly
         this.myUid = myUid
         this.hostId = hostId
+        this.player1Id = player1Id.ifBlank { hostId }
+        this.player2Id = player2Id
+        abandonedById = ""
         currentGameIndex = 0
     }
 
@@ -51,6 +65,9 @@ object MatchStore {
         isFriendly = false
         myUid = ""
         hostId = ""
+        player1Id = ""
+        player2Id = ""
+        abandonedById = ""
         currentGameIndex = 0
     }
 

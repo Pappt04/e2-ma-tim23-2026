@@ -30,9 +30,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.models.LEAGUE_STAR_THRESHOLDS
+import uns.ac.rs.team23.slagalica.models.LEAGUE_ICONS
 import uns.ac.rs.team23.slagalica.models.dailyTokensForLeague
-
-private val LEAGUE_ICONS = listOf("🐣", "🥉", "🥈", "🥇", "💎", "👑")
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

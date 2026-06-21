@@ -56,6 +56,8 @@ import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
+import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
+import uns.ac.rs.team23.slagalica.views.game.common.MatchPlayerHud
 import uns.ac.rs.team23.slagalica.viewmodels.ExprToken
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojPhase
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojState
@@ -85,6 +87,7 @@ fun MojBrojScreen(
         thisGameIndex = MatchGameOrder.MOJ_BROJ,
         onLeaveGame = onFinish,
     )
+    BlockGameBackNavigation()
 
     LaunchedEffect(state.phase) {
         if (state.phase == MojBrojPhase.GameOver) {
@@ -150,6 +153,7 @@ fun MojBrojScreen(
         },
     ) { innerPadding ->
         Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            MatchPlayerHud(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
             if (state.phase == MojBrojPhase.Player1Input || state.phase == MojBrojPhase.Player2Input) {
                 LinearProgressIndicator(
                     progress = { state.playSecondsLeft / 60f },

@@ -3,8 +3,11 @@ package uns.ac.rs.team23.slagalica.data
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
+import uns.ac.rs.team23.slagalica.models.Notification
+import uns.ac.rs.team23.slagalica.models.NotificationType
 import uns.ac.rs.team23.slagalica.models.Regions
 import uns.ac.rs.team23.slagalica.models.leagueLevelForStars
+import uns.ac.rs.team23.slagalica.repository.FirestoreNotificationWriter
 import java.time.LocalDate
 import kotlin.math.floor
 
@@ -88,6 +91,9 @@ class CycleManager(
             .get()
             .await()
             .documents
+
+        awardCycleTokens(users, field = "weeklyCycleStars", weekly = true)
+
         users.chunked(400).forEach { chunk ->
             val batch = firestore.batch()
             chunk.forEach { doc -> batch.update(doc.reference, "weeklyCycleStars", 0) }
@@ -120,6 +126,8 @@ class CycleManager(
             .take(rankedCutoff)
             .map { it.first }
             .toSet()
+
+        awardCycleTokens(users, field = "cycleStars", weekly = false)
 
         // 3) Per-user writes: 30% penalty for the unranked, reset cycleStars for all.
         users.chunked(400).forEach { chunk ->
@@ -165,5 +173,57 @@ class CycleManager(
             ),
             com.google.firebase.firestore.SetOptions.merge(),
         ).await()
+    }
+
+    private suspend fun awardCycleTokens(
+        users: List<com.google.firebase.firestore.DocumentSnapshot>,
+        field: String,
+        weekly: Boolean,
+    ) {
+        val ranked = users
+            .map { it.id to (it.getLong(field) ?: 0L).toInt() }
+            .filter { it.second > 0 }
+            .sortedByDescending { it.second }
+            .take(10)
+
+        ranked.forEachIndexed { index, (uid, _) ->
+            val rank = index + 1
+            val tokens = tokenRewardForRank(rank, weekly)
+            if (tokens <= 0) return@forEachIndexed
+            val userRef = firestore.collection("users").document(uid)
+            firestore.runTransaction { tx ->
+                val snap = tx.get(userRef)
+                val current = (snap.getLong("tokens") ?: 0L).toInt()
+                tx.update(
+                    userRef,
+                    mapOf(
+                        "tokens" to current + tokens,
+                        "pendingRewardTokens" to tokens,
+                        "pendingRewardRank" to rank,
+                        "pendingRewardPeriod" to if (weekly) "weekly" else "monthly",
+                        "pendingRewardShown" to false,
+                    ),
+                )
+            }.await()
+            val periodLabel = if (weekly) "nedeljnoj" else "mesečnoj"
+            FirestoreNotificationWriter.push(
+                firestore,
+                uid,
+                Notification(
+                    id = "reward_${if (weekly) "w" else "m"}_${System.currentTimeMillis()}",
+                    title = "Nagrada za rang listu!",
+                    message = "Osvojili ste $tokens tokena na $periodLabel rang listi (#$rank).",
+                    type = NotificationType.REWARD,
+                ),
+            )
+        }
+    }
+
+    private fun tokenRewardForRank(rank: Int, weekly: Boolean): Int = when (rank) {
+        1 -> if (weekly) 5 else 10
+        2 -> if (weekly) 3 else 6
+        3 -> if (weekly) 2 else 4
+        in 4..10 -> if (weekly) 1 else 2
+        else -> 0
     }
 }

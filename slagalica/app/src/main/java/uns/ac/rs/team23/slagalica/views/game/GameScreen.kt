@@ -22,7 +22,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,11 +32,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
+import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
+import uns.ac.rs.team23.slagalica.views.game.common.MatchPlayerHud
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 
 private val GAME_ORDER = MatchGameOrder.displayNames
@@ -60,7 +59,7 @@ fun GameScreen(
     onNavigateToAsocijacije: () -> Unit = {},
 ) {
     var showForfeitDialog by remember { mutableStateOf(false) }
-    var showOpponentLeftDialog by remember { mutableStateOf(false) }
+    var opponentAbandoned by remember(matchId) { mutableStateOf(false) }
     var navigatedToResults by remember(matchId) { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
 
@@ -95,30 +94,17 @@ fun GameScreen(
         }
     }
 
-    // Instant, listener-based abandonment detection (replaces the old 3s poll).
+    // Sync abandon state — remaining player continues the match (spec §3.f).
     LaunchedEffect(matchId, matchRepository) {
         if (matchId.isNotBlank() && matchRepository != null) {
             matchRepository.observeMatch(matchId).collect { match ->
-                if (match.status == "ABANDONED") {
-                    showOpponentLeftDialog = true
-                }
+                MatchStore.abandonedById = match.abandonedById.orEmpty()
+                opponentAbandoned = MatchStore.opponentAbandoned
             }
         }
     }
 
-    if (showOpponentLeftDialog) {
-        AlertDialog(
-            onDismissRequest = {},
-            title = { Text("Opponent left") },
-            text = { Text("Your opponent abandoned the match. You win!") },
-            confirmButton = {
-                Button(onClick = {
-                    showOpponentLeftDialog = false
-                    onForfeit()
-                }) { Text("OK") }
-            },
-        )
-    }
+    BlockGameBackNavigation()
 
     if (showForfeitDialog) {
         AlertDialog(
@@ -164,6 +150,19 @@ fun GameScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
+            MatchPlayerHud()
+            if (opponentAbandoned) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                ) {
+                    Text(
+                        text = "Protivnik je napustio partiju — nastavljate igru.",
+                        modifier = Modifier.padding(12.dp),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                }
+            }
             Text(
                 text = "Match progress",
                 style = MaterialTheme.typography.titleMedium,

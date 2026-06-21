@@ -14,6 +14,8 @@ import uns.ac.rs.team23.slagalica.repository.MatchRepository
  * When the host calls [advanceMatch], Firebase [currentGameIndex] moves ahead (or the match
  * becomes COMPLETED after the last game). The other player may still be on the finished game
  * screen — this pops back to [GameScreen] and syncs the local index.
+ *
+ * Also keeps [MatchStore.abandonedById] in sync so game VMs can fast-forward absent opponents.
  */
 @Composable
 fun MatchGameAdvanceEffect(
@@ -26,6 +28,9 @@ fun MatchGameAdvanceEffect(
     LaunchedEffect(matchId, thisGameIndex) {
         if (matchId.isBlank()) return@LaunchedEffect
         matchRepository.observeMatch(matchId).collect { match ->
+            MatchStore.abandonedById = match.abandonedById.orEmpty()
+            MatchStore.player1Id = match.player1Id
+            MatchStore.player2Id = match.player2Id.orEmpty()
             if (left) return@collect
             val shouldLeave = match.status == "COMPLETED" ||
                 match.currentGameIndex > thisGameIndex
