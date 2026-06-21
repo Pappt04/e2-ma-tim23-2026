@@ -40,6 +40,8 @@ firebase-database = { group = "com.google.firebase", name = "firebase-database-k
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
 firebase-functions = { group = "com.google.firebase", name = "firebase-functions-ktx" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
+osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version = "6.1.20" }
+zxing-android-embedded = { group = "com.journeyapps", name = "zxing-android-embedded", version = "4.3.0" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

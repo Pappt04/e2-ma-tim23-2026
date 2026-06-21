@@ -75,4 +75,9 @@ dependencies {
 
     // QR code generation (friend-invite QR on the profile)
     implementation("com.google.zxing:core:3.4.0")
+    // QR scanning (add friend by scanning) — on-device, free, no billing
+    implementation(libs.zxing.android.embedded)
+
+    // OpenStreetMap region map — free, no API key (avoids Google Maps billing)
+    implementation(libs.osmdroid.android)
 }

@@ -6,12 +6,21 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.util.UUID
+import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
+import uns.ac.rs.team23.slagalica.models.Notification
+import uns.ac.rs.team23.slagalica.models.NotificationType
 import uns.ac.rs.team23.slagalica.models.UserProfile
 import uns.ac.rs.team23.slagalica.repository.AuthRepository
+import uns.ac.rs.team23.slagalica.repository.NotificationRepository
 
 sealed class AuthState {
     data object Idle : AuthState()
@@ -26,8 +35,14 @@ sealed class UserSession {
     data class LoggedIn(val username: String, val email: String) : UserSession()
 }
 
+/** Emitted when the user's league level changes (promotion or demotion). */
+data class LeagueChangeEvent(val oldLevel: Int, val newLevel: Int) {
+    val promoted: Boolean get() = newLevel > oldLevel
+}
+
 class AuthViewModel(
     private val authRepository: AuthRepository,
+    private val notificationRepository: NotificationRepository,
 ) : ViewModel() {
 
     private val _userSession = MutableStateFlow<UserSession>(UserSession.NotLoggedIn)
@@ -35,6 +50,9 @@ class AuthViewModel(
 
     private val _userProfile = MutableStateFlow<UserProfile?>(null)
     val userProfile: StateFlow<UserProfile?> = _userProfile.asStateFlow()
+
+    private val _leagueChange = MutableSharedFlow<LeagueChangeEvent>(extraBufferCapacity = 4)
+    val leagueChange: SharedFlow<LeagueChangeEvent> = _leagueChange.asSharedFlow()
 
     init {
         // Firebase Auth persists state across restarts — restore from current user
@@ -49,11 +67,50 @@ class AuthViewModel(
                 refreshProfile()
             }
         }
+        startPresenceHeartbeat()
     }
 
     fun refreshProfile() {
         viewModelScope.launch {
-            authRepository.getProfile().onSuccess { _userProfile.value = it }
+            authRepository.getProfile().onSuccess { newProfile ->
+                val old = _userProfile.value
+                _userProfile.value = newProfile
+                detectLeagueChange(old, newProfile)
+            }
+        }
+    }
+
+    /** Persist the user's chosen avatar variant. */
+    fun updateAvatar(index: Int) {
+        viewModelScope.launch {
+            authRepository.updateAvatar(index).onSuccess { refreshProfile() }
+        }
+    }
+
+    private fun startPresenceHeartbeat() {
+        viewModelScope.launch {
+            while (true) {
+                authRepository.updatePresence()
+                delay(60_000)
+            }
+        }
+    }
+
+    private fun detectLeagueChange(old: UserProfile?, updated: UserProfile) {
+        val oldLevel = old?.leagueLevel ?: return
+        if (oldLevel == updated.leagueLevel) return
+        val event = LeagueChangeEvent(oldLevel, updated.leagueLevel)
+        val leagueName = LEAGUE_NAMES.getOrElse(updated.leagueLevel) { "Liga ${updated.leagueLevel}" }
+        viewModelScope.launch {
+            notificationRepository.saveNotification(
+                Notification(
+                    id = UUID.randomUUID().toString(),
+                    title = if (event.promoted) "Napredovali ste u ligi!" else "Pali ste u nižu ligu",
+                    message = "Sada se nalazite u ligi: $leagueName",
+                    type = NotificationType.RANKING,
+                )
+            )
+            _leagueChange.emit(event)
         }
     }
 

@@ -5,10 +5,17 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -16,10 +23,17 @@ import androidx.navigation.compose.rememberNavController
 import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import uns.ac.rs.team23.slagalica.data.MatchStore
+import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
+import uns.ac.rs.team23.slagalica.repository.RegionRepository
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
+import uns.ac.rs.team23.slagalica.viewmodels.LeagueChangeEvent
+import uns.ac.rs.team23.slagalica.viewmodels.LobbyViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.UserSession
 import uns.ac.rs.team23.slagalica.views.HomeScreen
+import uns.ac.rs.team23.slagalica.views.friends.FriendsScreen
+import uns.ac.rs.team23.slagalica.views.league.LeagueScreen
+import uns.ac.rs.team23.slagalica.views.region.RegionMapScreen
 import uns.ac.rs.team23.slagalica.views.game.GameScreen
 import uns.ac.rs.team23.slagalica.views.game.MatchResultsScreen
 import uns.ac.rs.team23.slagalica.views.game.asocijacije.AsocijacijeScreen
@@ -62,6 +76,12 @@ sealed class Screen(val route: String) {
     }
     data object Challenge : Screen("challenge/{region}") {
         fun route(region: String) = "challenge/$region"
+    }
+    data object Friends : Screen("friends")
+    data object Region : Screen("region")
+    data object League : Screen("league")
+    data object LobbyFriend : Screen("lobby_friend/{friendId}") {
+        fun route(friendId: String) = "lobby_friend/$friendId"
     }
 }
 
@@ -137,6 +157,9 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onNavigateToChallenge = {
                     if (region.isNotBlank()) navController.navigate(Screen.Challenge.route(region))
                 },
+                onNavigateToFriends = { navController.navigate(Screen.Friends.route) },
+                onNavigateToRegion = { navController.navigate(Screen.Region.route) },
+                onNavigateToLeague = { navController.navigate(Screen.League.route) },
             )
         }
         composable(Screen.Profile.route) {
@@ -148,6 +171,13 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 }
             }
             if (session is UserSession.LoggedIn) {
+                val regionRepo: RegionRepository = koinInject()
+                val myRegion = userProfile?.region ?: ""
+                val frameRank by produceState(0, myRegion) {
+                    val tops = regionRepo.loadPreviousTopRegions().getOrDefault(emptyList())
+                    val idx = tops.indexOf(myRegion)
+                    value = if (idx in 0..2) idx + 1 else 0
+                }
                 ProfileScreen(
                     username = session.username,
                     email = session.email,
@@ -155,9 +185,13 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                     stars = userProfile?.stars ?: 0,
                     leagueLevel = userProfile?.leagueLevel ?: 0,
                     region = userProfile?.region ?: "",
+                    avatarIndex = userProfile?.avatarIndex ?: 0,
+                    frameRank = frameRank,
+                    onAvatarChange = authViewModel::updateAvatar,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToStatistics = { navController.navigate(Screen.ProfileStatistics.route) },
                     onNavigateToChangePassword = { navController.navigate(Screen.ChangePassword.route) },
+                    onNavigateToLeague = { navController.navigate(Screen.League.route) },
                     onLogout = authViewModel::logout,
                 )
             } else {
@@ -378,5 +412,75 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onNavigateBack = { navController.popBackStack() },
             )
         }
+        composable(Screen.Friends.route) {
+            val session = userSession
+            LaunchedEffect(session) {
+                if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
+            }
+            if (session is UserSession.LoggedIn) {
+                FriendsScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onPlayFriend = { friendId -> navController.navigate(Screen.LobbyFriend.route(friendId)) },
+                )
+            } else {
+                Box(Modifier.fillMaxSize())
+            }
+        }
+        composable(Screen.Region.route) {
+            val session = userSession
+            LaunchedEffect(session) {
+                if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
+            }
+            if (session is UserSession.LoggedIn) {
+                RegionMapScreen(onNavigateBack = { navController.popBackStack() })
+            } else {
+                Box(Modifier.fillMaxSize())
+            }
+        }
+        composable(Screen.League.route) {
+            val session = userSession
+            LaunchedEffect(session) {
+                if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
+            }
+            if (session is UserSession.LoggedIn) {
+                LeagueScreen(
+                    leagueLevel = userProfile?.leagueLevel ?: 0,
+                    stars = userProfile?.stars ?: 0,
+                    onNavigateBack = { navController.popBackStack() },
+                )
+            } else {
+                Box(Modifier.fillMaxSize())
+            }
+        }
+        composable(Screen.LobbyFriend.route) { backStack ->
+            val friendId = backStack.arguments?.getString("friendId") ?: ""
+            val session = userSession
+            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            LobbyScreen(
+                currentUsername = username,
+                friendId = friendId,
+                onNavigateBack = { navController.popBackStack() },
+                onGameStart = {
+                    navController.navigate(Screen.Game.route) {
+                        popUpTo(Screen.LobbyFriend.route) { inclusive = true }
+                    }
+                },
+            )
+        }
+    }
+
+    // League promotion / demotion dialog (req. 6 — "dijalogom ili notifikacijom").
+    var leagueEvent by remember { mutableStateOf<LeagueChangeEvent?>(null) }
+    LaunchedEffect(Unit) {
+        authViewModel.leagueChange.collect { leagueEvent = it }
+    }
+    leagueEvent?.let { event ->
+        val leagueName = LEAGUE_NAMES.getOrElse(event.newLevel) { "Liga ${event.newLevel}" }
+        AlertDialog(
+            onDismissRequest = { leagueEvent = null },
+            confirmButton = { TextButton(onClick = { leagueEvent = null }) { Text("U redu") } },
+            title = { Text(if (event.promoted) "🎉 Napredovali ste!" else "📉 Pali ste u nižu ligu") },
+            text = { Text("Sada se nalazite u ligi: $leagueName") },
+        )
     }
 }
