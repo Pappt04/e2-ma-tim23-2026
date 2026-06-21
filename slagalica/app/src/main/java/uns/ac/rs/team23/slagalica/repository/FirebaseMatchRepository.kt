@@ -298,35 +298,26 @@ class FirebaseMatchRepository(
             val match = tx.get(matchRef)
             if (match.getString("status") != "IN_PROGRESS") return@runTransaction
 
-            val isFriendly = match.getBoolean("isFriendly") ?: false
-            val p1Id = match.getString("player1Id")
-            val p2Id = match.getString("player2Id")
-            val opponentId = if (p1Id == uid) p2Id else p1Id
+            val existingAbandon = match.getString("abandonedById")
+            if (existingAbandon != null) return@runTransaction
 
             tx.update(
                 matchRef,
-                mapOf(
-                    "status" to "ABANDONED",
-                    "winnerId" to opponentId,
-                    "completedAt" to FieldValue.serverTimestamp(),
-                ),
+                mapOf("abandonedById" to uid),
             )
-
-            if (!isFriendly && opponentId != null && p1Id != null && p2Id != null) {
-                val p1Ref = usersCol.document(p1Id)
-                val p2Ref = usersCol.document(p2Id)
-                val p1Snap = tx.get(p1Ref)
-                val p2Snap = tx.get(p2Ref)
-                val p1Total = (match.getLong("player1TotalScore") ?: 0L).toInt()
-                val p2Total = (match.getLong("player2TotalScore") ?: 0L).toInt()
-                awardStarsForcedWinner(
-                    tx, p1Ref, p1Snap, p2Ref, p2Snap, p1Total, p2Total,
-                    winnerIsP1 = opponentId == p1Id,
-                )
-            }
+            tx.update(usersCol.document(uid), mapOf("inMatch" to false))
         }.await()
 
-        matchRef.get().await().toMatchResponseDto()
+        val matchSnap = matchRef.get().await()
+        val gameType = matchSnap.getString("currentGameType")
+        if (gameType != null) {
+            firestore.collection("matches").document(matchId)
+                .collection("gameState").document(gameType)
+                .set(mapOf("opponentAbandoned" to true), SetOptions.merge())
+                .await()
+        }
+
+        matchSnap.toMatchResponseDto()
     }
 
     override suspend fun cancelQueue(): Result<Unit> = runCatching {
@@ -612,7 +603,12 @@ class FirebaseMatchRepository(
             val nextGameIndex = gameIndex + 1
 
             if (nextGameIndex >= GAME_ORDER.size) {
+                val abandonedBy = match.getString("abandonedById")
                 val winnerId = when {
+                    abandonedBy != null -> {
+                        val p1Id = match.getString("player1Id")
+                        if (abandonedBy == p1Id) match.getString("player2Id") else p1Id
+                    }
                     newP1Total > newP2Total -> match.getString("player1Id")
                     newP2Total > newP1Total -> match.getString("player2Id")
                     else -> null
@@ -627,7 +623,15 @@ class FirebaseMatchRepository(
                     )
                 )
                 if (p1Snap != null && p2Snap != null && p1Ref != null && p2Ref != null) {
-                    awardStars(tx, p1Ref, p1Snap, p2Ref, p2Snap, newP1Total, newP2Total)
+                    if (abandonedBy != null) {
+                        val p1Id = match.getString("player1Id")
+                        awardStarsForcedWinner(
+                            tx, p1Ref, p1Snap, p2Ref, p2Snap, newP1Total, newP2Total,
+                            winnerIsP1 = winnerId == p1Id,
+                        )
+                    } else {
+                        awardStars(tx, p1Ref, p1Snap, p2Ref, p2Snap, newP1Total, newP2Total)
+                    }
                 }
             } else {
                 tx.update(
@@ -753,5 +757,6 @@ class FirebaseMatchRepository(
             winnerId = getString("winnerId"),
             player1Ready = getBoolean("player1Ready") ?: false,
             player2Ready = getBoolean("player2Ready") ?: false,
+            abandonedById = getString("abandonedById"),
         )
 }

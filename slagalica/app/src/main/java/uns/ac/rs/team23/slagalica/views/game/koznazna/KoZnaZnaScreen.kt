@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
+import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
+import uns.ac.rs.team23.slagalica.views.game.common.MatchPlayerHud
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaPhase
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaQuestion
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaState
@@ -56,8 +58,9 @@ fun KoZnaZnaScreen(
     LaunchedEffect(Unit) { viewModel.enter() }
 
     MatchGameAdvanceEffect(thisGameIndex = MatchGameOrder.KO_ZNA_ZNA, onLeaveGame = onFinish)
+    BlockGameBackNavigation()
 
-    // Both clients reach ROUND_END together (driven by the shared doc); auto-advance to the next game.
+    // Both clients reach ROUND_END together
     LaunchedEffect(state.phase) {
         if (state.phase == KoZnaZnaPhase.ROUND_END) {
             delay(4_000)
@@ -87,6 +90,7 @@ fun KoZnaZnaScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
+            MatchPlayerHud(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
             when (state.phase) {
                 KoZnaZnaPhase.ROUND_INTRO -> WaitingContent()
                 KoZnaZnaPhase.PLAYING ->

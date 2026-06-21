@@ -127,6 +127,8 @@ class NotificationsViewModel(
                             hostId = match.player1Id,
                             player1 = match.player1Username,
                             player2 = match.player2Username ?: "",
+                            player1Id = match.player1Id,
+                            player2Id = match.player2Id.orEmpty(),
                         )
                     }
                 }

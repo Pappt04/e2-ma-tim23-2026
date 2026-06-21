@@ -198,7 +198,13 @@ class KoZnaZnaViewModel(
         val now = System.currentTimeMillis()
         val expired = gs.deadlineAt in 1..now
         val bothAnswered = p1 != null && p2 != null
-        if (!expired && !bothAnswered) return
+        val abandonerId = MatchStore.abandonedById
+        val p1Absent = abandonerId == MatchStore.player1Id
+        val p2Absent = abandonerId == MatchStore.player2Id
+        val canResolve = expired || bothAnswered ||
+            (p1Absent && (p2 != null || expired)) ||
+            (p2Absent && (p1 != null || expired))
+        if (!canResolve) return
 
         lastResolvedIndex = gs.index
 

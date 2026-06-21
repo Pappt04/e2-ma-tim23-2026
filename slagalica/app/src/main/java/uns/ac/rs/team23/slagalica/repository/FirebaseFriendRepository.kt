@@ -128,5 +128,6 @@ class FirebaseFriendRepository(
         monthlyRank = monthlyRank,
         onlineAt = getLong("onlineAt") ?: 0L,
         inMatch = getBoolean("inMatch") ?: false,
+        sessionActive = getBoolean("sessionActive") ?: true,
     )
 }

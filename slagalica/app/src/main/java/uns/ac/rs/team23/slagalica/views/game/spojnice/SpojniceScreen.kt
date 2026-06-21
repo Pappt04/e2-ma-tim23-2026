@@ -42,6 +42,8 @@ import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
+import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
+import uns.ac.rs.team23.slagalica.views.game.common.MatchPlayerHud
 import uns.ac.rs.team23.slagalica.viewmodels.SpojnicePhase
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceState
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceViewModel
@@ -62,6 +64,7 @@ fun SpojniceScreen(
     LaunchedEffect(Unit) { viewModel.enter() }
 
     MatchGameAdvanceEffect(thisGameIndex = MatchGameOrder.SPOJNICE, onLeaveGame = onFinish)
+    BlockGameBackNavigation()
 
     LaunchedEffect(state.phase) {
         if (state.phase == SpojnicePhase.GAME_OVER) {
@@ -72,19 +75,22 @@ fun SpojniceScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        Text("Spojnice", style = MaterialTheme.typography.titleMedium)
-                        Text(
-                            text = "Round ${state.currentRound}/2  ·  $player1Name: ${state.player1Points}  $player2Name: ${state.player2Points}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                },
-                actions = { ForfeitAction(onForfeit) },
-            )
+            Column {
+                TopAppBar(
+                    title = {
+                        Column {
+                            Text("Spojnice", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                text = "Round ${state.currentRound}/2  ·  $player1Name: ${state.player1Points}  $player2Name: ${state.player2Points}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    },
+                    actions = { ForfeitAction(onForfeit) },
+                )
+                MatchPlayerHud(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+            }
         },
     ) { innerPadding ->
         when (state.phase) {

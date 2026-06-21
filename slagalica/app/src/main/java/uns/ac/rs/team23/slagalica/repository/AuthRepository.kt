@@ -16,4 +16,7 @@ interface AuthRepository {
 
     /** Write a presence heartbeat (onlineAt) for the current user. */
     suspend fun updatePresence(): Result<Unit>
+
+    /** Client-side daily token grant (replaces scheduled Cloud Function). */
+    suspend fun refreshDailyTokensIfNeeded(): Result<Unit>
 }

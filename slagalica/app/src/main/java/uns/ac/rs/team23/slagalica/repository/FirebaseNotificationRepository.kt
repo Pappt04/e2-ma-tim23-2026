@@ -27,6 +27,7 @@ class FirebaseNotificationRepository(
                 "isRead" to notification.isRead,
                 "inviteId" to notification.inviteId,
                 "createdAtMillis" to notification.createdAtMillis,
+                "suppressPush" to notification.suppressPush,
             )
         ).await()
     }

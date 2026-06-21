@@ -206,6 +206,7 @@ class MojBrojViewModel(
                     maybeResolve()
                     syncReadyFromPayload()
                     syncFinishedPhase()
+                    maybeFastForwardAbandoned()
                     checkBothReady()
                 } else {
                     rebuildState()
@@ -419,6 +420,15 @@ class MojBrojViewModel(
                 player1Points = gs.p1Score,
                 player2Points = gs.p2Score,
             )
+        }
+    }
+
+    private fun maybeFastForwardAbandoned() {
+        if (!isHost || !MatchStore.opponentAbandoned) return
+        val s = _state.value
+        if (s.phase == MojBrojPhase.RoundEnd && s.p1Ready && !s.p2Ready) {
+            patchPayloadReady(p1Ready = true, p2Ready = true)
+            _state.update { it.copy(p2Ready = true) }
         }
     }
 

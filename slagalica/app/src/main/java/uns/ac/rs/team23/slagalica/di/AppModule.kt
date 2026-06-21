@@ -2,10 +2,12 @@ package uns.ac.rs.team23.slagalica.di
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
 import org.koin.dsl.module
 import uns.ac.rs.team23.slagalica.data.CycleManager
+import uns.ac.rs.team23.slagalica.services.ClientDbListeners
 import uns.ac.rs.team23.slagalica.repository.AuthRepository
 import uns.ac.rs.team23.slagalica.repository.ChallengeRepository
 import uns.ac.rs.team23.slagalica.repository.ChatRepository
@@ -59,9 +61,10 @@ val AppModule = module {
     single<RegionRepository> { FirebaseRegionRepository(get(), get()) }
     single<LeaderboardRepository> { FirebaseLeaderboardRepository(get()) }
     single { CycleManager(get()) }
+    single { ClientDbListeners(androidContext(), get(), get(), get(), get()) }
 
     // ViewModels
-    viewModel { AuthViewModel(get(), get(), get()) }
+    viewModel { AuthViewModel(get(), get(), get(), get()) }
     viewModel { FriendsViewModel(get(), get()) }
     viewModel { RegionViewModel(get(), get()) }
     viewModel { KorakPoKorakViewModel(get(), get(), get()) }

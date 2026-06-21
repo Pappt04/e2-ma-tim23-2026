@@ -29,6 +29,7 @@ import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 import uns.ac.rs.team23.slagalica.repository.RegionRepository
+import uns.ac.rs.team23.slagalica.services.PendingRewardEvent
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.LeagueChangeEvent
 import uns.ac.rs.team23.slagalica.viewmodels.ChallengeViewModel
@@ -469,7 +470,15 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
             }
             if (session is UserSession.LoggedIn) {
-                RegionMapScreen(onNavigateBack = { navController.popBackStack() })
+                val region = userProfile?.region ?: ""
+                RegionMapScreen(
+                    onNavigateBack = { navController.popBackStack() },
+                    onNavigateToChallenge = {
+                        if (region.isNotBlank()) {
+                            navController.navigate(Screen.Challenge.route(region))
+                        }
+                    },
+                )
             } else {
                 Box(Modifier.fillMaxSize())
             }
@@ -529,6 +538,33 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             confirmButton = { TextButton(onClick = { leagueEvent = null }) { Text("U redu") } },
             title = { Text(if (event.promoted) "🎉 Napredovali ste!" else "📉 Pali ste u nižu ligu") },
             text = { Text("Sada se nalazite u ligi: $leagueName") },
+        )
+    }
+
+    var rewardEvent by remember { mutableStateOf<PendingRewardEvent?>(null) }
+    LaunchedEffect(Unit) {
+        authViewModel.pendingReward.collect { rewardEvent = it }
+    }
+    rewardEvent?.let { event ->
+        val period = if (event.weekly) "nedeljnoj" else "mesečnoj"
+        AlertDialog(
+            onDismissRequest = {
+                rewardEvent = null
+                authViewModel.refreshProfile()
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    rewardEvent = null
+                    authViewModel.refreshProfile()
+                }) { Text("Super!") }
+            },
+            title = { Text("🎉🎟 Nagrada osvojena!") },
+            text = {
+                Text(
+                    "Plasman #${event.rank} na $period rang listi donosi vam " +
+                        "${event.tokens} tokena!\n\n⭐🎊🎁",
+                )
+            },
         )
     }
 }

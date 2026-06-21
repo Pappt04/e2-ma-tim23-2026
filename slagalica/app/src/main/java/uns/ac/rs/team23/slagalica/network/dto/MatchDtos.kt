@@ -25,6 +25,7 @@ data class MatchResponseDto(
     val winnerId: String?,
     val player1Ready: Boolean = false,
     val player2Ready: Boolean = false,
+    val abandonedById: String? = null,
 )
 
 data class GameResultDto(
