@@ -20,7 +20,6 @@ data class RegionUiState(
     val myRegion: String = "",
     val selectedStats: RegionStats? = null,
     val loading: Boolean = true,
-    val info: String? = null,
 )
 
 class RegionViewModel(
@@ -63,20 +62,6 @@ class RegionViewModel(
     }
 
     fun clearSelection() = _ui.update { it.copy(selectedStats = null) }
-
-    fun clearInfo() = _ui.update { it.copy(info = null) }
-
-    /** Demo trigger: finalize the current cycle now (frames, 30% penalty, reset). */
-    fun forceEndCycle() {
-        viewModelScope.launch {
-            cycleManager.forceRollover()
-                .onSuccess {
-                    _ui.update { it.copy(info = "Ciklus zatvoren — okviri i kazne primenjeni") }
-                    reload()
-                }
-                .onFailure { e -> _ui.update { it.copy(info = e.message ?: "Greška") } }
-        }
-    }
 
     fun frameRankFor(region: String): Int {
         val idx = _ui.value.previousTopRegions.indexOf(region)

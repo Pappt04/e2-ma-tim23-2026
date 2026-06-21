@@ -24,6 +24,9 @@ interface MatchRepository {
     /** Mark the current user as ready in the match lobby. */
     suspend fun markReady(matchId: String): Result<Unit>
 
+    /** Flag whether the current user is currently in a match (used by friends' "Play" gating). */
+    suspend fun setInMatch(inMatch: Boolean): Result<Unit>
+
     // --- Real-time match & game synchronization ---
 
     /** Live updates of the match document (status, scores, current game). */

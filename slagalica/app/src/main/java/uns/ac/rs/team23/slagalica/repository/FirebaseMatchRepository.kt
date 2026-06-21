@@ -405,6 +405,11 @@ class FirebaseMatchRepository(
         matchRef.update(field, true).await()
     }
 
+    override suspend fun setInMatch(inMatch: Boolean): Result<Unit> = runCatching {
+        val uid = auth.currentUser?.uid ?: return@runCatching
+        firestore.collection("users").document(uid).update("inMatch", inMatch).await()
+    }
+
     // --- Real-time match & game synchronization ---
 
     override fun observeMatch(matchId: String): Flow<MatchResponseDto> = callbackFlow {

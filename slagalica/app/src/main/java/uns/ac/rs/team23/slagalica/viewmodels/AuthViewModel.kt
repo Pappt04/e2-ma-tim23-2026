@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import java.util.UUID
+import uns.ac.rs.team23.slagalica.data.CycleManager
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.models.Notification
 import uns.ac.rs.team23.slagalica.models.NotificationType
@@ -43,6 +44,7 @@ data class LeagueChangeEvent(val oldLevel: Int, val newLevel: Int) {
 class AuthViewModel(
     private val authRepository: AuthRepository,
     private val notificationRepository: NotificationRepository,
+    private val cycleManager: CycleManager,
 ) : ViewModel() {
 
     private val _userSession = MutableStateFlow<UserSession>(UserSession.NotLoggedIn)
@@ -68,6 +70,15 @@ class AuthViewModel(
             }
         }
         startPresenceHeartbeat()
+        runMonthlyRollover()
+    }
+
+    /** Automatic monthly-cycle rollover (no Cloud Functions / billing required). */
+    private fun runMonthlyRollover() {
+        viewModelScope.launch {
+            cycleManager.maybeRollover()
+                .onSuccess { rolled -> if (rolled) refreshProfile() }
+        }
     }
 
     fun refreshProfile() {
@@ -91,7 +102,7 @@ class AuthViewModel(
         viewModelScope.launch {
             while (true) {
                 authRepository.updatePresence()
-                delay(60_000)
+                delay(30_000)
             }
         }
     }
