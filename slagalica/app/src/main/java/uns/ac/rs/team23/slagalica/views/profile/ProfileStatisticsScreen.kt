@@ -87,7 +87,7 @@ fun ProfileStatisticsScreen(
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center,
                         )
-                        Button(onClick = viewModel::load) { Text("Pokušaj ponovo") }
+                        Button(onClick = viewModel::load) { Text("Try again") }
                     }
                 }
 
@@ -96,7 +96,7 @@ fun ProfileStatisticsScreen(
                         StatisticsContent(state.statistics)
                     } else {
                         Text(
-                            text = "Još nema odigranih mečeva.\nOdigraj meč da bi se ovde pojavila statistika.",
+                            text = "No matches played yet.\nPlay a match to see statistics here.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -187,7 +187,7 @@ private fun pct(part: Int, total: Int): Int =
 private fun LazyListScope.detailSections(d: GameDetailStats) {
     val koTotal = d.koCorrect + d.koIncorrect
     if (koTotal > 0) item {
-        StatsSectionTitle("Ko zna zna")
+        StatsSectionTitle("Who Knows Who")
         StatsTableCard(
             subtitle = "Share of answers",
             rows = listOf(
@@ -199,7 +199,7 @@ private fun LazyListScope.detailSections(d: GameDetailStats) {
 
     if (d.mbRounds > 0) item {
         val miss = d.mbRounds - d.mbFound
-        StatsSectionTitle("Moj broj")
+        StatsSectionTitle("My Number")
         StatsTableCard(
             subtitle = "Exact target number found",
             rows = listOf(
@@ -211,7 +211,7 @@ private fun LazyListScope.detailSections(d: GameDetailStats) {
 
     val korakTotal = d.korakSteps.sum()
     if (korakTotal > 0) item {
-        StatsSectionTitle("Korak po korak")
+        StatsSectionTitle("Step by Step")
         StatsTableCard(
             subtitle = "Concept guessed at step",
             rows = d.korakSteps.mapIndexedNotNull { i, c ->
@@ -222,7 +222,7 @@ private fun LazyListScope.detailSections(d: GameDetailStats) {
 
     val asoTotal = d.asoSolved + d.asoUnsolved
     if (asoTotal > 0) item {
-        StatsSectionTitle("Asocijacije")
+        StatsSectionTitle("Associations")
         StatsTableCard(
             subtitle = "Columns & final solution",
             rows = listOf(
@@ -234,7 +234,7 @@ private fun LazyListScope.detailSections(d: GameDetailStats) {
 
     val skoTotal = d.skockoAttempts.sum()
     if (skoTotal > 0) item {
-        StatsSectionTitle("Skočko")
+        StatsSectionTitle("Skocko")
         StatsTableCard(
             subtitle = "Combination solved on attempt",
             rows = d.skockoAttempts.mapIndexedNotNull { i, c ->
@@ -244,7 +244,7 @@ private fun LazyListScope.detailSections(d: GameDetailStats) {
     }
 
     if (d.spojniceTotal > 0) item {
-        StatsSectionTitle("Spojnice")
+        StatsSectionTitle("Connections")
         StatsTableCard(
             subtitle = "Successfully connected concepts",
             rows = listOf(

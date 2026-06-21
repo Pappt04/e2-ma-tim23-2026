@@ -205,14 +205,14 @@ class CycleManager(
                     ),
                 )
             }.await()
-            val periodLabel = if (weekly) "nedeljnoj" else "mesečnoj"
+            val periodLabel = if (weekly) "weekly" else "monthly"
             FirestoreNotificationWriter.push(
                 firestore,
                 uid,
                 Notification(
                     id = "reward_${if (weekly) "w" else "m"}_${System.currentTimeMillis()}",
-                    title = "Nagrada za rang listu!",
-                    message = "Osvojili ste $tokens tokena na $periodLabel rang listi (#$rank).",
+                    title = "Leaderboard reward!",
+                    message = "You earned $tokens tokens on the $periodLabel leaderboard (#$rank).",
                     type = NotificationType.REWARD,
                 ),
             )

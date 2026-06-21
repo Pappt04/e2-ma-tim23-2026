@@ -210,7 +210,7 @@ private fun ModePicker(
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
         Text(
-            text = "Tip partije",
+            text = "Match type",
             style = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.Bold,
         )
@@ -218,19 +218,19 @@ private fun ModePicker(
             FilterChip(
                 selected = !friendly,
                 onClick = { onFriendlyChange(false) },
-                label = { Text("Rangirana (1 žeton)") },
+                label = { Text("Ranked (1 token)") },
             )
             FilterChip(
                 selected = friendly,
                 onClick = { onFriendlyChange(true) },
-                label = { Text("Prijateljska") },
+                label = { Text("Friendly") },
             )
         }
         Text(
             text = if (friendly) {
-                "Prijateljska partija ne troši žetone i ne utiče na zvezde."
+                "Friendly matches do not cost tokens and do not affect stars."
             } else {
-                "Rangirana partija košta 1 žeton. Pobeda i poraz utiču na zvezde."
+                "Ranked matches cost 1 token. Wins and losses affect stars."
             },
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -238,9 +238,9 @@ private fun ModePicker(
             modifier = Modifier.fillMaxWidth(0.85f),
         )
         Button(onClick = onStart, modifier = Modifier.fillMaxWidth(0.7f)) {
-            Text("Traži protivnika")
+            Text("Find opponent")
         }
-        OutlinedButton(onClick = onCancel) { Text("Nazad") }
+        OutlinedButton(onClick = onCancel) { Text("Back") }
     }
 }
 
@@ -251,7 +251,7 @@ private fun ErrorContent(message: String, onRetry: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(message, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
-        Button(onClick = onRetry) { Text("Pokušaj ponovo") }
+        Button(onClick = onRetry) { Text("Try again") }
     }
 }
 

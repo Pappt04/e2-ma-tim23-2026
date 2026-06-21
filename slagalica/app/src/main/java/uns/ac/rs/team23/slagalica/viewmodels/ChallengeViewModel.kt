@@ -97,12 +97,12 @@ class ChallengeViewModel(
                 .onSuccess { match ->
                     MatchStore.set(
                         id = match.id,
-                        opponent = "Izazov",
+                        opponent = "Challenge",
                         friendly = true,
                         myUid = match.player1Id,
                         hostId = match.player1Id,
                         player1 = match.player1Username,
-                        player2 = "Izazov",
+                        player2 = "Challenge",
                     )
                     ChallengeStore.set(challenge.id, challenge.region)
                     onReady()

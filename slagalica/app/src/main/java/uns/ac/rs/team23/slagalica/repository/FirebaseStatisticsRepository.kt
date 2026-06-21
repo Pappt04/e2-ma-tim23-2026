@@ -32,7 +32,7 @@ class FirebaseStatisticsRepository(
 ) : StatisticsRepository {
 
     override suspend fun getPlayerStatistics(): Result<PlayerStatistics> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
 
         // Query each side separately (single-field filters) to avoid composite indexes, then merge.
         val asP1 = firestore.collection("matches")

@@ -37,7 +37,7 @@ class FirebaseChallengeRepository(
         stakedStars: Int,
         stakedTokens: Int,
     ): Result<ChallengeResponseDto> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         val userRef = firestore.collection("users").document(uid)
         val challengeRef = firestore.collection("challenges").document()
         val participantRef = challengeRef.collection("participants").document(uid)
@@ -70,7 +70,7 @@ class FirebaseChallengeRepository(
 
     override suspend fun joinChallenge(challengeId: String): Result<ChallengeResponseDto> =
         runCatching {
-            val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+            val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
             val userRef = firestore.collection("users").document(uid)
             val challengeRef = firestore.collection("challenges").document(challengeId)
             val participantRef = challengeRef.collection("participants").document(uid)
@@ -79,12 +79,12 @@ class FirebaseChallengeRepository(
                 val challenge = tx.get(challengeRef)
                 val user = tx.get(userRef)
 
-                if (challenge.getString("status") != "OPEN") throw Exception("Izazov nije otvoren")
+                if (challenge.getString("status") != "OPEN") throw Exception("Challenge is not open")
                 val count = (challenge.getLong("participantCount") ?: 0L).toInt()
-                if (count >= 4) throw Exception("Izazov je pun")
+                if (count >= 4) throw Exception("Challenge is full")
                 @Suppress("UNCHECKED_CAST")
                 val ids = challenge.get("participantIds") as? List<String> ?: emptyList()
-                if (uid in ids) throw Exception("Već ste u izazovu")
+                if (uid in ids) throw Exception("You are already in this challenge")
 
                 val stakedStars = (challenge.getLong("stakedStars") ?: 0L).toInt()
                 val stakedTokens = (challenge.getLong("stakedTokens") ?: 0L).toInt()
@@ -110,7 +110,7 @@ class FirebaseChallengeRepository(
         gameType: String,
         score: Int,
     ): Result<ChallengeResponseDto> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
 
         val gameResultRef = firestore.collection("challenges").document(challengeId)
             .collection("participants").document(uid)
@@ -135,7 +135,7 @@ class FirebaseChallengeRepository(
         challengeId: String,
         matchId: String,
     ): Result<ChallengeResponseDto> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
 
         // Pull the solo match's per-game scores (player1 is the challenger).
         val resultsSnap = firestore.collection("matches").document(matchId)
@@ -181,13 +181,13 @@ class FirebaseChallengeRepository(
             val participantsSnap = firestore.collection("challenges").document(challengeId)
                 .collection("participants").get().await()
             doc.toChallengeResponseDto(participantsSnap.toParticipants())
-                ?: throw Exception("Izazov nije pronađen")
+                ?: throw Exception("Challenge not found")
         }
 
     // --- Finalization & payouts ---
 
     /**
-     * Spec "Izazov" payout: once every participant (≥2) has played all 6 games, the highest total
+     * Spec "Challenge" payout: once every participant (≥2) has played all 6 games, the highest total
      * score wins 75% of the pooled stakes, 2nd place gets their own stake back, everyone else
      * loses what they staked. Guarded by `status == "OPEN"` so it runs exactly once.
      */
@@ -278,8 +278,8 @@ class FirebaseChallengeRepository(
     private fun requireStake(user: DocumentSnapshot, stakedStars: Int, stakedTokens: Int) {
         val stars = (user.getLong("stars") ?: 0L).toInt()
         val tokens = (user.getLong("tokens") ?: 0L).toInt()
-        if (stars < stakedStars) throw Exception("Nemate dovoljno zvezdica")
-        if (tokens < stakedTokens) throw Exception("Nemate dovoljno žetona")
+        if (stars < stakedStars) throw Exception("Not enough stars")
+        if (tokens < stakedTokens) throw Exception("Not enough tokens")
     }
 
     private fun deductStake(stakedStars: Int, stakedTokens: Int): Map<String, Any> = mapOf(

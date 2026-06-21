@@ -110,12 +110,12 @@ class ClientDbListeners(
                     val doc = change.document
                     if (doc.getString("status") != "PENDING") return@forEach
                     val inviteId = doc.id
-                    val inviter = doc.getString("inviterUsername") ?: "Prijatelj"
+                    val inviter = doc.getString("inviterUsername") ?: "Friend"
                     val friendly = doc.getBoolean("isFriendly") ?: true
                     val notification = Notification(
                         id = "invite_$inviteId",
-                        title = "Poziv za partiju",
-                        message = "$inviter te poziva na ${if (friendly) "prijateljsku" else "rangiranu"} partiju",
+                        title = "Match invite",
+                        message = "$inviter invites you to a ${if (friendly) "friendly" else "ranked"} match",
                         type = NotificationType.INVITE,
                         inviteId = inviteId,
                     )

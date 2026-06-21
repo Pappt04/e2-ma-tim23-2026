@@ -57,7 +57,7 @@ fun LoginComponent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Prijava",
+                text = "Log in",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -65,7 +65,7 @@ fun LoginComponent(
             OutlinedTextField(
                 value = viewModel.loginEmailOrUsername,
                 onValueChange = viewModel::onLoginEmailOrUsernameChange,
-                label = { Text("Email ili korisničko ime") },
+                label = { Text("Email or username") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -74,7 +74,7 @@ fun LoginComponent(
             OutlinedTextField(
                 value = viewModel.loginPassword,
                 onValueChange = viewModel::onLoginPasswordChange,
-                label = { Text("Lozinka") },
+                label = { Text("Password") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation =
@@ -86,7 +86,7 @@ fun LoginComponent(
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
                     TextButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Text(if (passwordVisible) "Sakrij" else "Prikaži")
+                        Text(if (passwordVisible) "Hide" else "Show")
                     }
                 },
             )
@@ -106,7 +106,7 @@ fun LoginComponent(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = loginState !is AuthState.Loading,
             ) {
-                Text(if (loginState is AuthState.Loading) "Prijavljivanje..." else "Prijavi se")
+                Text(if (loginState is AuthState.Loading) "Logging in..." else "Log in")
             }
 
             TextButton(
@@ -114,7 +114,7 @@ fun LoginComponent(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Text(
-                    "Zaboravili ste lozinku?",
+                    "Forgot your password?",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

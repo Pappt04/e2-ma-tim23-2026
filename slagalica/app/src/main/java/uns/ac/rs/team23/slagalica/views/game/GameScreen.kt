@@ -157,7 +157,7 @@ fun GameScreen(
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                 ) {
                     Text(
-                        text = "Protivnik je napustio partiju — nastavljate igru.",
+                        text = "Your opponent left the match — you continue playing.",
                         modifier = Modifier.padding(12.dp),
                         fontWeight = FontWeight.SemiBold,
                     )

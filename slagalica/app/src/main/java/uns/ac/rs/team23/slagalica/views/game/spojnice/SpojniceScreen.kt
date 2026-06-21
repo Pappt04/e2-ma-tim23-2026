@@ -79,7 +79,7 @@ fun SpojniceScreen(
                 TopAppBar(
                     title = {
                         Column {
-                            Text("Spojnice", style = MaterialTheme.typography.titleMedium)
+                            Text("Connections", style = MaterialTheme.typography.titleMedium)
                             Text(
                                 text = "Round ${state.currentRound}/2  ·  $player1Name: ${state.player1Points}  $player2Name: ${state.player2Points}",
                                 style = MaterialTheme.typography.bodySmall,

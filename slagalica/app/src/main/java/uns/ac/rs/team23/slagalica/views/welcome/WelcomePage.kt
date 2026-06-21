@@ -64,7 +64,7 @@ fun WelcomePage(
                 onClick = onNavigateToRegister,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Nemate nalog? Registrujte se")
+                Text("Don't have an account? Register")
             }
 
             Spacer(modifier = Modifier.height(8.dp))
@@ -75,7 +75,7 @@ fun WelcomePage(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 HorizontalDivider(modifier = Modifier.weight(1f))
-                Text("ili", style = MaterialTheme.typography.bodySmall)
+                Text("or", style = MaterialTheme.typography.bodySmall)
                 HorizontalDivider(modifier = Modifier.weight(1f))
             }
 
@@ -85,10 +85,10 @@ fun WelcomePage(
                 onClick = viewModel::loginAsGuest,
                 modifier = Modifier.fillMaxWidth(),
             ) {
-                Text("Nastavi kao gost")
+                Text("Continue as guest")
             }
             Text(
-                text = "Gosti mogu samo igrati partije. Registrujte se za profil, statistiku, takmičenja i rang listu.",
+                text = "Guests can only play matches. Register for profile, statistics, competitions, and the leaderboard.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 8.dp),

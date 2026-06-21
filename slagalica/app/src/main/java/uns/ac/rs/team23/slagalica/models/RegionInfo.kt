@@ -17,11 +17,11 @@ data class RegionInfo(
 
 object Regions {
     val ALL = listOf(
-        RegionInfo("Beograd", "Beograd", "🏙️", 44.8125, 20.4612, 0.12),
+        RegionInfo("Beograd", "Belgrade", "🏙️", 44.8125, 20.4612, 0.12),
         RegionInfo("Vojvodina", "Vojvodina", "🌻", 45.40, 19.85, 0.55),
-        RegionInfo("Šumadija i Zapadna Srbija", "Šumadija i Zap. Srbija", "⛰️", 43.85, 20.00, 0.60),
-        RegionInfo("Južna i Istočna Srbija", "Južna i Ist. Srbija", "🌲", 43.30, 22.00, 0.65),
-        RegionInfo("Kosovo i Metohija", "Kosovo i Metohija", "🏞️", 42.60, 21.00, 0.35),
+        RegionInfo("Šumadija i Zapadna Srbija", "Sumadija & Western Serbia", "⛰️", 43.85, 20.00, 0.60),
+        RegionInfo("Južna i Istočna Srbija", "Southern & Eastern Serbia", "🌲", 43.30, 22.00, 0.65),
+        RegionInfo("Kosovo i Metohija", "Kosovo & Metohija", "🏞️", 42.60, 21.00, 0.35),
     )
 
     fun byId(id: String): RegionInfo? = ALL.firstOrNull { it.id == id }

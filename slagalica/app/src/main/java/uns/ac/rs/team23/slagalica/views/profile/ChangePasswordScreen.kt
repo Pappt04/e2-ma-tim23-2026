@@ -61,13 +61,13 @@ fun ChangePasswordScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Promena lozinke") },
+                title = { Text("Change password") },
                 navigationIcon = {
                     IconButton(onClick = {
                         viewModel.clearChangePasswordState()
                         onNavigateBack()
                     }) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Nazad")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
             )
@@ -89,7 +89,7 @@ fun ChangePasswordScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "Lozinka je uspešno promenjena!",
+                            "Password changed successfully!",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -103,20 +103,20 @@ fun ChangePasswordScreen(
                     onClick = onNavigateBack,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Nazad na profil")
+                    Text("Back to profile")
                 }
             } else {
                 OutlinedTextField(
                     value = viewModel.changeOldPassword,
                     onValueChange = viewModel::onChangeOldPasswordChange,
-                    label = { Text("Trenutna lozinka") },
+                    label = { Text("Current password") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     visualTransformation = if (oldVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
                         TextButton(onClick = { oldVisible = !oldVisible }) {
-                            Text(if (oldVisible) "Sakrij" else "Prikaži")
+                            Text(if (oldVisible) "Hide" else "Show")
                         }
                     },
                 )
@@ -124,14 +124,14 @@ fun ChangePasswordScreen(
                 OutlinedTextField(
                     value = viewModel.changeNewPassword,
                     onValueChange = viewModel::onChangeNewPasswordChange,
-                    label = { Text("Nova lozinka") },
+                    label = { Text("New password") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     visualTransformation = if (newVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
                         TextButton(onClick = { newVisible = !newVisible }) {
-                            Text(if (newVisible) "Sakrij" else "Prikaži")
+                            Text(if (newVisible) "Hide" else "Show")
                         }
                     },
                 )
@@ -139,14 +139,14 @@ fun ChangePasswordScreen(
                 OutlinedTextField(
                     value = viewModel.changeConfirmNewPassword,
                     onValueChange = viewModel::onChangeConfirmNewPasswordChange,
-                    label = { Text("Ponovi novu lozinku") },
+                    label = { Text("Confirm new password") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     visualTransformation = if (confirmVisible) VisualTransformation.None else PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     trailingIcon = {
                         TextButton(onClick = { confirmVisible = !confirmVisible }) {
-                            Text(if (confirmVisible) "Sakrij" else "Prikaži")
+                            Text(if (confirmVisible) "Hide" else "Show")
                         }
                     },
                 )
@@ -164,7 +164,7 @@ fun ChangePasswordScreen(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = changeState !is AuthState.Loading,
                 ) {
-                    Text(if (changeState is AuthState.Loading) "Čekajte..." else "Promeni lozinku")
+                    Text(if (changeState is AuthState.Loading) "Please wait..." else "Change password")
                 }
             }
         }

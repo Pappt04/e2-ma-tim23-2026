@@ -32,16 +32,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import uns.ac.rs.team23.slagalica.models.Regions
 import uns.ac.rs.team23.slagalica.viewmodels.AuthState
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
-
-private val REGIONS = listOf(
-    "Beograd",
-    "Vojvodina",
-    "Šumadija i Zapadna Srbija",
-    "Južna i Istočna Srbija",
-    "Kosovo i Metohija",
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -74,19 +67,19 @@ fun RegisterComponent(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Text(
-                    "Registracija uspešna!",
+                    "Registration successful!",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 Text(
-                    "Poslali smo email sa linkom za potvrdu na adresu ${viewModel.registerEmail}. " +
-                        "Kliknite na link u emailu da biste aktivirali nalog.",
+                    "We sent a confirmation link to ${viewModel.registerEmail}. " +
+                        "Click the link in the email to activate your account.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
                 Text(
-                    "[DEV] Otvorite MailHog na http://10.0.2.2:8025 u browseru da biste pronašli email i kliknuli na verifikacioni link.",
+                    "[DEV] Open MailHog at http://10.0.2.2:8025 in a browser to find the email and click the verification link.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
@@ -95,7 +88,7 @@ fun RegisterComponent(
                     onClick = onNavigateToLogin,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Idi na prijavu")
+                    Text("Go to log in")
                 }
             }
         }
@@ -111,7 +104,7 @@ fun RegisterComponent(
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
-                text = "Registracija",
+                text = "Register",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -128,7 +121,7 @@ fun RegisterComponent(
             OutlinedTextField(
                 value = viewModel.registerUsername,
                 onValueChange = viewModel::onRegisterUsernameChange,
-                label = { Text("Korisničko ime") },
+                label = { Text("Username") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -138,7 +131,7 @@ fun RegisterComponent(
                 onExpandedChange = { regionExpanded = it },
             ) {
                 OutlinedTextField(
-                    value = viewModel.registerRegion,
+                    value = Regions.byId(viewModel.registerRegion)?.displayName ?: viewModel.registerRegion,
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Region") },
@@ -153,11 +146,11 @@ fun RegisterComponent(
                     expanded = regionExpanded,
                     onDismissRequest = { regionExpanded = false },
                 ) {
-                    REGIONS.forEach { region ->
+                    Regions.ALL.forEach { region ->
                         DropdownMenuItem(
-                            text = { Text(region) },
+                            text = { Text(region.displayName) },
                             onClick = {
-                                viewModel.onRegisterRegionChange(region)
+                                viewModel.onRegisterRegionChange(region.id)
                                 regionExpanded = false
                             },
                         )
@@ -168,14 +161,14 @@ fun RegisterComponent(
             OutlinedTextField(
                 value = viewModel.registerPassword,
                 onValueChange = viewModel::onRegisterPasswordChange,
-                label = { Text("Lozinka") },
+                label = { Text("Password") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
                     TextButton(onClick = { passwordVisible = !passwordVisible }) {
-                        Text(if (passwordVisible) "Sakrij" else "Prikaži")
+                        Text(if (passwordVisible) "Hide" else "Show")
                     }
                 },
             )
@@ -183,14 +176,14 @@ fun RegisterComponent(
             OutlinedTextField(
                 value = viewModel.registerConfirmPassword,
                 onValueChange = viewModel::onRegisterConfirmPasswordChange,
-                label = { Text("Ponovi lozinku") },
+                label = { Text("Confirm password") },
                 singleLine = true,
                 modifier = Modifier.fillMaxWidth(),
                 visualTransformation = if (confirmPasswordVisible) VisualTransformation.None else PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                 trailingIcon = {
                     TextButton(onClick = { confirmPasswordVisible = !confirmPasswordVisible }) {
-                        Text(if (confirmPasswordVisible) "Sakrij" else "Prikaži")
+                        Text(if (confirmPasswordVisible) "Hide" else "Show")
                     }
                 },
             )
@@ -210,7 +203,7 @@ fun RegisterComponent(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = registerState !is AuthState.Loading,
             ) {
-                Text(if (registerState is AuthState.Loading) "Registracija..." else "Registruj se")
+                Text(if (registerState is AuthState.Loading) "Registering..." else "Register")
             }
         }
     }

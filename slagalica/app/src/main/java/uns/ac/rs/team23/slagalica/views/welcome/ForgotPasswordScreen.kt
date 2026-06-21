@@ -55,10 +55,10 @@ fun ForgotPasswordScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Oporavak lozinke") },
+                title = { Text("Password recovery") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Nazad")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
             )
@@ -80,14 +80,14 @@ fun ForgotPasswordScreen(
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
                         Text(
-                            "Email je poslat!",
+                            "Email sent!",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "Proverite vašu email adresu i kliknite na link za resetovanje lozinke.",
+                            "Check your email and click the link to reset your password.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onPrimaryContainer,
                         )
@@ -95,7 +95,7 @@ fun ForgotPasswordScreen(
                 }
             } else {
                 Text(
-                    "Unesite vašu email adresu i poslaćemo vam link za resetovanje lozinke.",
+                    "Enter your email address and we will send you a password reset link.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -103,7 +103,7 @@ fun ForgotPasswordScreen(
                 OutlinedTextField(
                     value = viewModel.forgotEmail,
                     onValueChange = viewModel::onForgotEmailChange,
-                    label = { Text("Email adresa") },
+                    label = { Text("Email address") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
@@ -122,7 +122,7 @@ fun ForgotPasswordScreen(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = forgotState !is AuthState.Loading,
                 ) {
-                    Text(if (forgotState is AuthState.Loading) "Slanje..." else "Pošalji link")
+                    Text(if (forgotState is AuthState.Loading) "Sending..." else "Send link")
                 }
             }
         }

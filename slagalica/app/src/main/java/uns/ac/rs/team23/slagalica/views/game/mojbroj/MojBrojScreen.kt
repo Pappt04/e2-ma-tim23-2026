@@ -125,7 +125,7 @@ fun MojBrojScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Moj broj", style = MaterialTheme.typography.titleMedium)
+                        Text("My Number", style = MaterialTheme.typography.titleMedium)
                         Text(
                             text = "Round ${state.currentRound}/2  ·  $player1Name: ${state.player1Points}  $player2Name: ${state.player2Points}",
                             style = MaterialTheme.typography.bodySmall,

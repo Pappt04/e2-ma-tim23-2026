@@ -23,10 +23,10 @@ class FirebaseAuthRepository(
     ): Result<Unit> = runCatching {
         // Username uniqueness check — usernames collection is publicly readable
         val usernameDoc = firestore.collection("usernames").document(username).get().await()
-        if (usernameDoc.exists()) throw Exception("Korisničko ime je već zauzeto")
+        if (usernameDoc.exists()) throw Exception("Username is already taken")
 
         val result = auth.createUserWithEmailAndPassword(email, password).await()
-        val user = result.user ?: throw Exception("Registracija nije uspela")
+        val user = result.user ?: throw Exception("Registration failed")
 
         user.updateProfile(
             UserProfileChangeRequest.Builder().setDisplayName(username).build()
@@ -75,15 +75,15 @@ class FirebaseAuthRepository(
             } else {
                 // usernames is publicly readable — single pre-auth read to get the email
                 val doc = firestore.collection("usernames").document(emailOrUsername).get().await()
-                doc.getString("email") ?: throw Exception("Korisnik nije pronađen")
+                doc.getString("email") ?: throw Exception("User not found")
             }
 
             val result = auth.signInWithEmailAndPassword(email, password).await()
-            val user = result.user ?: throw Exception("Prijavljivanje nije uspelo")
+            val user = result.user ?: throw Exception("Login failed")
 
             if (!user.isEmailVerified) {
                 auth.signOut()
-                throw Exception("Email adresa nije potvrđena. Proverite poštu i kliknite na link.")
+                throw Exception("Email address is not verified. Check your inbox and click the link.")
             }
 
             grantDailyTokensIfNeeded(user.uid)
@@ -95,13 +95,13 @@ class FirebaseAuthRepository(
 
     override suspend fun loginAsGuest(): Result<UserProfile> = runCatching {
         val result = auth.signInAnonymously().await()
-        val user = result.user ?: throw Exception("Gost prijava nije uspela")
+        val user = result.user ?: throw Exception("Guest login failed")
         val uid = user.uid
 
         firestore.collection("users").document(uid).set(
             mapOf(
                 "uid" to uid,
-                "username" to "Gost_${uid.take(6)}",
+                "username" to "Guest_${uid.take(6)}",
                 "email" to "",
                 "region" to "",
                 "tokens" to 0,
@@ -132,7 +132,7 @@ class FirebaseAuthRepository(
     }
 
     override suspend fun getProfile(): Result<UserProfile> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         if (auth.currentUser?.isAnonymous != true) {
             grantDailyTokensIfNeeded(uid)
         }
@@ -148,15 +148,15 @@ class FirebaseAuthRepository(
         oldPassword: String,
         newPassword: String,
     ): Result<Unit> = runCatching {
-        val user = auth.currentUser ?: throw Exception("Nije prijavljen")
-        val email = user.email ?: throw Exception("Nije prijavljen")
+        val user = auth.currentUser ?: throw Exception("Not logged in")
+        val email = user.email ?: throw Exception("Not logged in")
         val credential = EmailAuthProvider.getCredential(email, oldPassword)
         user.reauthenticate(credential).await()
         user.updatePassword(newPassword).await()
     }
 
     override suspend fun updateAvatar(avatarIndex: Int): Result<Unit> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         firestore.collection("users").document(uid)
             .update("avatarIndex", avatarIndex)
             .await()

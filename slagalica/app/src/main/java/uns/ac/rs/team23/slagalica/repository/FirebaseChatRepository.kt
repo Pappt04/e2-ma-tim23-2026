@@ -30,13 +30,13 @@ class FirebaseChatRepository(
 
     override suspend fun sendMessage(region: String, content: String): Result<ChatMessageDto> =
         runCatching {
-            val user = auth.currentUser ?: throw Exception("Nije prijavljen")
+            val user = auth.currentUser ?: throw Exception("Not logged in")
             val uid = user.uid
             val userDoc = firestore.collection("users").document(uid).get().await()
-            val username = userDoc.getString("username") ?: user.displayName ?: "Korisnik"
+            val username = userDoc.getString("username") ?: user.displayName ?: "User"
             val userRegion = userDoc.getString("region") ?: ""
             if (userRegion != region) {
-                throw Exception("Možete pisati samo u četu svog regiona")
+                throw Exception("You can only chat in your own region")
             }
 
             val now = com.google.firebase.Timestamp.now()
@@ -95,7 +95,7 @@ class FirebaseChatRepository(
                 doc.id,
                 Notification(
                     id = UUID.randomUUID().toString(),
-                    title = "Nova poruka u $region",
+                    title = "New message in $region",
                     message = "$sender: $body",
                     type = NotificationType.CHAT,
                 ),
