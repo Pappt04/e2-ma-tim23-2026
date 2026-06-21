@@ -37,6 +37,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import uns.ac.rs.team23.slagalica.models.Regions
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.models.leagueIconFor
 import uns.ac.rs.team23.slagalica.utils.QrGenerator
@@ -153,7 +154,7 @@ fun ProfileScreen(
                                 )
                             }
                         }
-                        ProfileInfoRow("Region", region)
+                        ProfileInfoRow("Region", Regions.byId(region)?.displayName ?: region)
                     }
                 }
             }
@@ -207,7 +208,7 @@ fun ProfileScreen(
                     onClick = onNavigateToStatistics,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Statistika")
+                    Text("Statistics")
                 }
             }
 
@@ -216,7 +217,7 @@ fun ProfileScreen(
                     onClick = onNavigateToChangePassword,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Promeni lozinku")
+                    Text("Change password")
                 }
             }
 
@@ -229,7 +230,7 @@ fun ProfileScreen(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null)
                     Spacer(modifier = Modifier.padding(3.dp))
-                    Text("Odjava")
+                    Text("Log out")
                 }
             }
         }

@@ -75,7 +75,7 @@ fun FriendsScreen(
     fun launchScanner() {
         scanLauncher.launch(
             ScanOptions()
-                .setPrompt("Skenirajte QR kod prijatelja")
+                .setPrompt("Scan a friend's QR code")
                 .setBeepEnabled(false)
                 .setOrientationLocked(false)
         )
@@ -104,10 +104,10 @@ fun FriendsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Prijatelji") },
+                title = { Text("Friends") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Nazad")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
             )
@@ -129,13 +129,13 @@ fun FriendsScreen(
                     OutlinedTextField(
                         value = viewModel.searchQuery,
                         onValueChange = viewModel::onSearchChange,
-                        label = { Text("Pretraži korisnike") },
+                        label = { Text("Search users") },
                         singleLine = true,
                         modifier = Modifier.weight(1f),
                     )
                     Spacer(Modifier.width(8.dp))
                     OutlinedButton(onClick = ::onScanClick) {
-                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Skeniraj QR")
+                        Icon(Icons.Default.QrCodeScanner, contentDescription = "Scan QR")
                     }
                 }
             }
@@ -143,7 +143,7 @@ fun FriendsScreen(
             if (ui.searchResults.isNotEmpty()) {
                 item {
                     Text(
-                        "Rezultati pretrage",
+                        "Search results",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.SemiBold,
                     )
@@ -155,7 +155,7 @@ fun FriendsScreen(
 
             item {
                 Text(
-                    "Moji prijatelji (${ui.friends.size})",
+                    "My friends (${ui.friends.size})",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(top = 8.dp),
@@ -165,7 +165,7 @@ fun FriendsScreen(
             if (ui.friends.isEmpty()) {
                 item {
                     Text(
-                        "Još nemate prijatelja. Pretražite korisnike ili skenirajte QR kod.",
+                        "You have no friends yet. Search for users or scan a QR code.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -199,7 +199,7 @@ private fun SearchResultRow(user: Friend, onAdd: () -> Unit) {
             OutlinedButton(onClick = onAdd) {
                 Icon(Icons.Default.PersonAdd, contentDescription = null)
                 Spacer(Modifier.width(4.dp))
-                Text("Dodaj")
+                Text("Add")
             }
         }
     }
@@ -233,7 +233,7 @@ private fun FriendCard(
                     )
                 }
                 Text(
-                    text = LEAGUE_NAMES.getOrElse(friend.leagueLevel) { "Liga ${friend.leagueLevel}" },
+                    text = LEAGUE_NAMES.getOrElse(friend.leagueLevel) { "League ${friend.leagueLevel}" },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -243,7 +243,7 @@ private fun FriendCard(
                     Text("${friend.stars}", style = MaterialTheme.typography.bodySmall)
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        if (friend.monthlyRank > 0) "Mesečni rang: #${friend.monthlyRank}" else "Nerangiran",
+                        if (friend.monthlyRank > 0) "Monthly rank: #${friend.monthlyRank}" else "Unranked",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -253,10 +253,10 @@ private fun FriendCard(
                 Button(onClick = onPlay, enabled = friend.isPlayable) {
                     Icon(Icons.Default.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
-                    Text(if (friend.inMatch) "U igri" else if (!friend.sessionActive) "Offline" else "Igraj")
+                    Text(if (friend.inMatch) "In game" else if (!friend.sessionActive) "Offline" else "Play")
                 }
                 IconButton(onClick = onRemove) {
-                    Icon(Icons.Default.Delete, contentDescription = "Ukloni", tint = MaterialTheme.colorScheme.error)
+                    Icon(Icons.Default.Delete, contentDescription = "Remove", tint = MaterialTheme.colorScheme.error)
                 }
             }
         }

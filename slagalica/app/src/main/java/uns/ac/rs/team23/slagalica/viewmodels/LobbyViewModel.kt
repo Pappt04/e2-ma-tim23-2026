@@ -195,7 +195,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                 .onSuccess { match ->
                     when (match.status) {
                         "INVITE_SENT" -> {
-                            _state.value = LobbyState.InviteSent(match.id, match.player2Username ?: "Prijatelj")
+                            _state.value = LobbyState.InviteSent(match.id, match.player2Username ?: "Friend")
                             startInviteAcceptPolling(match.id)
                         }
                         "IN_PROGRESS" -> onMatchFound(match)
@@ -223,7 +223,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
             if (_state.value is LobbyState.InviteSent) {
                 matchRepository.cancelInvite(inviteId)
                 MatchStore.clear()
-                _state.value = LobbyState.Error("Prijatelj nije prihvatio poziv.")
+                _state.value = LobbyState.Error("Your friend did not accept the invite.")
             }
         }
     }

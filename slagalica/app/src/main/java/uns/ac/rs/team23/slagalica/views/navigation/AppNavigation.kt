@@ -152,7 +152,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             val session = userSession
             val region = userProfile?.region ?: ""
             HomeScreen(
-                username = if (session is UserSession.LoggedIn) session.username else "Gost",
+                username = if (session is UserSession.LoggedIn) session.username else "Guest",
                 isRegistered = session is UserSession.LoggedIn,
                 onNavigateToPlay = { navController.navigate(Screen.Lobby.route) },
                 onLogout = authViewModel::logout,
@@ -253,7 +253,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.Lobby.route) {
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             LobbyScreen(
                 currentUsername = username,
                 onNavigateBack = { navController.popBackStack() },
@@ -266,13 +266,13 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.Game.route) {
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             val matchRepo: MatchRepository = koinInject()
             val challengeViewModel: ChallengeViewModel = koinViewModel()
             val scope = rememberCoroutineScope()
             GameScreen(
                 playerName = username,
-                opponentName = MatchStore.opponentUsername.ifBlank { "Protivnik" },
+                opponentName = MatchStore.opponentUsername.ifBlank { "Opponent" },
                 matchId = MatchStore.matchId,
                 matchRepository = matchRepo,
                 onForfeit = {
@@ -322,10 +322,10 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.KorakPoKorak.route) {
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             KorakPoKorakScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
-                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Opponent" } },
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
@@ -337,10 +337,10 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.KoZnaZna.route) {
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             KoZnaZnaScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
-                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Opponent" } },
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
@@ -352,10 +352,10 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.Spojnice.route) {
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             SpojniceScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
-                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Opponent" } },
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
@@ -367,10 +367,10 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.MojBroj.route) {
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             MojBrojScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
-                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Opponent" } },
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
@@ -382,10 +382,10 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.Skocko.route) {
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             SkockoScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
-                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Opponent" } },
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
@@ -397,10 +397,10 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.Asocijacije.route) {
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             AsocijacijeScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
-                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Opponent" } },
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
@@ -412,10 +412,10 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         }
         composable(Screen.MatchResults.route) {
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             MatchResultsScreen(
                 player1Name = MatchStore.player1Username.ifBlank { username },
-                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Protivnik" } },
+                player2Name = MatchStore.player2Username.ifBlank { MatchStore.opponentUsername.ifBlank { "Opponent" } },
                 onDone = {
                     MatchStore.clear()
                     authViewModel.refreshProfile()
@@ -428,7 +428,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         composable(Screen.Chat.route) { backStack ->
             val region = backStack.arguments?.getString("region") ?: ""
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             ChatScreen(
                 region = region,
                 username = username,
@@ -512,7 +512,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         composable(Screen.LobbyFriend.route) { backStack ->
             val friendId = backStack.arguments?.getString("friendId") ?: ""
             val session = userSession
-            val username = if (session is UserSession.LoggedIn) session.username else "Gost"
+            val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             LobbyScreen(
                 currentUsername = username,
                 friendId = friendId,
@@ -532,12 +532,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         authViewModel.leagueChange.collect { leagueEvent = it }
     }
     leagueEvent?.let { event ->
-        val leagueName = LEAGUE_NAMES.getOrElse(event.newLevel) { "Liga ${event.newLevel}" }
+        val leagueName = LEAGUE_NAMES.getOrElse(event.newLevel) { "League ${event.newLevel}" }
         AlertDialog(
             onDismissRequest = { leagueEvent = null },
-            confirmButton = { TextButton(onClick = { leagueEvent = null }) { Text("U redu") } },
-            title = { Text(if (event.promoted) "🎉 Napredovali ste!" else "📉 Pali ste u nižu ligu") },
-            text = { Text("Sada se nalazite u ligi: $leagueName") },
+            confirmButton = { TextButton(onClick = { leagueEvent = null }) { Text("OK") } },
+            title = { Text(if (event.promoted) "🎉 You were promoted!" else "📉 You were demoted") },
+            text = { Text("You are now in: $leagueName") },
         )
     }
 
@@ -546,7 +546,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         authViewModel.pendingReward.collect { rewardEvent = it }
     }
     rewardEvent?.let { event ->
-        val period = if (event.weekly) "nedeljnoj" else "mesečnoj"
+        val period = if (event.weekly) "weekly" else "monthly"
         AlertDialog(
             onDismissRequest = {
                 rewardEvent = null
@@ -558,11 +558,11 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                     authViewModel.refreshProfile()
                 }) { Text("Super!") }
             },
-            title = { Text("🎉🎟 Nagrada osvojena!") },
+            title = { Text("🎉🎟 Reward earned!") },
             text = {
                 Text(
-                    "Plasman #${event.rank} na $period rang listi donosi vam " +
-                        "${event.tokens} tokena!\n\n⭐🎊🎁",
+                    "Rank #${event.rank} on the $period leaderboard earns you " +
+                        "${event.tokens} tokens!\n\n⭐🎊🎁",
                 )
             },
         )

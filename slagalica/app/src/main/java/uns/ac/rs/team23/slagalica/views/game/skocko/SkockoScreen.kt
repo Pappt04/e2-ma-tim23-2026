@@ -118,9 +118,9 @@ fun SkockoScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Skočko", style = MaterialTheme.typography.titleMedium)
+                        Text("Skocko", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            text = "Runda ${state.currentRound}/2  ·  " +
+                            text = "Round ${state.currentRound}/2  ·  " +
                                     "$player1Name: ${state.player1Points}  " +
                                     "$player2Name: ${state.player2Points}",
                             style = MaterialTheme.typography.bodySmall,
@@ -207,25 +207,25 @@ private fun RoundIntroContent(round: Int, activeName: String, onStart: () -> Uni
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             Text(
-                text = "Runda $round od 2",
+                text = "Round $round of 2",
                 style = MaterialTheme.typography.headlineMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
             )
             Text(
-                text = "$activeName počinje rundu",
+                text = "$activeName starts the round",
                 style = MaterialTheme.typography.titleLarge,
             )
             Text(
-                text = "Pogodi kombinaciju 4 simbola u 6 pokušaja.\n" +
-                        "Simboli: Pik, Karo, Tref, Srce, Zvezda, Skočko",
+                text = "Guess the combination of 4 symbols in 6 attempts.\n" +
+                        "Symbols: Spades, Diamonds, Clubs, Hearts, Star, Skocko",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(8.dp))
             Button(onClick = onStart, modifier = Modifier.fillMaxWidth(0.6f)) {
-                Text("Počni rundu", fontWeight = FontWeight.Bold)
+                Text("Start round", fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -256,9 +256,9 @@ private fun GameContent(
             modifier = Modifier.fillMaxWidth(),
         ) {
             Text(
-                text = if (isSteal) "Krađa: $activeName (1 pokušaj)"
-                else "Na potezu: $activeName  " +
-                        "(pokušaj ${mainAttempts.size + 1}/6)",
+                text = if (isSteal) "Steal: $activeName (1 attempt)"
+                else "Turn: $activeName  " +
+                        "(attempt ${mainAttempts.size + 1}/6)",
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold,
@@ -305,7 +305,7 @@ private fun GameContent(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
 
                 Text(
-                    text = "Krađa",
+                    text = "Steal",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.secondary,
                 )
@@ -321,7 +321,7 @@ private fun GameContent(
                 }
 
                 Text(
-                    text = "Konačno rešenje",
+                    text = "Final solution",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -343,7 +343,7 @@ private fun GameContent(
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    text = "Simboli",
+                    text = "Symbols",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -391,7 +391,7 @@ private fun RoundEndContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = "Kraj runde ${state.currentRound}",
+            text = "End of round ${state.currentRound}",
             style = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Bold,
         )
@@ -405,12 +405,12 @@ private fun RoundEndContent(
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        text = if (state.roundSolved) "✅ Pogođeno!" else "❌ Nije pogođeno",
+                        text = if (state.roundSolved) "✅ Guessed!" else "❌ Not guessed",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = if (state.roundSolved) Color(0xFF388E3C) else MaterialTheme.colorScheme.error,
                     )
-                    Text("Tačno rešenje:", style = MaterialTheme.typography.labelMedium)
+                    Text("Correct solution:", style = MaterialTheme.typography.labelMedium)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         state.solution.forEach { sym -> SymbolCell(sym) }
                     }
@@ -445,16 +445,16 @@ private fun GameOverContent(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
-            text = "Kraj igre!",
+            text = "Game over!",
             style = MaterialTheme.typography.headlineLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
         )
         ScoreCard(player1Name, state.player1Points, player2Name, state.player2Points)
         val winner = when {
-            state.player1Points > state.player2Points -> "$player1Name pobedio!"
-            state.player2Points > state.player1Points -> "$player2Name pobedio!"
-            else -> "Nerešeno!"
+            state.player1Points > state.player2Points -> "$player1Name wins!"
+            state.player2Points > state.player1Points -> "$player2Name wins!"
+            else -> "Draw!"
         }
         Text(
             text = winner,
@@ -464,7 +464,7 @@ private fun GameOverContent(
         )
         Spacer(Modifier.weight(1f))
         Button(onClick = onFinish, modifier = Modifier.fillMaxWidth(0.7f)) {
-            Text("Nazad na igru", fontWeight = FontWeight.Bold)
+            Text("Back to game", fontWeight = FontWeight.Bold)
         }
     }
 }
@@ -616,7 +616,7 @@ private fun SymbolContent(symbol: SkockoSymbol, compact: Boolean) {
         ) {
             Image(
                 painter = painterResource(id = R.drawable.ic_launcher_foreground),
-                contentDescription = "Skočko",
+                contentDescription = "Skocko",
                 modifier = Modifier.fillMaxSize(),
             )
         }

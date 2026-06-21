@@ -64,9 +64,9 @@ fun AsocijacijeScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Asocijacije", style = MaterialTheme.typography.titleMedium)
+                        Text("Associations", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            text = "Runda ${state.currentRound}/2  ·  " +
+                            text = "Round ${state.currentRound}/2  ·  " +
                                     "$player1Name: ${state.player1Points}  " +
                                     "$player2Name: ${state.player2Points}",
                             style = MaterialTheme.typography.bodySmall,
@@ -163,23 +163,23 @@ private fun RoundIntroContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    text = "Runda $round",
+                    text = "Round $round",
                     style = MaterialTheme.typography.displaySmall,
                     fontWeight = FontWeight.Bold,
                 )
                 Text(
-                    text = "Asocijacije",
+                    text = "Associations",
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 HorizontalDivider()
                 Text(
-                    text = "$activeName počinje rundu",
+                    text = "$activeName starts the round",
                     style = MaterialTheme.typography.bodyLarge,
                     textAlign = TextAlign.Center,
                 )
                 Text(
-                    text = "Maks. 30 bodova · 2 minuta",
+                    text = "Max 30 points · 2 minutes",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
@@ -188,7 +188,7 @@ private fun RoundIntroContent(
                     onClick = onStart,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Počni rundu $round")
+                    Text("Start round $round")
                 }
             }
         }
@@ -242,7 +242,7 @@ private fun PlayingContent(
         ) {
             Text(
                 text = if (canGuessNow)
-                    "$activeName pogađa..."
+                    "$activeName is guessing..."
                 else
                     "$activeName otkriva polje",
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -275,8 +275,8 @@ private fun PlayingContent(
                 AssocCell(
                     text = when {
                         state.isFinalSolved -> state.finalAnswer
-                        finalSelected -> state.guessInput.ifBlank { "RESENJE" }
-                        else -> "RESENJE"
+                        finalSelected -> state.guessInput.ifBlank { "SOLUTION" }
+                        else -> "SOLUTION"
                     },
                     backgroundColor = when {
                         finalWrong -> MaterialTheme.colorScheme.error
@@ -305,7 +305,7 @@ private fun PlayingContent(
                         containerColor = MaterialTheme.colorScheme.error,
                     ),
                     modifier = Modifier.height(56.dp),
-                ) { Text("Dalje") }
+                ) { Text("Pass") }
             }
 
             PairAnswerRow(state = state, leftCol = 2, rightCol = 3, onSelectTarget = onSelectTarget)
@@ -316,8 +316,8 @@ private fun PlayingContent(
         // Visible input bar — shown only when the local player can type a guess.
         if (state.selectedGuessTarget != null && canGuessNow) {
             val targetLabel = when (val target = state.selectedGuessTarget) {
-                is GuessTarget.Column -> "kolonu ${('A'.code + target.index).toChar()}"
-                else -> "finalno rešenje"
+                is GuessTarget.Column -> "column ${('A'.code + target.index).toChar()}"
+                else -> "final solution"
             }
             Row(
                 modifier = Modifier
@@ -329,7 +329,7 @@ private fun PlayingContent(
                 OutlinedTextField(
                     value = state.guessInput,
                     onValueChange = onGuessChange,
-                    label = { Text("Pogađaš $targetLabel") },
+                    label = { Text("Guessing $targetLabel") },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { onSubmit() }),
@@ -341,7 +341,7 @@ private fun PlayingContent(
                     onClick = onSubmit,
                     enabled = state.guessInput.isNotBlank(),
                     modifier = Modifier.height(56.dp),
-                ) { Text("Potvrdi") }
+                ) { Text("Submit") }
             }
         }
     }
@@ -488,13 +488,13 @@ private fun RoundEndContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    "Runda ${state.currentRound} završena!",
+                    "Round ${state.currentRound} finished!",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                 )
                 HorizontalDivider()
                 Text(
-                    text = "Finalno rešenje: ${state.finalAnswer}",
+                    text = "Final solution: ${state.finalAnswer}",
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary,
                     fontWeight = FontWeight.Bold,
@@ -541,13 +541,13 @@ private fun GameOverContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
                 Text(
-                    text = "Kraj igre!",
+                    text = "Game over!",
                     style = MaterialTheme.typography.headlineLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Text(
-                    text = if (winner != null) "🏆 Pobednik: $winner" else "🤝 Nerešeno!",
+                    text = if (winner != null) "🏆 Winner: $winner" else "🤝 Draw!",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                 )
@@ -563,7 +563,7 @@ private fun GameOverContent(
                     onClick = onFinish,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text("Nazad na igre")
+                    Text("Back to games")
                 }
             }
         }
@@ -581,6 +581,6 @@ private fun ScoreColumn(name: String, points: Int) {
             style = MaterialTheme.typography.headlineSmall,
             fontWeight = FontWeight.Bold,
         )
-        Text("bodova", style = MaterialTheme.typography.labelSmall)
+        Text("points", style = MaterialTheme.typography.labelSmall)
     }
 }

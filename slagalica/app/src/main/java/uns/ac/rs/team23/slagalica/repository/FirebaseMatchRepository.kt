@@ -33,7 +33,7 @@ class FirebaseMatchRepository(
 
     override suspend fun startRandomMatch(friendly: Boolean): Result<MatchResponseDto> =
         runCatching {
-            val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+            val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
             val userDoc = firestore.collection("users").document(uid).get().await()
             val username = userDoc.getString("username") ?: ""
 
@@ -83,7 +83,7 @@ class FirebaseMatchRepository(
         }
 
     override suspend fun startSoloMatch(): Result<MatchResponseDto> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         val userDoc = firestore.collection("users").document(uid).get().await()
         val username = userDoc.getString("username") ?: ""
 
@@ -93,7 +93,7 @@ class FirebaseMatchRepository(
                 "player1Id" to uid,
                 "player1Username" to username,
                 "player2Id" to null,
-                "player2Username" to "Izazov",
+                "player2Username" to "Challenge",
                 "status" to "IN_PROGRESS",
                 "isFriendly" to true,
                 "currentGameIndex" to 0,
@@ -110,7 +110,7 @@ class FirebaseMatchRepository(
             player1Id = uid,
             player1Username = username,
             player2Id = null,
-            player2Username = "Izazov",
+            player2Username = "Challenge",
             status = "IN_PROGRESS",
             isFriendly = true,
             currentGameIndex = 0,
@@ -180,7 +180,7 @@ class FirebaseMatchRepository(
     }
 
     override suspend fun getCurrentMatch(): Result<MatchResponseDto?> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
 
         val snap1 = firestore.collection("matches")
             .whereEqualTo("player1Id", uid)
@@ -203,7 +203,7 @@ class FirebaseMatchRepository(
 
     override suspend fun submitScore(matchId: String, score: Int): Result<MatchResponseDto> =
         runCatching {
-            val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+            val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
             val matchRef = firestore.collection("matches").document(matchId)
 
             firestore.runTransaction { tx ->
@@ -290,7 +290,7 @@ class FirebaseMatchRepository(
         }
 
     override suspend fun abandonMatch(matchId: String): Result<MatchResponseDto> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         val matchRef = firestore.collection("matches").document(matchId)
         val usersCol = firestore.collection("users")
 
@@ -335,11 +335,11 @@ class FirebaseMatchRepository(
         friendId: String,
         friendly: Boolean,
     ): Result<MatchResponseDto> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         val userDoc = firestore.collection("users").document(uid).get().await()
         val username = userDoc.getString("username") ?: ""
         val friendDoc = firestore.collection("users").document(friendId).get().await()
-        val friendUsername = friendDoc.getString("username") ?: "Prijatelj"
+        val friendUsername = friendDoc.getString("username") ?: "Friend"
 
         val inviteRef = firestore.collection("matchInvites").document()
         val inviteId = inviteRef.id
@@ -360,8 +360,8 @@ class FirebaseMatchRepository(
             friendId,
             Notification(
                 id = "invite_$inviteId",
-                title = "Poziv za partiju",
-                message = "$username te poziva na ${if (friendly) "prijateljsku" else "rangiranu"} partiju",
+                title = "Match invite",
+                message = "$username invites you to a ${if (friendly) "friendly" else "ranked"} match",
                 type = NotificationType.INVITE,
                 inviteId = inviteId,
             ),
@@ -384,7 +384,7 @@ class FirebaseMatchRepository(
     }
 
     override suspend fun getPendingInvites(): Result<List<MatchInviteResponseDto>> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         val snapshot = firestore.collection("matchInvites")
             .whereEqualTo("inviteeId", uid)
             .whereEqualTo("status", "PENDING")
@@ -404,11 +404,11 @@ class FirebaseMatchRepository(
         inviteId: String,
         accept: Boolean,
     ): Result<MatchResponseDto> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         val inviteRef = firestore.collection("matchInvites").document(inviteId)
         val invite = inviteRef.get().await()
 
-        val inviterId = invite.getString("inviterId") ?: throw Exception("Neispravan poziv")
+        val inviterId = invite.getString("inviterId") ?: throw Exception("Invalid invite")
         val inviterUsername = invite.getString("inviterUsername") ?: ""
         val inviteeUsername = invite.getString("inviteeUsername") ?: ""
         val isFriendly = invite.getBoolean("isFriendly") ?: false
@@ -483,7 +483,7 @@ class FirebaseMatchRepository(
     }
 
     override suspend fun markReady(matchId: String): Result<Unit> = runCatching {
-        val uid = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         val matchRef = firestore.collection("matches").document(matchId)
         val match = matchRef.get().await()
         val field = if (match.getString("player1Id") == uid) "player1Ready" else "player2Ready"
@@ -716,7 +716,7 @@ class FirebaseMatchRepository(
     private fun deductToken(tx: Transaction, userRef: DocumentReference) {
         val snap = tx.get(userRef)
         val tokens = (snap.getLong("tokens") ?: 0L).toInt()
-        if (tokens < 1) throw Exception("Nemate dovoljno žetona za rangiranu partiju")
+        if (tokens < 1) throw Exception("Not enough tokens for a ranked match")
         tx.update(userRef, "tokens", tokens - 1)
     }
 

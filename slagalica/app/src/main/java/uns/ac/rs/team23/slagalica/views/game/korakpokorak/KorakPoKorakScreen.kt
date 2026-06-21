@@ -77,7 +77,7 @@ fun KorakPoKorakScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Korak po korak", style = MaterialTheme.typography.titleMedium)
+                        Text("Step by Step", style = MaterialTheme.typography.titleMedium)
                         Text(
                             text = "Round ${state.currentRound}/2 - $player1Name: ${state.player1Points} $player2Name: ${state.player2Points}",
                             style = MaterialTheme.typography.bodySmall,

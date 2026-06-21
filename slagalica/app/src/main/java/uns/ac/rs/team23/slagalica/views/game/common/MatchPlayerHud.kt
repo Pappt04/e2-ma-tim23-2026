@@ -35,7 +35,7 @@ fun MatchPlayerHud(
     val t = profile?.tokens ?: 0
     val s = profile?.stars ?: 0
     val league = profile?.leagueLevel ?: 0
-    val leagueLabel = LEAGUE_NAMES.getOrElse(league) { "Liga $league" }
+    val leagueLabel = LEAGUE_NAMES.getOrElse(league) { "League $league" }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -48,8 +48,8 @@ fun MatchPlayerHud(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HudItem("🎟", "Tokeni", t.toString())
-            HudItem("⭐", "Zvezde", s.toString())
+            HudItem("🎟", "Tokens", t.toString())
+            HudItem("⭐", "Stars", s.toString())
             HudItem(leagueIconFor(league), leagueLabel, "")
         }
     }

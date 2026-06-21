@@ -9,12 +9,12 @@ object MatchGameOrder {
     const val MOJ_BROJ = 5
 
     val displayNames = listOf(
-        "Ko zna zna",
-        "Spojnice",
-        "Asocijacije",
-        "Skočko",
-        "Korak po korak",
-        "Moj broj",
+        "Who Knows Who",
+        "Connections",
+        "Associations",
+        "Skocko",
+        "Step by Step",
+        "My Number",
     )
 
     val firebaseTypes = listOf(

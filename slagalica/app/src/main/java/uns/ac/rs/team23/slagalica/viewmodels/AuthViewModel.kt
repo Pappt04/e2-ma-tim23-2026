@@ -117,13 +117,13 @@ class AuthViewModel(
         val oldLevel = old?.leagueLevel ?: return
         if (oldLevel == updated.leagueLevel) return
         val event = LeagueChangeEvent(oldLevel, updated.leagueLevel)
-        val leagueName = LEAGUE_NAMES.getOrElse(updated.leagueLevel) { "Liga ${updated.leagueLevel}" }
+        val leagueName = LEAGUE_NAMES.getOrElse(updated.leagueLevel) { "League ${updated.leagueLevel}" }
         viewModelScope.launch {
             notificationRepository.saveNotification(
                 Notification(
                     id = "league_${updated.leagueLevel}_${System.currentTimeMillis()}",
-                    title = if (event.promoted) "Napredovali ste u ligi!" else "Pali ste u nižu ligu",
-                    message = "Sada se nalazite u ligi: $leagueName",
+                    title = if (event.promoted) "You were promoted!" else "You were demoted",
+                    message = "You are now in: $leagueName",
                     type = NotificationType.RANKING,
                     suppressPush = true,
                 )
@@ -147,7 +147,7 @@ class AuthViewModel(
 
     fun login() {
         if (loginEmailOrUsername.isBlank() || loginPassword.isBlank()) {
-            _loginState.value = AuthState.Error("Popunite sva polja")
+            _loginState.value = AuthState.Error("Fill in all fields")
             return
         }
         _loginState.value = AuthState.Loading
@@ -160,7 +160,7 @@ class AuthViewModel(
                     FirebaseAuth.getInstance().currentUser?.uid?.let { clientDbListeners.start(it) }
                     _loginState.value = AuthState.Success
                 }
-                .onFailure { _loginState.value = AuthState.Error(it.message ?: "Greška pri logovanju") }
+                .onFailure { _loginState.value = AuthState.Error(it.message ?: "Login error") }
         }
     }
 
@@ -192,22 +192,22 @@ class AuthViewModel(
         if (registerEmail.isBlank() || registerUsername.isBlank() ||
             registerRegion.isBlank() || registerPassword.isBlank()
         ) {
-            _registerState.value = AuthState.Error("Popunite sva polja")
+            _registerState.value = AuthState.Error("Fill in all fields")
             return
         }
         if (registerPassword != registerConfirmPassword) {
-            _registerState.value = AuthState.Error("Lozinke se ne podudaraju")
+            _registerState.value = AuthState.Error("Passwords do not match")
             return
         }
         if (registerPassword.length < 6) {
-            _registerState.value = AuthState.Error("Lozinka mora imati najmanje 6 znakova")
+            _registerState.value = AuthState.Error("Password must be at least 6 characters")
             return
         }
         _registerState.value = AuthState.Loading
         viewModelScope.launch {
             authRepository.register(registerEmail.trim(), registerUsername.trim(), registerRegion, registerPassword)
                 .onSuccess { _registerState.value = AuthState.Success }
-                .onFailure { _registerState.value = AuthState.Error(it.message ?: "Greška pri registraciji") }
+                .onFailure { _registerState.value = AuthState.Error(it.message ?: "Registration error") }
         }
     }
 
@@ -225,14 +225,14 @@ class AuthViewModel(
 
     fun sendPasswordReset() {
         if (forgotEmail.isBlank()) {
-            _forgotState.value = AuthState.Error("Unesite email adresu")
+            _forgotState.value = AuthState.Error("Enter your email address")
             return
         }
         _forgotState.value = AuthState.Loading
         viewModelScope.launch {
             authRepository.sendPasswordResetEmail(forgotEmail.trim())
                 .onSuccess { _forgotState.value = AuthState.Success }
-                .onFailure { _forgotState.value = AuthState.Error(it.message ?: "Greška") }
+                .onFailure { _forgotState.value = AuthState.Error(it.message ?: "Error") }
         }
     }
 
@@ -260,22 +260,22 @@ class AuthViewModel(
     fun changePassword() {
         val session = _userSession.value as? UserSession.LoggedIn ?: return
         if (changeOldPassword.isBlank() || changeNewPassword.isBlank()) {
-            _changePasswordState.value = AuthState.Error("Popunite sva polja")
+            _changePasswordState.value = AuthState.Error("Fill in all fields")
             return
         }
         if (changeNewPassword != changeConfirmNewPassword) {
-            _changePasswordState.value = AuthState.Error("Nove lozinke se ne podudaraju")
+            _changePasswordState.value = AuthState.Error("New passwords do not match")
             return
         }
         if (changeNewPassword.length < 6) {
-            _changePasswordState.value = AuthState.Error("Nova lozinka mora imati najmanje 6 znakova")
+            _changePasswordState.value = AuthState.Error("New password must be at least 6 characters")
             return
         }
         _changePasswordState.value = AuthState.Loading
         viewModelScope.launch {
             authRepository.changePassword(session.username, changeOldPassword, changeNewPassword)
                 .onSuccess { _changePasswordState.value = AuthState.Success }
-                .onFailure { _changePasswordState.value = AuthState.Error(it.message ?: "Greška") }
+                .onFailure { _changePasswordState.value = AuthState.Error(it.message ?: "Error") }
         }
     }
 

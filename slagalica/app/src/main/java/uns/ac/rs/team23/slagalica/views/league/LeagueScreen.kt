@@ -43,10 +43,10 @@ fun LeagueScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Lige") },
+                title = { Text("Leagues") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Nazad")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
             )
@@ -64,7 +64,7 @@ fun LeagueScreen(
             }
             item {
                 Text(
-                    "Sve lige",
+                    "All leagues",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -106,13 +106,13 @@ private fun CurrentLeagueHeader(leagueLevel: Int, stars: Int) {
                 style = MaterialTheme.typography.displaySmall,
             )
             Text(
-                LEAGUE_NAMES.getOrElse(leagueLevel) { "Liga $leagueLevel" },
+                LEAGUE_NAMES.getOrElse(leagueLevel) { "League $leagueLevel" },
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             Text(
-                "⭐ $stars zvezda",
+                "⭐ $stars stars",
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
             )
             LinearProgressIndicator(
@@ -123,9 +123,9 @@ private fun CurrentLeagueHeader(leagueLevel: Int, stars: Int) {
             )
             Text(
                 text = if (nextThreshold == null) {
-                    "Najviša liga dostignuta!"
+                    "Highest league reached!"
                 } else {
-                    "Još ${nextThreshold - stars} zvezda do sledeće lige"
+                    "${nextThreshold - stars} more stars until the next league"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -164,19 +164,19 @@ private fun LeagueRow(
                     fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
                 )
                 Text(
-                    "Potrebno: ⭐ $threshold",
+                    "Required: ⭐ $threshold",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "Benefit: +$dailyTokens tokena dnevno",
+                    "Benefit: +$dailyTokens tokens daily",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             if (isCurrent) {
                 Text(
-                    "TRENUTNA",
+                    "CURRENT",
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary,

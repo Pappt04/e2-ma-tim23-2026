@@ -73,7 +73,7 @@ fun KoZnaZnaScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text("Ko zna zna", style = MaterialTheme.typography.titleMedium)
+                        Text("Who Knows Who", style = MaterialTheme.typography.titleMedium)
                         Text(
                             text = "$player1Name: ${state.player1Points}   $player2Name: ${state.player2Points}",
                             style = MaterialTheme.typography.bodySmall,

@@ -47,13 +47,13 @@ class SlagalicaFcmService : FirebaseMessagingService() {
         val manager = getSystemService(NotificationManager::class.java)
         listOf(
             NotificationChannel(CHANNEL_CHAT, "Chat", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Obaveštenja u četu" },
-            NotificationChannel(CHANNEL_RANKING, "Rangiranje", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Obaveštenja o rangiranju" },
-            NotificationChannel(CHANNEL_REWARD, "Nagrade", NotificationManager.IMPORTANCE_HIGH)
-                .apply { description = "Obaveštenja o nagradama" },
-            NotificationChannel(CHANNEL_OTHER, "Ostalo", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Pozivi za prijatelje i ostala obaveštenja" },
+                .apply { description = "Chat notifications" },
+            NotificationChannel(CHANNEL_RANKING, "Ranking", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Ranking notifications" },
+            NotificationChannel(CHANNEL_REWARD, "Rewards", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "Reward notifications" },
+            NotificationChannel(CHANNEL_OTHER, "Other", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Friend invites and other notifications" },
         ).forEach { manager.createNotificationChannel(it) }
     }
 

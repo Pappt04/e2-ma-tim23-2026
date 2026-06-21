@@ -66,10 +66,10 @@ class FriendsViewModel(
         viewModelScope.launch {
             friendRepository.addFriendByUid(uid)
                 .onSuccess {
-                    _ui.update { it.copy(info = "Prijatelj dodat") }
+                    _ui.update { it.copy(info = "Friend added") }
                     onSearchChange(searchQuery)
                 }
-                .onFailure { e -> _ui.update { it.copy(info = e.message ?: "Greška") } }
+                .onFailure { e -> _ui.update { it.copy(info = e.message ?: "Error") } }
         }
     }
 
@@ -77,8 +77,8 @@ class FriendsViewModel(
     fun addFriendByUsername(username: String) {
         viewModelScope.launch {
             friendRepository.addFriendByUsername(username)
-                .onSuccess { _ui.update { it.copy(info = "Prijatelj dodat: $username") } }
-                .onFailure { e -> _ui.update { it.copy(info = e.message ?: "Greška") } }
+                .onSuccess { _ui.update { it.copy(info = "Friend added: $username") } }
+                .onFailure { e -> _ui.update { it.copy(info = e.message ?: "Error") } }
         }
     }
 

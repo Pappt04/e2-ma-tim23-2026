@@ -16,12 +16,12 @@ data class UserProfile(
 )
 
 val LEAGUE_NAMES = listOf(
-    "Nulta liga",
-    "Prva liga",
-    "Druga liga",
-    "Treća liga",
-    "Četvrta liga",
-    "Peta liga",
+    "League Zero",
+    "First League",
+    "Second League",
+    "Third League",
+    "Fourth League",
+    "Fifth League",
 )
 
 val LEAGUE_ICONS = listOf("🐣", "🥉", "🥈", "🥇", "💎", "👑")

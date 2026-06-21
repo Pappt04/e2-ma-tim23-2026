@@ -31,10 +31,10 @@ fun LeaderboardScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Rang lista") },
+                title = { Text("Leaderboard") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Nazad")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
             )
@@ -49,12 +49,12 @@ fun LeaderboardScreen(
                 Tab(
                     selected = ui.period == LeaderboardPeriod.WEEKLY,
                     onClick = { viewModel.setPeriod(LeaderboardPeriod.WEEKLY) },
-                    text = { Text("Nedeljna") },
+                    text = { Text("Weekly") },
                 )
                 Tab(
                     selected = ui.period == LeaderboardPeriod.MONTHLY,
                     onClick = { viewModel.setPeriod(LeaderboardPeriod.MONTHLY) },
-                    text = { Text("Mesečna") },
+                    text = { Text("Monthly") },
                 )
             }
 
@@ -81,7 +81,7 @@ fun LeaderboardScreen(
                 ui.entries.isEmpty() -> {
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
-                            "Niko još nije odigrao partiju u ovom ciklusu.",
+                            "No one has played a match in this cycle yet.",
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(24.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,

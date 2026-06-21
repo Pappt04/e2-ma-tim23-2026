@@ -19,13 +19,13 @@ object LocalNotificationDispatcher {
         val manager = context.getSystemService(NotificationManager::class.java)
         listOf(
             NotificationChannel(SlagalicaFcmService.CHANNEL_CHAT, "Chat", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Obaveštenja u četu" },
-            NotificationChannel(SlagalicaFcmService.CHANNEL_RANKING, "Rangiranje", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Obaveštenja o rangiranju" },
-            NotificationChannel(SlagalicaFcmService.CHANNEL_REWARD, "Nagrade", NotificationManager.IMPORTANCE_HIGH)
-                .apply { description = "Obaveštenja o nagradama" },
-            NotificationChannel(SlagalicaFcmService.CHANNEL_OTHER, "Ostalo", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Pozivi za prijatelje i ostala obaveštenja" },
+                .apply { description = "Chat notifications" },
+            NotificationChannel(SlagalicaFcmService.CHANNEL_RANKING, "Ranking", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Ranking notifications" },
+            NotificationChannel(SlagalicaFcmService.CHANNEL_REWARD, "Rewards", NotificationManager.IMPORTANCE_HIGH)
+                .apply { description = "Reward notifications" },
+            NotificationChannel(SlagalicaFcmService.CHANNEL_OTHER, "Other", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Friend invites and other notifications" },
         ).forEach { manager.createNotificationChannel(it) }
     }
 

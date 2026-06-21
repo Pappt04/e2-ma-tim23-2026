@@ -33,7 +33,7 @@ class StatisticsViewModel(
                 .onSuccess { _uiState.value = StatisticsUiState.Success(it) }
                 .onFailure {
                     _uiState.value = StatisticsUiState.Error(
-                        it.message ?: "Greška pri učitavanju statistike",
+                        it.message ?: "Failed to load statistics",
                     )
                 }
         }

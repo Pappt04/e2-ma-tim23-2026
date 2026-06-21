@@ -113,10 +113,10 @@ fun RegionMapScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Regioni") },
+                title = { Text("Regions") },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Nazad")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
             )
@@ -125,7 +125,7 @@ fun RegionMapScreen(
             ExtendedFloatingActionButton(
                 onClick = onNavigateToChallenge,
                 icon = { Icon(Icons.Default.SportsEsports, contentDescription = null) },
-                text = { Text("Izazov") },
+                text = { Text("Challenge") },
             )
         },
     ) { innerPadding ->
@@ -157,14 +157,14 @@ fun RegionMapScreen(
             ) {
                 item {
                     Text(
-                        "Mesečna rang lista regiona",
+                        "Monthly regional leaderboard",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                     )
                 }
                 item {
                     Text(
-                        "Broj zvezda osvojenih u tekućem mesečnom ciklusu (resetuje se na kraju ciklusa).",
+                        "Stars earned in the current monthly cycle (resets at the end of the cycle).",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -187,15 +187,15 @@ fun RegionMapScreen(
         val info = Regions.byId(stats.regionId)
         AlertDialog(
             onDismissRequest = viewModel::clearSelection,
-            confirmButton = { TextButton(onClick = viewModel::clearSelection) { Text("Zatvori") } },
+            confirmButton = { TextButton(onClick = viewModel::clearSelection) { Text("Close") } },
             title = { Text("${info?.icon ?: ""} ${info?.displayName ?: stats.regionId}") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    StatLine("Osvojenih prvih mesta", stats.firsts)
-                    StatLine("Osvojenih drugih mesta", stats.seconds)
-                    StatLine("Osvojenih trećih mesta", stats.thirds)
-                    StatLine("Trenutno aktivnih igrača", stats.activePlayers)
-                    StatLine("Ukupno registrovanih igrača", stats.totalPlayers)
+                    StatLine("First-place wins", stats.firsts)
+                    StatLine("Second-place wins", stats.seconds)
+                    StatLine("Third-place wins", stats.thirds)
+                    StatLine("Currently active players", stats.activePlayers)
+                    StatLine("Total registered players", stats.totalPlayers)
                 }
             },
         )
@@ -245,13 +245,13 @@ private fun RegionRow(
                     }
                     if (isMyRegion) {
                         Text(
-                            "  (vaš region)",
+                            "  (your region)",
                             style = MaterialTheme.typography.labelSmall,
                         )
                     }
                 }
                 Text(
-                    "${standing.playerCount} igrača",
+                    "${standing.playerCount} players",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

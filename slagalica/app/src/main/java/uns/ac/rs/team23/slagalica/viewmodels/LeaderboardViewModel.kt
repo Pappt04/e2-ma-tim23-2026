@@ -71,5 +71,5 @@ class LeaderboardViewModel(
     }
 
     fun leagueName(level: Int): String =
-        LEAGUE_NAMES.getOrElse(level) { "Liga $level" }
+        LEAGUE_NAMES.getOrElse(level) { "League $level" }
 }

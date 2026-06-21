@@ -23,7 +23,7 @@ class FirebaseFriendRepository(
         firestore.collection("users").document(uid).collection("friends")
 
     override suspend fun searchUsers(prefix: String): Result<List<Friend>> = runCatching {
-        val me = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val me = auth.currentUser?.uid ?: throw Exception("Not logged in")
         if (prefix.isBlank()) return@runCatching emptyList()
 
         val existingFriends = friendsCol(me).get().await().documents.map { it.id }.toSet()
@@ -44,17 +44,17 @@ class FirebaseFriendRepository(
 
     override suspend fun addFriendByUsername(username: String): Result<Unit> = runCatching {
         val doc = firestore.collection("usernames").document(username).get().await()
-        val uid = doc.getString("uid") ?: throw Exception("Korisnik nije pronađen")
+        val uid = doc.getString("uid") ?: throw Exception("User not found")
         addFriendByUid(uid).getOrThrow()
     }
 
     override suspend fun addFriendByUid(uid: String): Result<Unit> = runCatching {
-        val me = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
-        if (uid == me) throw Exception("Ne možete dodati sebe")
+        val me = auth.currentUser?.uid ?: throw Exception("Not logged in")
+        if (uid == me) throw Exception("You cannot add yourself")
 
         val meDoc = firestore.collection("users").document(me).get().await()
         val friendDoc = firestore.collection("users").document(uid).get().await()
-        if (!friendDoc.exists()) throw Exception("Korisnik nije pronađen")
+        if (!friendDoc.exists()) throw Exception("User not found")
 
         val now = FieldValue.serverTimestamp()
         firestore.runBatch { batch ->
@@ -70,7 +70,7 @@ class FirebaseFriendRepository(
     }
 
     override suspend fun removeFriend(uid: String): Result<Unit> = runCatching {
-        val me = auth.currentUser?.uid ?: throw Exception("Nije prijavljen")
+        val me = auth.currentUser?.uid ?: throw Exception("Not logged in")
         firestore.runBatch { batch ->
             batch.delete(friendsCol(me).document(uid))
             batch.delete(friendsCol(uid).document(me))
