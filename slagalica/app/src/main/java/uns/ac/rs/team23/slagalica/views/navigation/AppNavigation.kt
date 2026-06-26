@@ -26,6 +26,7 @@ import org.koin.androidx.compose.koinViewModel
 import org.koin.compose.koinInject
 import uns.ac.rs.team23.slagalica.data.ChallengeStore
 import uns.ac.rs.team23.slagalica.data.MatchStore
+import uns.ac.rs.team23.slagalica.data.TournamentStore
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 import uns.ac.rs.team23.slagalica.repository.RegionRepository
@@ -51,6 +52,8 @@ import uns.ac.rs.team23.slagalica.views.chat.ChatScreen
 import uns.ac.rs.team23.slagalica.views.challenge.ChallengeScreen
 import uns.ac.rs.team23.slagalica.views.leaderboard.LeaderboardScreen
 import uns.ac.rs.team23.slagalica.views.lobby.LobbyScreen
+import uns.ac.rs.team23.slagalica.views.tournament.TournamentScreen
+import uns.ac.rs.team23.slagalica.views.missions.DailyTasksScreen
 import uns.ac.rs.team23.slagalica.views.NotificationsScreen
 import uns.ac.rs.team23.slagalica.views.profile.ChangePasswordScreen
 import uns.ac.rs.team23.slagalica.views.profile.ProfileScreen
@@ -69,6 +72,7 @@ sealed class Screen(val route: String) {
     data object ProfileStatistics : Screen("profile_statistics")
     data object ChangePassword : Screen("change_password")
     data object Lobby : Screen("lobby")
+    data object Tournament : Screen("tournament")
     data object Game : Screen("game")
     data object KoZnaZna : Screen("ko_zna_zna")
     data object Spojnice : Screen("spojnice")
@@ -87,6 +91,7 @@ sealed class Screen(val route: String) {
     data object Region : Screen("region")
     data object League : Screen("league")
     data object Leaderboard : Screen("leaderboard")
+    data object DailyTasks : Screen("daily_tasks")
     data object LobbyFriend : Screen("lobby_friend/{friendId}") {
         fun route(friendId: String) = "lobby_friend/$friendId"
     }
@@ -155,6 +160,8 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 username = if (session is UserSession.LoggedIn) session.username else "Guest",
                 isRegistered = session is UserSession.LoggedIn,
                 onNavigateToPlay = { navController.navigate(Screen.Lobby.route) },
+                onNavigateToTournament = { navController.navigate(Screen.Tournament.route) },
+                onNavigateToDailyTasks = { navController.navigate(Screen.DailyTasks.route) },
                 onLogout = authViewModel::logout,
                 onNavigateToNotifications = { navController.navigate(Screen.Notifications.route) },
                 onNavigateToProfile = { navController.navigate(Screen.Profile.route) },
@@ -264,6 +271,28 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 },
             )
         }
+        composable(Screen.Tournament.route) {
+            val session = userSession
+            LaunchedEffect(session) {
+                if (session !is UserSession.LoggedIn) {
+                    val popped = navController.popBackStack(Screen.Home.route, inclusive = false)
+                    if (!popped) navController.navigate(Screen.Home.route) { popUpTo(0) { inclusive = true }; launchSingleTop = true }
+                }
+            }
+            if (session is UserSession.LoggedIn) {
+                TournamentScreen(
+                    onEnterMatch = { navController.navigate(Screen.Game.route) },
+                    onExitToHome = {
+                        authViewModel.refreshProfile()
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Home.route) { inclusive = true }
+                        }
+                    },
+                )
+            } else {
+                Box(Modifier.fillMaxSize())
+            }
+        }
         composable(Screen.Game.route) {
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Guest"
@@ -278,6 +307,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onForfeit = {
                     MatchStore.clear()
                     ChallengeStore.clear()
+                    TournamentStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -285,12 +315,40 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onAllGamesFinished = {
                     MatchStore.clear()
                     ChallengeStore.clear()
+                    TournamentStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
                 },
-                onMatchCompleted = {
-                    if (ChallengeStore.isActive) {
+                onMatchCompleted = { iWon ->
+                    if (TournamentStore.isActive) {
+                        val isFinal = TournamentStore.isFinalRound
+                        if (!iWon && !isFinal) {
+                            // Lost (or forfeited) a semifinal — the tournament is over for this player.
+                            // Return to the main menu; they're no longer in a match or the tournament.
+                            // NOTE: do NOT clear MatchStore here — blanking matchId makes the Game route
+                            // recompose (via refreshProfile) into a blank-match GameScreen that bails to
+                            // Home. The tournament VM's leave()/cancel() clears MatchStore.
+                            TournamentStore.clear()
+                            authViewModel.refreshProfile()
+                            navController.navigate(Screen.Home.route) {
+                                popUpTo(Screen.Home.route) { inclusive = true }
+                            }
+                        } else {
+                            // Winner advances (or it's the final — both see the result on the bracket
+                            // screen). Re-affirm which match just finished so the bracket screen can
+                            // record the winner reliably and never re-enter the completed game.
+                            TournamentStore.setCurrentMatch(
+                                MatchStore.matchId,
+                                if (isFinal) TournamentStore.ROUND_FINAL else TournamentStore.ROUND_SEMIFINAL,
+                            )
+                            authViewModel.refreshProfile()
+                            navController.navigate(Screen.Tournament.route) {
+                                popUpTo(Screen.Tournament.route) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    } else if (ChallengeStore.isActive) {
                         val challengeId = ChallengeStore.activeChallengeId
                         val matchId = MatchStore.matchId
                         val region = ChallengeStore.region
@@ -329,6 +387,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
+                    TournamentStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -344,6 +403,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
+                    TournamentStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -359,6 +419,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
+                    TournamentStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -374,6 +435,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
+                    TournamentStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -389,6 +451,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
+                    TournamentStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -404,6 +467,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 onFinish = { navController.popBackStack() },
                 onForfeit = {
                     MatchStore.clear()
+                    TournamentStore.clear()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -505,6 +569,17 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             }
             if (session is UserSession.LoggedIn) {
                 LeaderboardScreen(onNavigateBack = { navController.popBackStack() })
+            } else {
+                Box(Modifier.fillMaxSize())
+            }
+        }
+        composable(Screen.DailyTasks.route) {
+            val session = userSession
+            LaunchedEffect(session) {
+                if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
+            }
+            if (session is UserSession.LoggedIn) {
+                DailyTasksScreen(onNavigateBack = { navController.popBackStack() })
             } else {
                 Box(Modifier.fillMaxSize())
             }

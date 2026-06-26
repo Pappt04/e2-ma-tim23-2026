@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
@@ -25,6 +26,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalDrawerSheet
 import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationDrawerItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.NavigationDrawerItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -51,6 +53,8 @@ fun HomeScreen(
     username: String,
     isRegistered: Boolean,
     onNavigateToPlay: () -> Unit,
+    onNavigateToTournament: () -> Unit = {},
+    onNavigateToDailyTasks: () -> Unit = {},
     onLogout: () -> Unit,
     onNavigateToNotifications: () -> Unit,
     onNavigateToProfile: () -> Unit,
@@ -116,6 +120,28 @@ fun HomeScreen(
                     shape = RoundedCornerShape(0.dp),
                 )
                 if (isRegistered) {
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.EmojiEvents, contentDescription = null) },
+                        label = { Text("Tournament") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToTournament()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(0.dp),
+                    )
+                    NavigationDrawerItem(
+                        icon = { Icon(Icons.Default.CheckCircle, contentDescription = null) },
+                        label = { Text("Daily Tasks") },
+                        selected = false,
+                        onClick = {
+                            scope.launch { drawerState.close() }
+                            onNavigateToDailyTasks()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(0.dp),
+                    )
                     NavigationDrawerItem(
                         icon = { Icon(Icons.Default.Person, contentDescription = null) },
                         label = { Text("Profile") },
@@ -282,6 +308,17 @@ fun HomeScreen(
                     Icon(Icons.Default.PlayArrow, contentDescription = null)
                     Spacer(modifier = Modifier.padding(4.dp))
                     Text("Play")
+                }
+                if (isRegistered) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedButton(
+                        onClick = onNavigateToTournament,
+                        modifier = Modifier.fillMaxWidth(0.7f),
+                    ) {
+                        Icon(Icons.Default.EmojiEvents, contentDescription = null)
+                        Spacer(modifier = Modifier.padding(4.dp))
+                        Text("Tournament")
+                    }
                 }
                 }
             }
