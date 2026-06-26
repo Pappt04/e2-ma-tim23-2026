@@ -71,11 +71,18 @@ class ClientDbListeners(
 
     /** Incoming notification docs (chat, invites written by peers). */
     private fun attachNotificationListener(uid: String) {
+        var initialLoadDone = false
         val reg = firestore.collection("users").document(uid).collection("notifications")
             .orderBy("createdAtMillis", Query.Direction.DESCENDING)
             .limit(20)
             .addSnapshotListener { snapshot, _ ->
-                snapshot?.documentChanges?.forEach { change ->
+                if (snapshot == null) return@addSnapshotListener
+                // Skip the first emission (existing notifications) so we only push genuinely new ones.
+                if (!initialLoadDone) {
+                    initialLoadDone = true
+                    return@addSnapshotListener
+                }
+                snapshot.documentChanges.forEach { change ->
                     if (change.type != DocumentChange.Type.ADDED) return@forEach
                     val doc = change.document
                     val typeStr = doc.getString("type") ?: return@forEach

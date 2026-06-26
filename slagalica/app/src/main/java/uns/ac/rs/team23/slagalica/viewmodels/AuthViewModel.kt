@@ -125,7 +125,6 @@ class AuthViewModel(
                     title = if (event.promoted) "You were promoted!" else "You were demoted",
                     message = "You are now in: $leagueName",
                     type = NotificationType.RANKING,
-                    suppressPush = true,
                 )
             )
             _leagueChange.emit(event)

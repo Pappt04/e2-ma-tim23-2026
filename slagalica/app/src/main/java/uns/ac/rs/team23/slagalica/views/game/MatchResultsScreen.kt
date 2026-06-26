@@ -31,11 +31,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.compose.koinInject
+import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.network.dto.GameResultDto
 import uns.ac.rs.team23.slagalica.network.dto.MatchResponseDto
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
+import uns.ac.rs.team23.slagalica.viewmodels.DailyMissionViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -44,9 +46,16 @@ fun MatchResultsScreen(
     player2Name: String,
     onDone: () -> Unit,
     matchRepository: MatchRepository = koinInject(),
+    missionViewModel: DailyMissionViewModel = koinViewModel(),
 ) {
     var match by remember { mutableStateOf<MatchResponseDto?>(null) }
     var gameResults by remember { mutableStateOf<List<GameResultDto>>(emptyList()) }
+
+    // Credit the "win a match" / "play a friendly match" daily missions (spec 12).
+    LaunchedEffect(MatchStore.matchId) {
+        val id = MatchStore.matchId
+        if (id.isNotBlank()) missionViewModel.onMatchFinished(id)
+    }
 
     LaunchedEffect(MatchStore.matchId) {
         val id = MatchStore.matchId
@@ -60,11 +69,18 @@ fun MatchResultsScreen(
     }
 
     val m = match
+    // winnerId is authoritative (set on normal completion and on forfeit); only a true tie is a draw.
     val winnerText = when {
         m == null -> ""
-        m.player1TotalScore > m.player2TotalScore -> "$player1Name wins!"
-        m.player2TotalScore > m.player1TotalScore -> "$player2Name wins!"
+        m.winnerId == m.player1Id -> "$player1Name wins!"
+        m.winnerId == m.player2Id -> "$player2Name wins!"
         else -> "It's a draw!"
+    }
+    val forfeitText = when (m?.abandonedById) {
+        null -> ""
+        m?.player1Id -> "$player1Name forfeited the match."
+        m?.player2Id -> "$player2Name forfeited the match."
+        else -> ""
     }
 
     Scaffold(
@@ -112,6 +128,15 @@ fun MatchResultsScreen(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth(),
                         )
+                        if (forfeitText.isNotEmpty()) {
+                            Text(
+                                text = forfeitText,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth(),
+                            )
+                        }
                     }
                 }
 

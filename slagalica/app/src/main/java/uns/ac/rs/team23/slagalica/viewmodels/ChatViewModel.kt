@@ -10,11 +10,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import uns.ac.rs.team23.slagalica.models.DailyMissionType
 import uns.ac.rs.team23.slagalica.network.dto.ChatMessageDto
 import uns.ac.rs.team23.slagalica.repository.ChatRepository
+import uns.ac.rs.team23.slagalica.repository.DailyMissionRepository
 
 class ChatViewModel(
     private val chatRepository: ChatRepository,
+    private val dailyMissionRepository: DailyMissionRepository,
 ) : ViewModel() {
 
     private val _messages = MutableStateFlow<List<ChatMessageDto>>(emptyList())
@@ -59,6 +62,7 @@ class ChatViewModel(
         inputText = ""
         viewModelScope.launch {
             chatRepository.sendMessage(region, text)
+                .onSuccess { dailyMissionRepository.completeMission(DailyMissionType.SEND_CHAT) }
                 .onFailure { _error.value = it.message }
         }
     }
