@@ -52,7 +52,9 @@ class FirebaseChatRepository(
                 .add(data)
                 .await()
 
-            notifyRegionPeers(uid, region, username, content)
+            // Best-effort: a peer-notification failure must not fail the send (the message is
+            // already stored, and the daily "send a chat message" mission keys off this success).
+            runCatching { notifyRegionPeers(uid, region, username, content) }
 
             ChatMessageDto(
                 id = ref.id,

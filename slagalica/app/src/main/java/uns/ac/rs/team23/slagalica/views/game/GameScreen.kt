@@ -32,7 +32,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
@@ -50,7 +52,7 @@ fun GameScreen(
     matchRepository: MatchRepository? = null,
     onForfeit: () -> Unit,
     onAllGamesFinished: () -> Unit = {},
-    onMatchCompleted: () -> Unit = {},
+    onMatchCompleted: (iWon: Boolean) -> Unit = {},
     onNavigateToKoZnaZna: () -> Unit = {},
     onNavigateToSpojnice: () -> Unit = {},
     onNavigateToKorakPoKorak: () -> Unit = {},
@@ -74,9 +76,16 @@ fun GameScreen(
 
     // Drive navigation from Firebase (source of truth after advanceMatch).
     LaunchedEffect(matchId, matchRepository) {
-        if (matchId.isBlank() || matchRepository == null) {
+        if (matchRepository == null) {
+            // Preview only (no repository): play locally.
             val idx = MatchStore.currentGameIndex
             if (idx < navigators.size) navigators[idx]() else onAllGamesFinished()
+            return@LaunchedEffect
+        }
+        if (matchId.isBlank()) {
+            // No active match (e.g., stores were cleared mid-flow) — bail out instead of starting a
+            // phantom local game (the "blank Opponent / random questions" bug after a forfeit).
+            onAllGamesFinished()
             return@LaunchedEffect
         }
         matchRepository.observeMatch(matchId).collect { match ->
@@ -85,7 +94,9 @@ fun GameScreen(
                 match.status == "COMPLETED" -> {
                     if (!navigatedToResults) {
                         navigatedToResults = true
-                        onMatchCompleted()
+                        // On a tie the match has no winnerId; player1 advances (tournament tiebreak).
+                        val effectiveWinner = match.winnerId ?: match.player1Id
+                        onMatchCompleted(effectiveWinner == MatchStore.myUid)
                     }
                 }
                 match.currentGameIndex < navigators.size -> navigators[match.currentGameIndex]()
@@ -117,9 +128,15 @@ fun GameScreen(
                         showForfeitDialog = false
                         scope.launch {
                             if (matchId.isNotBlank() && matchRepository != null) {
-                                matchRepository.abandonMatch(matchId)
+                                // Completes the match (opponent wins). Non-cancellable so it finishes
+                                // even as this screen leaves composition; the match-completed observer
+                                // then routes both players to the same end screen as a normal finish.
+                                withContext(NonCancellable) {
+                                    matchRepository.abandonMatch(matchId)
+                                }
+                            } else {
+                                onForfeit()
                             }
-                            onForfeit()
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),

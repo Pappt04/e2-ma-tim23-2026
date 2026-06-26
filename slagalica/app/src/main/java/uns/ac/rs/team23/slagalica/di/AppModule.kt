@@ -14,6 +14,8 @@ import uns.ac.rs.team23.slagalica.repository.ChatRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseAuthRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseChallengeRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseChatRepository
+import uns.ac.rs.team23.slagalica.repository.DailyMissionRepository
+import uns.ac.rs.team23.slagalica.repository.FirebaseDailyMissionRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseFriendRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseGameRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseLeaderboardRepository
@@ -28,6 +30,8 @@ import uns.ac.rs.team23.slagalica.repository.MatchRepository
 import uns.ac.rs.team23.slagalica.repository.NotificationRepository
 import uns.ac.rs.team23.slagalica.repository.RegionRepository
 import uns.ac.rs.team23.slagalica.repository.StatisticsRepository
+import uns.ac.rs.team23.slagalica.repository.FirebaseTournamentRepository
+import uns.ac.rs.team23.slagalica.repository.TournamentRepository
 import uns.ac.rs.team23.slagalica.viewmodels.AsocijacijeViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.ChallengeViewModel
@@ -43,6 +47,8 @@ import uns.ac.rs.team23.slagalica.viewmodels.RegionViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.SkockoViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.StatisticsViewModel
+import uns.ac.rs.team23.slagalica.viewmodels.TournamentViewModel
+import uns.ac.rs.team23.slagalica.viewmodels.DailyMissionViewModel
 
 val AppModule = module {
     // Firebase singletons
@@ -60,6 +66,8 @@ val AppModule = module {
     single<FriendRepository> { FirebaseFriendRepository(get(), get()) }
     single<RegionRepository> { FirebaseRegionRepository(get(), get()) }
     single<LeaderboardRepository> { FirebaseLeaderboardRepository(get()) }
+    single<TournamentRepository> { FirebaseTournamentRepository(get(), get()) }
+    single<DailyMissionRepository> { FirebaseDailyMissionRepository(get(), get()) }
     single { CycleManager(get()) }
     single { ClientDbListeners(androidContext(), get(), get(), get(), get()) }
 
@@ -79,4 +87,6 @@ val AppModule = module {
     viewModel { SpojniceViewModel(get(), get()) }
     viewModel { StatisticsViewModel(get()) }
     viewModel { LeaderboardViewModel(get()) }
+    viewModel { TournamentViewModel(get(), get()) }
+    viewModel { DailyMissionViewModel(get()) }
 }

@@ -37,8 +37,11 @@ class FirebaseMatchRepository(
             val userDoc = firestore.collection("users").document(uid).get().await()
             val username = userDoc.getString("username") ?: ""
 
-            // Clean up any stale waiting match left from a previous crash/session
+            // Clean up stale matches left from a previous crash/session so a new search can't
+            // re-surface them (a leftover IN_PROGRESS match still carries old ready flags, which
+            // made the lobby show "opponent ready" instantly against a phantom opponent).
             cancelQueue()
+            cleanupStaleInProgressMatches(uid)
 
             // Try to claim an existing waiting match (query only by status to avoid composite index)
             val joined = joinWaitingMatch(uid, username, friendly)
@@ -297,27 +300,45 @@ class FirebaseMatchRepository(
         firestore.runTransaction { tx ->
             val match = tx.get(matchRef)
             if (match.getString("status") != "IN_PROGRESS") return@runTransaction
+            if (match.getString("abandonedById") != null) return@runTransaction
 
-            val existingAbandon = match.getString("abandonedById")
-            if (existingAbandon != null) return@runTransaction
+            // The player who left loses; the one who stayed wins immediately — the match ends
+            // right here instead of continuing solo (avoids the inter-game wait for an absent player).
+            val p1Id = match.getString("player1Id")
+            val p2Id = match.getString("player2Id")
+            val winnerId = if (uid == p1Id) p2Id else p1Id
+            val isFriendly = match.getBoolean("isFriendly") ?: false
+
+            // Pre-read both players (reads before writes) for the forced-winner star award (ranked only).
+            val p1Ref = p1Id?.let { usersCol.document(it) }
+            val p2Ref = p2Id?.let { usersCol.document(it) }
+            val p1Snap = if (!isFriendly && p1Ref != null) tx.get(p1Ref) else null
+            val p2Snap = if (!isFriendly && p2Ref != null) tx.get(p2Ref) else null
+
+            val p1Total = (match.getLong("player1TotalScore") ?: 0L).toInt()
+            val p2Total = (match.getLong("player2TotalScore") ?: 0L).toInt()
 
             tx.update(
                 matchRef,
-                mapOf("abandonedById" to uid),
+                mapOf(
+                    "abandonedById" to uid,
+                    "status" to "COMPLETED",
+                    "winnerId" to winnerId,
+                    "completedAt" to FieldValue.serverTimestamp(),
+                ),
             )
             tx.update(usersCol.document(uid), mapOf("inMatch" to false))
+
+            // Tournament matches (isFriendly = true) get their rewards from the tournament flow.
+            if (p1Snap != null && p2Snap != null && p1Ref != null && p2Ref != null) {
+                awardStarsForcedWinner(
+                    tx, p1Ref, p1Snap, p2Ref, p2Snap, p1Total, p2Total,
+                    winnerIsP1 = winnerId == p1Id,
+                )
+            }
         }.await()
 
-        val matchSnap = matchRef.get().await()
-        val gameType = matchSnap.getString("currentGameType")
-        if (gameType != null) {
-            firestore.collection("matches").document(matchId)
-                .collection("gameState").document(gameType)
-                .set(mapOf("opponentAbandoned" to true), SetOptions.merge())
-                .await()
-        }
-
-        matchSnap.toMatchResponseDto()
+        matchRef.get().await().toMatchResponseDto()
     }
 
     override suspend fun cancelQueue(): Result<Unit> = runCatching {
@@ -329,6 +350,28 @@ class FirebaseMatchRepository(
             .get()
             .await()
         snap.documents.firstOrNull()?.reference?.delete()?.await()
+    }
+
+    /**
+     * Delete the user's leftover IN_PROGRESS regular matches (force-quit/crash debris) before a new
+     * search. Safe because the lobby is only reachable when not inside a live match; tournament
+     * matches are skipped (their lifecycle is owned by the tournament flow).
+     */
+    private suspend fun cleanupStaleInProgressMatches(uid: String) {
+        val refs = mutableListOf<DocumentReference>()
+        firestore.collection("matches")
+            .whereEqualTo("player1Id", uid)
+            .whereEqualTo("status", "IN_PROGRESS")
+            .get().await().documents
+            .filter { it.getString("tournamentId") == null }
+            .forEach { refs.add(it.reference) }
+        firestore.collection("matches")
+            .whereEqualTo("player2Id", uid)
+            .whereEqualTo("status", "IN_PROGRESS")
+            .get().await().documents
+            .filter { it.getString("tournamentId") == null }
+            .forEach { refs.add(it.reference) }
+        refs.forEach { ref -> runCatching { ref.delete().await() } }
     }
 
     override suspend fun sendFriendInvite(
