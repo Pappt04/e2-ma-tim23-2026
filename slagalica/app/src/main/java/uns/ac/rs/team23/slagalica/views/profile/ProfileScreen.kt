@@ -39,15 +39,19 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import kotlinx.coroutines.flow.SharedFlow
 import uns.ac.rs.team23.slagalica.models.Regions
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.models.leagueIconFor
 import uns.ac.rs.team23.slagalica.utils.QrGenerator
 import uns.ac.rs.team23.slagalica.views.common.AvatarWithFrame
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -74,6 +78,7 @@ fun ProfileScreen(
     onAvatarChange: (Int) -> Unit = {},
     onProfilePicturePicked: (Uri) -> Unit = {},
     onClearProfilePicture: () -> Unit = {},
+    profilePictureMessages: SharedFlow<String>? = null,
     onNavigateBack: () -> Unit,
     onNavigateToStatistics: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
@@ -83,8 +88,13 @@ fun ProfileScreen(
     val pickPhoto = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia(),
     ) { uri -> if (uri != null) onProfilePicturePicked(uri) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(profilePictureMessages) {
+        profilePictureMessages?.collect { msg -> snackbarHostState.showSnackbar(msg) }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("User Profile") },

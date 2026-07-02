@@ -4,9 +4,11 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.util.Base64
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageMetadata
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
@@ -27,9 +29,8 @@ class FirebaseProfileRepository(
     override suspend fun uploadProfilePicture(imageUri: Uri): Result<String> = runCatching {
         val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         val jpeg = withContext(Dispatchers.IO) { compressToJpeg(imageUri) }
-        val ref = storage.reference.child("profilePictures/$uid.jpg")
-        ref.putBytes(jpeg).await()
-        val url = ref.downloadUrl.await().toString()
+
+        val url = uploadToStorage(uid, jpeg) ?: jpegToDataUrl(jpeg)
         firestore.collection("users").document(uid)
             .update("profilePictureUrl", url)
             .await()
@@ -42,6 +43,23 @@ class FirebaseProfileRepository(
         firestore.collection("users").document(uid)
             .update("profilePictureUrl", "")
             .await()
+    }
+
+    /** Returns a download URL, or null when Storage is unavailable / rules not deployed. */
+    private suspend fun uploadToStorage(uid: String, jpeg: ByteArray): String? = try {
+        val ref = storage.reference.child("profilePictures/$uid.jpg")
+        val metadata = StorageMetadata.Builder()
+            .setContentType("image/jpeg")
+            .build()
+        ref.putBytes(jpeg, metadata).await()
+        ref.downloadUrl.await().toString()
+    } catch (_: Exception) {
+        null
+    }
+
+    private fun jpegToDataUrl(jpeg: ByteArray): String {
+        val b64 = Base64.encodeToString(jpeg, Base64.NO_WRAP)
+        return "data:image/jpeg;base64,$b64"
     }
 
     private fun compressToJpeg(uri: Uri): ByteArray {

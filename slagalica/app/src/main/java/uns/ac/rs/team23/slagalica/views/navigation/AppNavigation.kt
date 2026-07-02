@@ -216,6 +216,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                     onAvatarChange = authViewModel::updateAvatar,
                     onProfilePicturePicked = authViewModel::uploadProfilePicture,
                     onClearProfilePicture = authViewModel::clearProfilePicture,
+                    profilePictureMessages = authViewModel.profilePictureMessage,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToStatistics = { navController.navigate(Screen.ProfileStatistics.route) },
                     onNavigateToChangePassword = { navController.navigate(Screen.ChangePassword.route) },

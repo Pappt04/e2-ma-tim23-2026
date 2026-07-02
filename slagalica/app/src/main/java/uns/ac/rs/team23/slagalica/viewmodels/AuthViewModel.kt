@@ -61,6 +61,9 @@ class AuthViewModel(
     private val _leagueChange = MutableSharedFlow<LeagueChangeEvent>(extraBufferCapacity = 4)
     val leagueChange: SharedFlow<LeagueChangeEvent> = _leagueChange.asSharedFlow()
 
+    private val _profilePictureMessage = MutableSharedFlow<String>(extraBufferCapacity = 1)
+    val profilePictureMessage: SharedFlow<String> = _profilePictureMessage.asSharedFlow()
+
     /** Cycle-end token rewards (client-side, replaces Cloud Function). */
     val pendingReward: SharedFlow<PendingRewardEvent> = clientDbListeners.pendingReward
 
@@ -118,13 +121,29 @@ class AuthViewModel(
 
     fun uploadProfilePicture(uri: Uri) {
         viewModelScope.launch {
-            profileRepository.uploadProfilePicture(uri).onSuccess { refreshProfile() }
+            profileRepository.uploadProfilePicture(uri)
+                .onSuccess { url ->
+                    _userProfile.value = _userProfile.value?.copy(profilePictureUrl = url)
+                    refreshProfile()
+                    _profilePictureMessage.emit("Profile photo updated")
+                }
+                .onFailure {
+                    _profilePictureMessage.emit(it.message ?: "Failed to upload photo")
+                }
         }
     }
 
     fun clearProfilePicture() {
         viewModelScope.launch {
-            profileRepository.clearProfilePicture().onSuccess { refreshProfile() }
+            profileRepository.clearProfilePicture()
+                .onSuccess {
+                    _userProfile.value = _userProfile.value?.copy(profilePictureUrl = "")
+                    refreshProfile()
+                    _profilePictureMessage.emit("Profile photo removed")
+                }
+                .onFailure {
+                    _profilePictureMessage.emit(it.message ?: "Failed to remove photo")
+                }
         }
     }
 
