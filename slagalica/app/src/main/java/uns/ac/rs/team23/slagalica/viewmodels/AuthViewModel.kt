@@ -211,6 +211,26 @@ class AuthViewModel(
 
     fun clearLoginState() { _loginState.value = AuthState.Idle }
 
+    // ── Resend verification email ─────────────────────────────────────────────
+
+    private val _resendState = MutableStateFlow<AuthState>(AuthState.Idle)
+    val resendState: StateFlow<AuthState> = _resendState.asStateFlow()
+
+    fun resendVerificationEmail() {
+        if (loginEmailOrUsername.isBlank() || loginPassword.isBlank()) {
+            _resendState.value = AuthState.Error("Enter your email/username and password first")
+            return
+        }
+        _resendState.value = AuthState.Loading
+        viewModelScope.launch {
+            authRepository.resendVerificationEmail(loginEmailOrUsername.trim(), loginPassword)
+                .onSuccess { _resendState.value = AuthState.Success }
+                .onFailure { _resendState.value = AuthState.Error(it.message ?: "Error") }
+        }
+    }
+
+    fun clearResendState() { _resendState.value = AuthState.Idle }
+
     // ── Register fields ───────────────────────────────────────────────────────
 
     var registerEmail by mutableStateOf("")

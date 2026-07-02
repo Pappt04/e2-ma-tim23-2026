@@ -38,6 +38,7 @@ fun LoginComponent(
     onNavigateToForgotPassword: () -> Unit = {},
 ) {
     val loginState by viewModel.loginState.collectAsState()
+    val resendState by viewModel.resendState.collectAsState()
     var passwordVisible by remember { mutableStateOf(false) }
 
     LaunchedEffect(loginState) {
@@ -97,6 +98,31 @@ fun LoginComponent(
                     color = MaterialTheme.colorScheme.error,
                     style = MaterialTheme.typography.bodySmall,
                 )
+                if ((loginState as AuthState.Error).message.contains("not verified", ignoreCase = true)) {
+                    TextButton(
+                        onClick = viewModel::resendVerificationEmail,
+                        enabled = resendState !is AuthState.Loading,
+                    ) {
+                        Text(
+                            if (resendState is AuthState.Loading) "Sending..." else "Resend verification email",
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            }
+
+            when (val state = resendState) {
+                is AuthState.Success -> Text(
+                    "Verification email sent — check your inbox.",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                is AuthState.Error -> Text(
+                    state.message,
+                    color = MaterialTheme.colorScheme.error,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                else -> {}
             }
 
             Spacer(modifier = Modifier.height(4.dp))

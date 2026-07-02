@@ -69,15 +69,16 @@ class FirebaseAuthRepository(
         user.sendEmailVerification().await()
     }
 
+    private suspend fun resolveEmail(emailOrUsername: String): String {
+        if (emailOrUsername.contains("@")) return emailOrUsername
+        // usernames is publicly readable — single pre-auth read to get the email
+        val doc = firestore.collection("usernames").document(emailOrUsername).get().await()
+        return doc.getString("email") ?: throw Exception("User not found")
+    }
+
     override suspend fun login(emailOrUsername: String, password: String): Result<UserProfile> =
         runCatching {
-            val email = if (emailOrUsername.contains("@")) {
-                emailOrUsername
-            } else {
-                // usernames is publicly readable — single pre-auth read to get the email
-                val doc = firestore.collection("usernames").document(emailOrUsername).get().await()
-                doc.getString("email") ?: throw Exception("User not found")
-            }
+            val email = resolveEmail(emailOrUsername)
 
             val result = auth.signInWithEmailAndPassword(email, password).await()
             val user = result.user ?: throw Exception("Login failed")
@@ -143,6 +144,21 @@ class FirebaseAuthRepository(
     override suspend fun sendPasswordResetEmail(email: String): Result<Unit> = runCatching {
         auth.sendPasswordResetEmail(email).await()
     }
+
+    override suspend fun resendVerificationEmail(emailOrUsername: String, password: String): Result<Unit> =
+        runCatching {
+            val email = resolveEmail(emailOrUsername)
+            val result = auth.signInWithEmailAndPassword(email, password).await()
+            val user = result.user ?: throw Exception("Login failed")
+
+            if (user.isEmailVerified) {
+                auth.signOut()
+                throw Exception("Email is already verified — you can log in now.")
+            }
+
+            user.sendEmailVerification().await()
+            auth.signOut()
+        }
 
     override suspend fun changePassword(
         username: String,

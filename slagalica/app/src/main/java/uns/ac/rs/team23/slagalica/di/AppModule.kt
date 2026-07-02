@@ -91,7 +91,7 @@ val AppModule = module {
     viewModel { KoZnaZnaViewModel(get(), get()) }
     viewModel { SpojniceViewModel(get(), get()) }
     viewModel { StatisticsViewModel(get()) }
-    viewModel { LeaderboardViewModel(get()) }
+    viewModel { LeaderboardViewModel(get(), get()) }
     viewModel { TournamentViewModel(get(), get()) }
     viewModel { DailyMissionViewModel(get()) }
 }

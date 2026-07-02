@@ -42,6 +42,24 @@ class CycleManager(
         monthlyRolled
     }
 
+    /**
+     * Demo-only: forces the monthly and weekly cycles to finalize right now, regardless of the
+     * real calendar date, so cycle-end rewards/league changes can be shown during a defense.
+     */
+    suspend fun forceNewCycle(): Result<Unit> = runCatching {
+        finalizeCycle(currentMonthlyId())
+        val users = firestore.collection("users")
+            .whereEqualTo("isGuest", false)
+            .get()
+            .await()
+            .documents
+        resetWeeklyCycle(users)
+        cyclesRef().set(
+            mapOf("currentWeeklyId" to currentWeeklyId()),
+            com.google.firebase.firestore.SetOptions.merge(),
+        ).await()
+    }
+
     private suspend fun maybeMonthlyRollover(): Boolean {
         val current = currentMonthlyId()
         val shouldFinalize = firestore.runTransaction { tx ->
@@ -87,6 +105,10 @@ class CycleManager(
             .await()
             .documents
 
+        resetWeeklyCycle(users)
+    }
+
+    private suspend fun resetWeeklyCycle(users: List<com.google.firebase.firestore.DocumentSnapshot>) {
         awardCycleTokens(users, field = "weeklyCycleStars", weekly = true)
 
         users.chunked(400).forEach { chunk ->

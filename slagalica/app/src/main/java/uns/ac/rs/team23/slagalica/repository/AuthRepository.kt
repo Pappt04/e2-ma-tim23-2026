@@ -11,6 +11,9 @@ interface AuthRepository {
     suspend fun sendPasswordResetEmail(email: String): Result<Unit>
     suspend fun changePassword(username: String, oldPassword: String, newPassword: String): Result<Unit>
 
+    /** Re-sends the verification link for an unverified account (login is blocked until then). */
+    suspend fun resendVerificationEmail(emailOrUsername: String, password: String): Result<Unit>
+
     /** Persist the user's chosen avatar variant. */
     suspend fun updateAvatar(avatarIndex: Int): Result<Unit>
 

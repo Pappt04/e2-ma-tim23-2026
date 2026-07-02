@@ -5,11 +5,15 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -28,6 +32,33 @@ fun LeaderboardScreen(
     viewModel: LeaderboardViewModel = koinViewModel(),
 ) {
     val ui by viewModel.ui.collectAsState()
+    var showNewCycleConfirm by remember { mutableStateOf(false) }
+
+    if (showNewCycleConfirm) {
+        AlertDialog(
+            onDismissRequest = { showNewCycleConfirm = false },
+            title = { Text("End current cycle now?") },
+            text = {
+                Text(
+                    "This distributes rewards, resets cycle stars, and recalculates leagues " +
+                        "immediately — for demo purposes only.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    showNewCycleConfirm = false
+                    viewModel.triggerNewCycle()
+                }) {
+                    Text("Start new cycle")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewCycleConfirm = false }) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -36,6 +67,14 @@ fun LeaderboardScreen(
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(
+                        onClick = { showNewCycleConfirm = true },
+                        enabled = !ui.triggering,
+                    ) {
+                        Icon(Icons.Default.Refresh, contentDescription = "Start new cycle (demo)")
                     }
                 },
             )

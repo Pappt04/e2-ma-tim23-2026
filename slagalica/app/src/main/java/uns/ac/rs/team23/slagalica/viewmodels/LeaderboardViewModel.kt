@@ -7,6 +7,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import uns.ac.rs.team23.slagalica.data.CycleManager
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.models.LeaderboardEntry
 import uns.ac.rs.team23.slagalica.repository.LeaderboardRepository
@@ -19,10 +20,12 @@ data class LeaderboardUiState(
     val dateRange: String = "",
     val loading: Boolean = true,
     val error: String? = null,
+    val triggering: Boolean = false,
 )
 
 class LeaderboardViewModel(
     private val repository: LeaderboardRepository,
+    private val cycleManager: CycleManager,
 ) : ViewModel() {
 
     private val _ui = MutableStateFlow(LeaderboardUiState())
@@ -72,4 +75,17 @@ class LeaderboardViewModel(
 
     fun leagueName(level: Int): String =
         LEAGUE_NAMES.getOrElse(level) { "League $level" }
+
+    /** Demo-only: forces the current cycle to end right now (see CycleManager.forceNewCycle). */
+    fun triggerNewCycle() {
+        viewModelScope.launch {
+            _ui.value = _ui.value.copy(triggering = true)
+            val result = cycleManager.forceNewCycle()
+            _ui.value = _ui.value.copy(
+                triggering = false,
+                error = result.exceptionOrNull()?.message,
+            )
+            refresh(silent = true)
+        }
+    }
 }
