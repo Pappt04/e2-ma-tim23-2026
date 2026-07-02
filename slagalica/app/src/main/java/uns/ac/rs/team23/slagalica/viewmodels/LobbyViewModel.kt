@@ -32,12 +32,14 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
     private var observerJob: Job? = null
     private var countdownJob: Job? = null
     private var myUsername: String = ""
+    private var activeMatchId: String = ""
 
     private var currentFriendly: Boolean = false
     private var opponentReadyLocal: Boolean = false
     private var myReadyLocal: Boolean = false
 
     fun startSearch(username: String, friendly: Boolean = false) {
+        if (_state.value is LobbyState.Searching) return
         myUsername = username
         currentFriendly = friendly
         _state.value = LobbyState.Searching
@@ -93,11 +95,12 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
     private fun onMatchFound(match: MatchResponseDto) {
         myReadyLocal = false
         opponentReadyLocal = false
+        activeMatchId = match.id
         val opponent = resolveOpponent(match.player1Username, match.player2Username ?: "")
         MatchStore.set(
             match.id,
             opponent,
-            friendly = currentFriendly,
+            friendly = match.isFriendly,
             myUid = matchRepository.currentUserId() ?: "",
             hostId = match.player1Id,
             player1 = match.player1Username,
@@ -110,10 +113,36 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
         startMatchObserver(match.id, opponent)
     }
 
+    private fun onOpponentLeftLobby() {
+        countdownJob?.cancel()
+        countdownJob = null
+        observerJob?.cancel()
+        activeMatchId = ""
+        MatchStore.clear()
+        viewModelScope.launch { matchRepository.setInMatch(false) }
+        _state.value = LobbyState.Error("Your opponent left the lobby.")
+    }
+
+    private fun isLobbyPhase(): Boolean = when (_state.value) {
+        is LobbyState.OpponentFound,
+        is LobbyState.YouAreReady,
+        is LobbyState.Countdown,
+        -> true
+        else -> false
+    }
+
     private fun startMatchObserver(matchId: String, opponentName: String) {
         observerJob?.cancel()
         observerJob = viewModelScope.launch {
             matchRepository.observeMatch(matchId).collect { match ->
+                if (match.status == "CANCELLED" ||
+                    (match.abandonedById != null && isLobbyPhase())
+                ) {
+                    onOpponentLeftLobby()
+                    return@collect
+                }
+                if (match.status != "IN_PROGRESS") return@collect
+
                 val myUid = matchRepository.currentUserId() ?: return@collect
                 val iAmPlayer1 = match.player1Id == myUid
                 val newOpponentReady = if (iAmPlayer1) match.player2Ready else match.player1Ready
@@ -123,7 +152,7 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
                 if (current is LobbyState.Countdown || current is LobbyState.Starting) return@collect
 
                 if (myReadyLocal && newOpponentReady) {
-                    startCountdown(opponentName)
+                    startCountdown(opponentName, matchId)
                 } else if (myReadyLocal) {
                     _state.value = LobbyState.YouAreReady(opponentName, newOpponentReady)
                 } else {
@@ -145,57 +174,43 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
             matchRepository.markReady(MatchStore.matchId)
         }
         if (opponentReadyLocal) {
-            startCountdown(opponent)
+            startCountdown(opponent, activeMatchId)
         }
     }
 
-    private fun startCountdown(opponentName: String) {
+    private fun startCountdown(opponentName: String, matchId: String) {
         if (countdownJob != null) return
         countdownJob = viewModelScope.launch {
             delay(1_500)
             for (i in 3 downTo 1) {
+                if (_state.value is LobbyState.Error) return@launch
                 _state.value = LobbyState.Countdown(opponentName, i)
                 delay(1_000)
+            }
+            val stillValid = matchRepository.getCurrentMatch()
+                .getOrNull()
+                ?.let { it.id == matchId && it.status == "IN_PROGRESS" }
+                ?: false
+            if (!stillValid) {
+                onOpponentLeftLobby()
+                return@launch
             }
             _state.value = LobbyState.Starting
         }
     }
 
     fun startFriendSearch(friendId: String, username: String, friendly: Boolean = false) {
+        if (_state.value is LobbyState.Searching) return
         myUsername = username
         currentFriendly = friendly
         _state.value = LobbyState.Searching
         viewModelScope.launch {
             matchRepository.sendFriendInvite(friendId, friendly)
                 .onSuccess { match ->
-                    if (match.status == "INVITE_SENT") {
-                        val opponentName = match.player2Username ?: "Friend"
-                        _state.value = LobbyState.InviteSent(match.id, opponentName)
-                    } else if (match.status == "IN_PROGRESS") {
-                        onMatchFound(match)
-                    } else {
-                        _state.value = LobbyState.Error("Unexpected state: ${match.status}")
-                    }
-                }
-                .onFailure { _state.value = LobbyState.Error(it.message ?: "Failed to send invite") }
-        }
-    }
-
-    /**
-     * Invite a specific friend to a ranked match, then wait for them to accept.
-     * When the invitee accepts, [respondToInvite] creates a match with the
-     * inviter as player1, which [getCurrentMatch] then picks up.
-     */
-    fun startFriendInvite(friendId: String, username: String) {
-        myUsername = username
-        currentFriendly = true
-        _state.value = LobbyState.Searching
-        viewModelScope.launch {
-            matchRepository.sendFriendInvite(friendId, true)
-                .onSuccess { match ->
                     when (match.status) {
                         "INVITE_SENT" -> {
-                            _state.value = LobbyState.InviteSent(match.id, match.player2Username ?: "Friend")
+                            val opponentName = match.player2Username ?: "Friend"
+                            _state.value = LobbyState.InviteSent(match.id, opponentName)
                             startInviteAcceptPolling(match.id)
                         }
                         "IN_PROGRESS" -> onMatchFound(match)
@@ -246,14 +261,66 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
             matchRepository.cancelQueue()
             matchRepository.setInMatch(false)
         }
+        activeMatchId = ""
         MatchStore.clear()
         _state.value = LobbyState.Idle
+    }
+
+    /** Leave lobby — refunds tokens when backing out during search or the ready screen. */
+    fun leaveLobby() {
+        if (_state.value is LobbyState.Starting) return
+
+        val matchId = activeMatchId.ifBlank { MatchStore.matchId }
+        val inReadyLobby = isLobbyPhase()
+
+        pollingJob?.cancel()
+        observerJob?.cancel()
+        countdownJob?.cancel()
+        countdownJob = null
+
+        when (_state.value) {
+            is LobbyState.Searching, is LobbyState.InviteSent -> {
+                viewModelScope.launch {
+                    matchRepository.cancelQueue()
+                    matchRepository.setInMatch(false)
+                }
+            }
+            is LobbyState.OpponentFound,
+            is LobbyState.YouAreReady,
+            is LobbyState.Countdown,
+            -> {
+                viewModelScope.launch {
+                    if (matchId.isNotBlank()) matchRepository.leavePreGameLobby(matchId)
+                    matchRepository.setInMatch(false)
+                }
+            }
+            else -> Unit
+        }
+
+        if (inReadyLobby || _state.value is LobbyState.Searching || _state.value is LobbyState.InviteSent) {
+            activeMatchId = ""
+            MatchStore.clear()
+            _state.value = LobbyState.Idle
+        }
     }
 
     override fun onCleared() {
         pollingJob?.cancel()
         observerJob?.cancel()
         countdownJob?.cancel()
+        if (_state.value is LobbyState.Starting) {
+            super.onCleared()
+            return
+        }
+        val matchId = activeMatchId.ifBlank { MatchStore.matchId }
+        kotlinx.coroutines.runBlocking {
+            when {
+                isLobbyPhase() && matchId.isNotBlank() ->
+                    runCatching { matchRepository.leavePreGameLobby(matchId) }
+                _state.value is LobbyState.Searching || _state.value is LobbyState.InviteSent ->
+                    runCatching { matchRepository.cancelQueue() }
+            }
+        }
         super.onCleared()
     }
 }

@@ -8,6 +8,8 @@ import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
 import com.google.firebase.firestore.DocumentReference
 import com.google.firebase.firestore.DocumentSnapshot
@@ -29,10 +31,13 @@ class FirebaseMatchRepository(
     private val firestore: FirebaseFirestore,
 ) : MatchRepository {
 
+    private val matchmakingMutex = Mutex()
+
     override fun currentUserId(): String? = auth.currentUser?.uid
 
     override suspend fun startRandomMatch(friendly: Boolean): Result<MatchResponseDto> =
-        runCatching {
+        matchmakingMutex.withLock {
+            runCatching {
             val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
             val userDoc = firestore.collection("users").document(uid).get().await()
             val username = userDoc.getString("username") ?: ""
@@ -47,27 +52,30 @@ class FirebaseMatchRepository(
             val joined = joinWaitingMatch(uid, username, friendly)
             if (joined != null) return@runCatching joined
 
-            // No match to join — create a new waiting match (ranked costs 1 token up front)
-            if (!friendly) {
-                deductToken(firestore.collection("users").document(uid))
-            }
+            // No match to join — create a new waiting match (ranked costs 1 token up front).
+            // Token deduct and lobby doc are one transaction so we never charge without a room.
             val matchRef = firestore.collection("matches").document()
-            matchRef.set(
-                mapOf(
-                    "player1Id" to uid,
-                    "player1Username" to username,
-                    "player2Id" to null,
-                    "player2Username" to null,
-                    "status" to "WAITING_FOR_OPPONENT",
-                    "isFriendly" to friendly,
-                    "currentGameIndex" to 0,
-                    "currentGameType" to null,
-                    "player1TotalScore" to 0,
-                    "player2TotalScore" to 0,
-                    "winnerId" to null,
-                    "createdAt" to FieldValue.serverTimestamp(),
+            val userRef = firestore.collection("users").document(uid)
+            firestore.runTransaction { tx ->
+                if (!friendly) deductToken(tx, userRef)
+                tx.set(
+                    matchRef,
+                    mapOf(
+                        "player1Id" to uid,
+                        "player1Username" to username,
+                        "player2Id" to null,
+                        "player2Username" to null,
+                        "status" to "WAITING_FOR_OPPONENT",
+                        "isFriendly" to friendly,
+                        "currentGameIndex" to 0,
+                        "currentGameType" to null,
+                        "player1TotalScore" to 0,
+                        "player2TotalScore" to 0,
+                        "winnerId" to null,
+                        "createdAt" to FieldValue.serverTimestamp(),
+                    ),
                 )
-            ).await()
+            }.await()
 
             MatchResponseDto(
                 id = matchRef.id,
@@ -83,6 +91,7 @@ class FirebaseMatchRepository(
                 player2TotalScore = 0,
                 winnerId = null,
             )
+            }
         }
 
     override suspend fun startSoloMatch(): Result<MatchResponseDto> = runCatching {
@@ -174,7 +183,10 @@ class FirebaseMatchRepository(
                         winnerId = null,
                     )
                 }.await()
-                if (joined != null) return joined
+                if (joined != null) {
+                    abandonOwnWaitingLobbies(uid)
+                    return joined
+                }
             } catch (_: Exception) {
                 continue
             }
@@ -185,21 +197,30 @@ class FirebaseMatchRepository(
     override suspend fun getCurrentMatch(): Result<MatchResponseDto?> = runCatching {
         val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
 
-        val snap1 = firestore.collection("matches")
-            .whereEqualTo("player1Id", uid)
-            .whereIn("status", listOf("WAITING_FOR_OPPONENT", "IN_PROGRESS"))
-            .limit(1)
-            .get()
-            .await()
-        if (!snap1.isEmpty) return@runCatching snap1.documents[0].toMatchResponseDto()
-
-        val snap2 = firestore.collection("matches")
+        // Prefer an active match over an orphaned waiting lobby (e.g. after join-as-player2).
+        val inProgressAsP2 = firestore.collection("matches")
             .whereEqualTo("player2Id", uid)
             .whereEqualTo("status", "IN_PROGRESS")
             .limit(1)
             .get()
             .await()
-        if (!snap2.isEmpty) return@runCatching snap2.documents[0].toMatchResponseDto()
+        if (!inProgressAsP2.isEmpty) return@runCatching inProgressAsP2.documents[0].toMatchResponseDto()
+
+        val inProgressAsP1 = firestore.collection("matches")
+            .whereEqualTo("player1Id", uid)
+            .whereEqualTo("status", "IN_PROGRESS")
+            .limit(1)
+            .get()
+            .await()
+        if (!inProgressAsP1.isEmpty) return@runCatching inProgressAsP1.documents[0].toMatchResponseDto()
+
+        val waiting = firestore.collection("matches")
+            .whereEqualTo("player1Id", uid)
+            .whereEqualTo("status", "WAITING_FOR_OPPONENT")
+            .limit(1)
+            .get()
+            .await()
+        if (!waiting.isEmpty) return@runCatching waiting.documents[0].toMatchResponseDto()
 
         null
     }
@@ -341,37 +362,83 @@ class FirebaseMatchRepository(
         matchRef.get().await().toMatchResponseDto()
     }
 
+    override suspend fun leavePreGameLobby(matchId: String): Result<Unit> = runCatching {
+        val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
+        if (matchId.isBlank()) return@runCatching
+        cancelPreGameMatch(matchId, uid)
+    }
+
     override suspend fun cancelQueue(): Result<Unit> = runCatching {
         val uid = auth.currentUser?.uid ?: return@runCatching
-        val snap = firestore.collection("matches")
-            .whereEqualTo("player1Id", uid)
-            .whereEqualTo("status", "WAITING_FOR_OPPONENT")
-            .limit(1)
-            .get()
-            .await()
-        snap.documents.firstOrNull()?.reference?.delete()?.await()
+        abandonOwnWaitingLobbies(uid)
     }
 
     /**
-     * Delete the user's leftover IN_PROGRESS regular matches (force-quit/crash debris) before a new
-     * search. Safe because the lobby is only reachable when not inside a live match; tournament
-     * matches are skipped (their lifecycle is owned by the tournament flow).
+     * Cancel a lobby-phase match (ready screen, no game played yet). Refunds both ranked entry
+     * fees and clears [inMatch] for both players. Idempotent — safe if called twice.
+     */
+    private suspend fun cancelPreGameMatch(matchId: String, cancelledByUid: String) {
+        val matchRef = firestore.collection("matches").document(matchId)
+        val usersCol = firestore.collection("users")
+        firestore.runTransaction { tx ->
+            val match = tx.get(matchRef)
+            if (match.getString("status") != "IN_PROGRESS") return@runTransaction
+            if (match.getString("abandonedById") != null) return@runTransaction
+            if (match.getString("tournamentId") != null) return@runTransaction
+            val gameIndex = (match.getLong("currentGameIndex") ?: 0L).toInt()
+            val p1Total = (match.getLong("player1TotalScore") ?: 0L).toInt()
+            val p2Total = (match.getLong("player2TotalScore") ?: 0L).toInt()
+            if (gameIndex > 0 || p1Total > 0 || p2Total > 0) return@runTransaction
+
+            val isFriendly = match.getBoolean("isFriendly") ?: false
+            val p1Id = match.getString("player1Id")
+            val p2Id = match.getString("player2Id")
+            val p1Ref = p1Id?.let { usersCol.document(it) }
+            val p2Ref = p2Id?.let { usersCol.document(it) }
+
+            if (!isFriendly) {
+                if (p1Ref != null) refundToken(tx, p1Ref)
+                if (p2Ref != null) refundToken(tx, p2Ref)
+            }
+            tx.update(
+                matchRef,
+                mapOf(
+                    "status" to "CANCELLED",
+                    "cancelledById" to cancelledByUid,
+                    "completedAt" to FieldValue.serverTimestamp(),
+                ),
+            )
+            tx.update(usersCol.document(cancelledByUid), mapOf("inMatch" to false))
+            val opponentId = when (cancelledByUid) {
+                p1Id -> p2Id
+                p2Id -> p1Id
+                else -> null
+            }
+            if (opponentId != null) {
+                tx.update(usersCol.document(opponentId), mapOf("inMatch" to false))
+            }
+        }.await()
+    }
+
+    /**
+     * Cancel leftover IN_PROGRESS lobby matches before a new search so entry fees are refunded
+     * instead of silently deleted.
      */
     private suspend fun cleanupStaleInProgressMatches(uid: String) {
-        val refs = mutableListOf<DocumentReference>()
+        val matchIds = mutableSetOf<String>()
         firestore.collection("matches")
             .whereEqualTo("player1Id", uid)
             .whereEqualTo("status", "IN_PROGRESS")
             .get().await().documents
             .filter { it.getString("tournamentId") == null }
-            .forEach { refs.add(it.reference) }
+            .forEach { matchIds.add(it.id) }
         firestore.collection("matches")
             .whereEqualTo("player2Id", uid)
             .whereEqualTo("status", "IN_PROGRESS")
             .get().await().documents
             .filter { it.getString("tournamentId") == null }
-            .forEach { refs.add(it.reference) }
-        refs.forEach { ref -> runCatching { ref.delete().await() } }
+            .forEach { matchIds.add(it.id) }
+        matchIds.forEach { id -> runCatching { cancelPreGameMatch(id, uid) } }
     }
 
     override suspend fun sendFriendInvite(
@@ -479,6 +546,10 @@ class FirebaseMatchRepository(
         val inviteeRef = firestore.collection("users").document(uid)
 
         firestore.runTransaction { tx ->
+            val inviteSnap = tx.get(inviteRef)
+            if (inviteSnap.getString("status") != "PENDING") {
+                throw Exception("Invite no longer pending")
+            }
             if (!isFriendly) {
                 deductToken(tx, inviterRef)
                 deductToken(tx, inviteeRef)
@@ -765,6 +836,35 @@ class FirebaseMatchRepository(
 
     private suspend fun deductToken(userRef: DocumentReference) {
         firestore.runTransaction { tx -> deductToken(tx, userRef) }.await()
+    }
+
+    /** Refund a ranked waiting-lobby entry fee (create-then-cancel or join-someone-else). */
+    private fun refundToken(tx: Transaction, userRef: DocumentReference) {
+        val snap = tx.get(userRef)
+        val tokens = (snap.getLong("tokens") ?: 0L).toInt()
+        tx.update(userRef, "tokens", tokens + 1)
+    }
+
+    /** Delete every own WAITING lobby and refund ranked entry fees. */
+    private suspend fun abandonOwnWaitingLobbies(uid: String) {
+        val snap = firestore.collection("matches")
+            .whereEqualTo("player1Id", uid)
+            .whereEqualTo("status", "WAITING_FOR_OPPONENT")
+            .get()
+            .await()
+        for (doc in snap.documents) {
+            runCatching {
+                firestore.runTransaction { tx ->
+                    val match = tx.get(doc.reference)
+                    if (match.getString("status") != "WAITING_FOR_OPPONENT") return@runTransaction
+                    if (match.getString("player1Id") != uid) return@runTransaction
+                    if (!(match.getBoolean("isFriendly") ?: false)) {
+                        refundToken(tx, firestore.collection("users").document(uid))
+                    }
+                    tx.delete(doc.reference)
+                }.await()
+            }
+        }
     }
 
     @Suppress("UNCHECKED_CAST")

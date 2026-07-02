@@ -12,15 +12,20 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import uns.ac.rs.team23.slagalica.data.CycleManager
 import uns.ac.rs.team23.slagalica.models.Regions
 import uns.ac.rs.team23.slagalica.models.Notification
 import uns.ac.rs.team23.slagalica.models.NotificationType
+import uns.ac.rs.team23.slagalica.models.UserProfile
 import uns.ac.rs.team23.slagalica.repository.AuthRepository
+import uns.ac.rs.team23.slagalica.repository.toUserProfile
 
 /** Cycle-end reward surfaced as a dialog (spec: nagrada animacija). */
 data class PendingRewardEvent(
@@ -49,18 +54,23 @@ class ClientDbListeners(
     private val _pendingReward = MutableSharedFlow<PendingRewardEvent>(extraBufferCapacity = 4)
     val pendingReward: SharedFlow<PendingRewardEvent> = _pendingReward.asSharedFlow()
 
+    /** Live tokens / stars / league from Firestore `users/{uid}` (all screens stay in sync). */
+    private val _liveProfile = MutableStateFlow<UserProfile?>(null)
+    val liveProfile: StateFlow<UserProfile?> = _liveProfile.asStateFlow()
+
     fun start(uid: String) {
         if (uid == activeUid) return
         stop()
         activeUid = uid
         attachNotificationListener(uid)
         attachMatchInviteListener(uid)
-        attachUserRewardListener(uid)
+        attachUserDocListener(uid)
         startPeriodicTasks()
     }
 
     fun stop() {
         activeUid = null
+        _liveProfile.value = null
         registrations.forEach { it.remove() }
         registrations.clear()
         inviteExpiryJobs.values.forEach { it.cancel() }
@@ -133,13 +143,19 @@ class ClientDbListeners(
         registrations.add(reg)
     }
 
-    /** Watch own user doc for cycle reward flags written by [CycleManager]. */
-    private fun attachUserRewardListener(uid: String) {
+    /** Live profile + cycle reward flags on the same user document. */
+    private fun attachUserDocListener(uid: String) {
         val reg = firestore.collection("users").document(uid)
             .addSnapshotListener { snap, _ ->
                 if (snap == null || !snap.exists()) return@addSnapshotListener
-                val tokens = (snap.getLong("pendingRewardTokens") ?: 0L).toInt()
-                if (tokens <= 0) return@addSnapshotListener
+
+                _liveProfile.value = snap.toUserProfile(
+                    uid = uid,
+                    isEmailVerified = auth.currentUser?.isEmailVerified == true,
+                )
+
+                val rewardTokens = (snap.getLong("pendingRewardTokens") ?: 0L).toInt()
+                if (rewardTokens <= 0) return@addSnapshotListener
                 if (snap.getBoolean("pendingRewardShown") == true) return@addSnapshotListener
                 val rank = (snap.getLong("pendingRewardRank") ?: 0L).toInt()
                 val weekly = snap.getString("pendingRewardPeriod") == "weekly"
@@ -152,7 +168,7 @@ class ClientDbListeners(
                             ),
                         )
                         .await()
-                    _pendingReward.emit(PendingRewardEvent(tokens = tokens, rank = rank, weekly = weekly))
+                    _pendingReward.emit(PendingRewardEvent(tokens = rewardTokens, rank = rank, weekly = weekly))
                     authRepository.refreshDailyTokensIfNeeded()
                 }
             }

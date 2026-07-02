@@ -38,6 +38,7 @@ firebase-auth = { group = "com.google.firebase", name = "firebase-auth-ktx" }
 firebase-firestore = { group = "com.google.firebase", name = "firebase-firestore-ktx" }
 firebase-database = { group = "com.google.firebase", name = "firebase-database-ktx" }
 firebase-messaging = { group = "com.google.firebase", name = "firebase-messaging-ktx" }
+firebase-storage = { group = "com.google.firebase", name = "firebase-storage-ktx" }
 firebase-functions = { group = "com.google.firebase", name = "firebase-functions-ktx" }
 kotlinx-coroutines-play-services = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-play-services", version.ref = "coroutinesPlayServices" }
 osmdroid-android = { group = "org.osmdroid", name = "osmdroid-android", version = "6.1.20" }

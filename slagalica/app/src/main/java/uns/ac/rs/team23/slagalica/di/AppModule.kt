@@ -2,6 +2,7 @@ package uns.ac.rs.team23.slagalica.di
 
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.storage.FirebaseStorage
 import org.koin.android.ext.koin.androidContext
 import org.koin.core.module.dsl.viewModel
 import org.koin.core.module.dsl.viewModelOf
@@ -21,7 +22,9 @@ import uns.ac.rs.team23.slagalica.repository.FirebaseGameRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseLeaderboardRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseMatchRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseNotificationRepository
+import uns.ac.rs.team23.slagalica.repository.FirebaseProfileRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseRegionRepository
+import uns.ac.rs.team23.slagalica.repository.ProfileRepository
 import uns.ac.rs.team23.slagalica.repository.FirebaseStatisticsRepository
 import uns.ac.rs.team23.slagalica.repository.FriendRepository
 import uns.ac.rs.team23.slagalica.repository.GameRepository
@@ -54,9 +57,11 @@ val AppModule = module {
     // Firebase singletons
     single { FirebaseAuth.getInstance() }
     single { FirebaseFirestore.getInstance() }
+    single { FirebaseStorage.getInstance() }
 
     // Repositories
     single<AuthRepository> { FirebaseAuthRepository(get(), get()) }
+    single<ProfileRepository> { FirebaseProfileRepository(androidContext(), get(), get(), get()) }
     single<GameRepository> { FirebaseGameRepository(get()) }
     single<MatchRepository> { FirebaseMatchRepository(get(), get()) }
     single<ChatRepository> { FirebaseChatRepository(get(), get()) }
@@ -72,7 +77,7 @@ val AppModule = module {
     single { ClientDbListeners(androidContext(), get(), get(), get(), get()) }
 
     // ViewModels
-    viewModel { AuthViewModel(get(), get(), get(), get()) }
+    viewModel { AuthViewModel(get(), get(), get(), get(), get()) }
     viewModel { FriendsViewModel(get(), get()) }
     viewModel { RegionViewModel(get(), get()) }
     viewModel { KorakPoKorakViewModel(get(), get(), get()) }

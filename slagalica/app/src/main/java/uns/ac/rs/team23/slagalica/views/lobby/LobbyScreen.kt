@@ -34,6 +34,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -61,13 +62,13 @@ fun LobbyScreen(
     viewModel: LobbyViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    var modeChosen by remember(friendId) { mutableStateOf(friendId != null) }
+    var modeChosen by remember { mutableStateOf(false) }
     var friendly by remember { mutableStateOf(false) }
 
     LaunchedEffect(modeChosen, friendly) {
         if (!modeChosen || viewModel.state.value !is LobbyState.Idle) return@LaunchedEffect
         if (!friendId.isNullOrBlank()) {
-            viewModel.startFriendInvite(friendId, currentUsername)
+            viewModel.startFriendSearch(friendId, currentUsername, friendly)
         } else {
             viewModel.startSearch(currentUsername, friendly)
         }
@@ -77,12 +78,19 @@ fun LobbyScreen(
         if (state is LobbyState.Starting) onGameStart()
     }
 
+    DisposableEffect(Unit) {
+        onDispose { viewModel.leaveLobby() }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Find Match") },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = {
+                        viewModel.leaveLobby()
+                        onNavigateBack()
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -99,15 +107,14 @@ fun LobbyScreen(
         ) {
             when (val s = state) {
                 is LobbyState.Idle -> {
-                    if (!modeChosen && friendId.isNullOrBlank()) {
+                    if (!modeChosen) {
                         ModePicker(
                             friendly = friendly,
                             onFriendlyChange = { friendly = it },
                             onStart = { modeChosen = true },
                             onCancel = onNavigateBack,
+                            startLabel = if (friendId.isNullOrBlank()) "Find opponent" else "Send invite",
                         )
-                    } else if (!modeChosen) {
-                        SearchingContent()
                     } else {
                         SearchingContent()
                     }
@@ -204,6 +211,7 @@ private fun ModePicker(
     onFriendlyChange: (Boolean) -> Unit,
     onStart: () -> Unit,
     onCancel: () -> Unit,
+    startLabel: String = "Find opponent",
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -238,7 +246,7 @@ private fun ModePicker(
             modifier = Modifier.fillMaxWidth(0.85f),
         )
         Button(onClick = onStart, modifier = Modifier.fillMaxWidth(0.7f)) {
-            Text("Find opponent")
+            Text(startLabel)
         }
         OutlinedButton(onClick = onCancel) { Text("Back") }
     }

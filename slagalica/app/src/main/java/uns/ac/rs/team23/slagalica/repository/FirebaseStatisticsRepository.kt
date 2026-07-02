@@ -55,9 +55,15 @@ class FirebaseStatisticsRepository(
         var draws = 0
         var totalPoints = 0
         var bestMatchScore = 0
+        var playedMatches = 0
         val perGame = linkedMapOf<String, GameAccumulator>()
 
         for (match in matches) {
+            val results = match.reference.collection("gameResults").get().await()
+            // Skip lobby cancellations / phantom matches that never recorded a round.
+            if (results.isEmpty()) continue
+
+            playedMatches++
             val isPlayer1 = match.getString("player1Id") == uid
             val myScore = scoreFor(match, isPlayer1)
             totalPoints += myScore
@@ -69,8 +75,6 @@ class FirebaseStatisticsRepository(
                 else -> losses++
             }
 
-            // Per-game breakdown lives in each match's gameResults subcollection.
-            val results = match.reference.collection("gameResults").get().await()
             for (gr in results.documents) {
                 val gameType = gr.getString("gameType") ?: continue
                 val scoreField = if (isPlayer1) "player1Score" else "player2Score"
@@ -91,7 +95,7 @@ class FirebaseStatisticsRepository(
         }
 
         PlayerStatistics(
-            totalMatches = matches.size,
+            totalMatches = playedMatches,
             wins = wins,
             losses = losses,
             draws = draws,

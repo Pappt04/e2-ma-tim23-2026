@@ -11,6 +11,7 @@ data class UserProfile(
     val cycleStars: Int = 0,
     val leagueLevel: Int = 0,
     val avatarIndex: Int = 0,
+    val profilePictureUrl: String = "",
     val isEmailVerified: Boolean = false,
     val passwordHash: String = "",
 )

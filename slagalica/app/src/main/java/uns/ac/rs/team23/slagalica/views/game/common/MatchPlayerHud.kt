@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -32,8 +34,7 @@ fun MatchPlayerHud(
     val profile by authViewModel.userProfile.collectAsState()
     if (session !is UserSession.LoggedIn) return
 
-    val t = profile?.tokens ?: 0
-    val s = profile?.stars ?: 0
+    val isLoading = profile == null
     val league = profile?.leagueLevel ?: 0
     val leagueLabel = LEAGUE_NAMES.getOrElse(league) { "League $league" }
 
@@ -48,20 +49,54 @@ fun MatchPlayerHud(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            HudItem("🎟", "Tokens", t.toString())
-            HudItem("⭐", "Stars", s.toString())
-            HudItem(leagueIconFor(league), leagueLabel, "")
+            HudItem(
+                icon = "🎟",
+                label = "Tokens",
+                value = profile?.tokens?.toString(),
+                isLoading = isLoading,
+            )
+            HudItem(
+                icon = "⭐",
+                label = "Stars",
+                value = profile?.stars?.toString(),
+                isLoading = isLoading,
+            )
+            HudItem(
+                icon = leagueIconFor(league),
+                label = leagueLabel,
+                showValue = false,
+            )
         }
     }
 }
 
 @Composable
-private fun HudItem(icon: String, label: String, value: String) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+private fun HudItem(
+    icon: String,
+    label: String,
+    value: String? = null,
+    showValue: Boolean = true,
+    isLoading: Boolean = false,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
         Text(icon, style = MaterialTheme.typography.titleMedium)
         Text(label, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.SemiBold)
-        if (value.isNotEmpty()) {
-            Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
+        if (showValue) {
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(14.dp),
+                    strokeWidth = 2.dp,
+                )
+            } else if (value != null) {
+                Text(
+                    text = value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                )
+            }
         }
     }
 }

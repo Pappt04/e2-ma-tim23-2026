@@ -199,17 +199,6 @@ class FirebaseAuthRepository(
 
     private suspend fun readProfile(uid: String): UserProfile {
         val doc = firestore.collection("users").document(uid).get().await()
-        return UserProfile(
-            id = uid,
-            username = doc.getString("username") ?: "",
-            email = doc.getString("email") ?: "",
-            region = doc.getString("region") ?: "",
-            tokens = (doc.getLong("tokens") ?: 5L).toInt(),
-            stars = (doc.getLong("stars") ?: 0L).toInt(),
-            cycleStars = (doc.getLong("cycleStars") ?: 0L).toInt(),
-            leagueLevel = (doc.getLong("leagueLevel") ?: 0L).toInt(),
-            avatarIndex = (doc.getLong("avatarIndex") ?: 0L).toInt(),
-            isEmailVerified = doc.getBoolean("isGuest") == true || auth.currentUser?.isEmailVerified == true,
-        )
+        return doc.toUserProfile(uid, auth.currentUser?.isEmailVerified == true)
     }
 }

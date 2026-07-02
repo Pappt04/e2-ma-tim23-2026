@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -17,6 +18,7 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import kotlinx.coroutines.launch
 import androidx.navigation.compose.NavHost
@@ -154,6 +156,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             )
         }
         composable(Screen.Home.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             val region = userProfile?.region ?: ""
             HomeScreen(
@@ -178,6 +181,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             )
         }
         composable(Screen.Profile.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             LaunchedEffect(session) {
                 if (session !is UserSession.LoggedIn) {
@@ -186,8 +190,14 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 }
             }
             if (session is UserSession.LoggedIn) {
+                val profile = userProfile
+                if (profile == null) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
                 val regionRepo: RegionRepository = koinInject()
-                val myRegion = userProfile?.region ?: ""
+                val myRegion = profile.region
                 val frameRank by produceState(0, myRegion) {
                     val tops = regionRepo.loadPreviousTopRegions().getOrDefault(emptyList())
                     val idx = tops.indexOf(myRegion)
@@ -196,19 +206,23 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 ProfileScreen(
                     username = session.username,
                     email = session.email,
-                    tokens = userProfile?.tokens ?: 0,
-                    stars = userProfile?.stars ?: 0,
-                    leagueLevel = userProfile?.leagueLevel ?: 0,
-                    region = userProfile?.region ?: "",
-                    avatarIndex = userProfile?.avatarIndex ?: 0,
+                    tokens = profile.tokens,
+                    stars = profile.stars,
+                    leagueLevel = profile.leagueLevel,
+                    region = profile.region,
+                    avatarIndex = profile.avatarIndex,
+                    profilePictureUrl = profile.profilePictureUrl,
                     frameRank = frameRank,
                     onAvatarChange = authViewModel::updateAvatar,
+                    onProfilePicturePicked = authViewModel::uploadProfilePicture,
+                    onClearProfilePicture = authViewModel::clearProfilePicture,
                     onNavigateBack = { navController.popBackStack() },
                     onNavigateToStatistics = { navController.navigate(Screen.ProfileStatistics.route) },
                     onNavigateToChangePassword = { navController.navigate(Screen.ChangePassword.route) },
                     onNavigateToLeague = { navController.navigate(Screen.League.route) },
                     onLogout = authViewModel::logout,
                 )
+                }
             } else {
                 Box(Modifier.fillMaxSize())
             }
@@ -238,6 +252,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             }
         }
         composable(Screen.Notifications.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             LaunchedEffect(session) {
                 if (session !is UserSession.LoggedIn) {
@@ -259,6 +274,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             }
         }
         composable(Screen.Lobby.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             LobbyScreen(
@@ -272,6 +288,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             )
         }
         composable(Screen.Tournament.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             LaunchedEffect(session) {
                 if (session !is UserSession.LoggedIn) {
@@ -294,6 +311,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             }
         }
         composable(Screen.Game.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             val matchRepo: MatchRepository = koinInject()
@@ -308,6 +326,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                     MatchStore.clear()
                     ChallengeStore.clear()
                     TournamentStore.clear()
+                    authViewModel.refreshProfile()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -316,6 +335,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                     MatchStore.clear()
                     ChallengeStore.clear()
                     TournamentStore.clear()
+                    authViewModel.refreshProfile()
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Home.route) { inclusive = true }
                     }
@@ -475,6 +495,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             )
         }
         composable(Screen.MatchResults.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Guest"
             MatchResultsScreen(
@@ -490,6 +511,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             )
         }
         composable(Screen.Chat.route) { backStack ->
+            RefreshProfileOnEnter(authViewModel)
             val region = backStack.arguments?.getString("region") ?: ""
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Guest"
@@ -500,6 +522,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             )
         }
         composable(Screen.Challenge.route) { backStack ->
+            RefreshProfileOnEnter(authViewModel)
             val region = backStack.arguments?.getString("region") ?: ""
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else ""
@@ -515,6 +538,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             )
         }
         composable(Screen.Friends.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             LaunchedEffect(session) {
                 if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
@@ -529,6 +553,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             }
         }
         composable(Screen.Region.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             LaunchedEffect(session) {
                 if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
@@ -548,6 +573,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             }
         }
         composable(Screen.League.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             LaunchedEffect(session) {
                 if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
@@ -563,6 +589,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             }
         }
         composable(Screen.Leaderboard.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             LaunchedEffect(session) {
                 if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
@@ -574,6 +601,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             }
         }
         composable(Screen.DailyTasks.route) {
+            RefreshProfileOnEnter(authViewModel)
             val session = userSession
             LaunchedEffect(session) {
                 if (session !is UserSession.LoggedIn) navController.popBackStack(Screen.Home.route, inclusive = false)
@@ -585,6 +613,7 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
             }
         }
         composable(Screen.LobbyFriend.route) { backStack ->
+            RefreshProfileOnEnter(authViewModel)
             val friendId = backStack.arguments?.getString("friendId") ?: ""
             val session = userSession
             val username = if (session is UserSession.LoggedIn) session.username else "Guest"
@@ -641,5 +670,15 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 )
             },
         )
+    }
+}
+
+@Composable
+private fun RefreshProfileOnEnter(authViewModel: AuthViewModel) {
+    val session by authViewModel.userSession.collectAsState()
+    LaunchedEffect(session) {
+        if (session is UserSession.LoggedIn) {
+            authViewModel.refreshProfile()
+        }
     }
 }

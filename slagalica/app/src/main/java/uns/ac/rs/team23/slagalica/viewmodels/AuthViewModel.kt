@@ -3,6 +3,7 @@ package uns.ac.rs.team23.slagalica.viewmodels
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -20,6 +21,7 @@ import uns.ac.rs.team23.slagalica.models.Notification
 import uns.ac.rs.team23.slagalica.models.NotificationType
 import uns.ac.rs.team23.slagalica.models.UserProfile
 import uns.ac.rs.team23.slagalica.repository.AuthRepository
+import uns.ac.rs.team23.slagalica.repository.ProfileRepository
 import uns.ac.rs.team23.slagalica.repository.NotificationRepository
 import uns.ac.rs.team23.slagalica.services.ClientDbListeners
 import uns.ac.rs.team23.slagalica.services.PendingRewardEvent
@@ -44,6 +46,7 @@ data class LeagueChangeEvent(val oldLevel: Int, val newLevel: Int) {
 
 class AuthViewModel(
     private val authRepository: AuthRepository,
+    private val profileRepository: ProfileRepository,
     private val notificationRepository: NotificationRepository,
     private val cycleManager: CycleManager,
     private val clientDbListeners: ClientDbListeners,
@@ -62,6 +65,13 @@ class AuthViewModel(
     val pendingReward: SharedFlow<PendingRewardEvent> = clientDbListeners.pendingReward
 
     init {
+        viewModelScope.launch {
+            clientDbListeners.liveProfile.collect { profile ->
+                if (profile == null) return@collect
+                if (_userSession.value !is UserSession.LoggedIn) return@collect
+                applyProfileUpdate(profile)
+            }
+        }
         // Firebase Auth persists state across restarts — restore from current user
         val current = FirebaseAuth.getInstance().currentUser
         if (current != null) {
@@ -89,18 +99,32 @@ class AuthViewModel(
 
     fun refreshProfile() {
         viewModelScope.launch {
-            authRepository.getProfile().onSuccess { newProfile ->
-                val old = _userProfile.value
-                _userProfile.value = newProfile
-                detectLeagueChange(old, newProfile)
-            }
+            authRepository.getProfile().onSuccess { applyProfileUpdate(it) }
         }
+    }
+
+    private fun applyProfileUpdate(newProfile: UserProfile) {
+        val old = _userProfile.value
+        _userProfile.value = newProfile
+        detectLeagueChange(old, newProfile)
     }
 
     /** Persist the user's chosen avatar variant. */
     fun updateAvatar(index: Int) {
         viewModelScope.launch {
             authRepository.updateAvatar(index).onSuccess { refreshProfile() }
+        }
+    }
+
+    fun uploadProfilePicture(uri: Uri) {
+        viewModelScope.launch {
+            profileRepository.uploadProfilePicture(uri).onSuccess { refreshProfile() }
+        }
+    }
+
+    fun clearProfilePicture() {
+        viewModelScope.launch {
+            profileRepository.clearProfilePicture().onSuccess { refreshProfile() }
         }
     }
 
@@ -155,7 +179,7 @@ class AuthViewModel(
                 .onSuccess { profile ->
                     val session = UserSession.LoggedIn(profile.username, profile.email)
                     _userSession.value = session
-                    _userProfile.value = profile
+                    applyProfileUpdate(profile)
                     FirebaseAuth.getInstance().currentUser?.uid?.let { clientDbListeners.start(it) }
                     _loginState.value = AuthState.Success
                 }

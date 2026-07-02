@@ -91,6 +91,12 @@ fun GameScreen(
         matchRepository.observeMatch(matchId).collect { match ->
             MatchStore.currentGameIndex = match.currentGameIndex
             when {
+                match.status == "CANCELLED" -> {
+                    if (!navigatedToResults) {
+                        navigatedToResults = true
+                        onAllGamesFinished()
+                    }
+                }
                 match.status == "COMPLETED" -> {
                     if (!navigatedToResults) {
                         navigatedToResults = true

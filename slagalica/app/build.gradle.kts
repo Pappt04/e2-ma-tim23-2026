@@ -66,7 +66,11 @@ dependencies {
     implementation(libs.firebase.auth)
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.messaging)
+    implementation(libs.firebase.storage)
     implementation(libs.kotlinx.coroutines.play.services)
+
+    // Images (profile picture from gallery)
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
     // DI
     implementation(platform(libs.koin.bom))

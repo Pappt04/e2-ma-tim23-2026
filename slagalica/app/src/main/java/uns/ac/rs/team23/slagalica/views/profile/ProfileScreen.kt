@@ -22,8 +22,12 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Palette
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -36,6 +40,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import uns.ac.rs.team23.slagalica.models.Regions
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
@@ -64,14 +69,21 @@ fun ProfileScreen(
     leagueLevel: Int = 0,
     region: String = "",
     avatarIndex: Int = 0,
+    profilePictureUrl: String = "",
     frameRank: Int = 0,
     onAvatarChange: (Int) -> Unit = {},
+    onProfilePicturePicked: (Uri) -> Unit = {},
+    onClearProfilePicture: () -> Unit = {},
     onNavigateBack: () -> Unit,
     onNavigateToStatistics: () -> Unit,
     onNavigateToChangePassword: () -> Unit = {},
     onNavigateToLeague: () -> Unit = {},
     onLogout: () -> Unit,
 ) {
+    val pickPhoto = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia(),
+    ) { uri -> if (uri != null) onProfilePicturePicked(uri) }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -102,16 +114,31 @@ fun ProfileScreen(
                     ) {
                         AvatarWithFrame(
                             avatarIndex = avatarIndex,
+                            profilePictureUrl = profilePictureUrl,
                             size = 96.dp,
                             frameRank = frameRank,
                         )
 
-                        OutlinedButton(onClick = {
-                            onAvatarChange((avatarIndex + 1) % 4)
-                        }) {
-                            Icon(Icons.Default.Edit, contentDescription = null)
-                            Spacer(modifier = Modifier.padding(3.dp))
-                            Text("Change Avatar")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = {
+                                onAvatarChange((avatarIndex + 1) % 4)
+                            }) {
+                                Icon(Icons.Default.Palette, contentDescription = null)
+                                Spacer(modifier = Modifier.padding(3.dp))
+                                Text("Color")
+                            }
+                            OutlinedButton(onClick = {
+                                pickPhoto.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                            }) {
+                                Icon(Icons.Default.Image, contentDescription = null)
+                                Spacer(modifier = Modifier.padding(3.dp))
+                                Text("Gallery")
+                            }
+                        }
+                        if (profilePictureUrl.isNotBlank()) {
+                            TextButton(onClick = onClearProfilePicture) {
+                                Text("Remove photo")
+                            }
                         }
 
                         Text(username, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)

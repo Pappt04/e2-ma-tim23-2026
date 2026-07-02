@@ -23,6 +23,8 @@ interface MatchRepository {
     suspend fun getCurrentMatch(): Result<MatchResponseDto?>
     suspend fun submitScore(matchId: String, score: Int): Result<MatchResponseDto>
     suspend fun abandonMatch(matchId: String): Result<MatchResponseDto>
+    /** Leave the ready lobby before any game starts — refunds ranked entry fees for both players. */
+    suspend fun leavePreGameLobby(matchId: String): Result<Unit>
     suspend fun cancelQueue(): Result<Unit>
     suspend fun getPendingInvites(): Result<List<MatchInviteResponseDto>>
     suspend fun respondToInvite(inviteId: String, accept: Boolean): Result<MatchResponseDto>

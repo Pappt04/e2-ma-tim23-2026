@@ -2,6 +2,7 @@ package uns.ac.rs.team23.slagalica.views.common
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -13,9 +14,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
+import coil.compose.AsyncImage
 
 /** Shared avatar color palette, indexed by UserProfile.avatarIndex. */
 val AvatarColors = listOf(
@@ -41,6 +44,7 @@ fun AvatarWithFrame(
     modifier: Modifier = Modifier,
     size: Dp = 96.dp,
     frameRank: Int = 0,
+    profilePictureUrl: String = "",
 ) {
     val fillColor = AvatarColors[avatarIndex.mod(AvatarColors.size)]
     val frameColor = when (frameRank) {
@@ -58,11 +62,22 @@ fun AvatarWithFrame(
             .border(borderWidth, frameColor, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(
-            imageVector = Icons.Default.AccountCircle,
-            contentDescription = "Avatar",
-            tint = Color.White,
-            modifier = Modifier.size(size * 0.75f),
-        )
+        if (profilePictureUrl.isNotBlank()) {
+            AsyncImage(
+                model = profilePictureUrl,
+                contentDescription = "Profile photo",
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(CircleShape),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Icon(
+                imageVector = Icons.Default.AccountCircle,
+                contentDescription = "Avatar",
+                tint = Color.White,
+                modifier = Modifier.size(size * 0.75f),
+            )
+        }
     }
 }
