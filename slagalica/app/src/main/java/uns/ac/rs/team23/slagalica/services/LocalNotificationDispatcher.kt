@@ -47,6 +47,7 @@ object LocalNotificationDispatcher {
             .setSmallIcon(R.mipmap.slagalica_logo)
             .setContentTitle(notification.title)
             .setContentText(notification.message)
+            .setContentIntent(NotificationNavigation.pendingIntent(context, notification))
             .setPriority(
                 if (notification.type == NotificationType.REWARD) NotificationCompat.PRIORITY_HIGH
                 else NotificationCompat.PRIORITY_DEFAULT,

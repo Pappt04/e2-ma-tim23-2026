@@ -30,7 +30,6 @@ data class KoZnaZnaState(
     val phase: KoZnaZnaPhase = KoZnaZnaPhase.ROUND_INTRO,
     val player1Points: Int = 0,
     val player2Points: Int = 0,
-    val roundSecondsLeft: Int = 25,
     val questionSecondsLeft: Int = 5,
     val currentQuestionIndex: Int = 0,
     val questions: List<KoZnaZnaQuestion> = emptyList(),
@@ -219,7 +218,7 @@ class KoZnaZnaViewModel(
                 matchId, GAME_TYPE,
                 mapOf("phase" to "FINISHED", "p1Score" to newP1, "p2Score" to newP2),
             )
-            matchRepository.advanceMatch(matchId, GAME_TYPE, newP1, newP2)
+            matchRepository.recordGameResult(matchId, GAME_TYPE, newP1, newP2)
         } else {
             // No need to clear p1Input/p2Input: answerFor() ignores inputs whose stored index
             // doesn't match the current question, so stale answers don't carry over.
@@ -278,8 +277,6 @@ class KoZnaZnaViewModel(
         val now = System.currentTimeMillis()
         val qLeft = if (gs.deadlineAt > 0)
             (((gs.deadlineAt - now) + 999) / 1000).toInt().coerceIn(0, 5) else 5
-        val questionsLeft = (questions.size - gs.index - 1).coerceAtLeast(0)
-        val roundLeft = (qLeft + questionsLeft * 5).coerceAtLeast(0)
 
         val p1 = answerFor(gs.p1Input, gs.index)
         val p2 = answerFor(gs.p2Input, gs.index)
@@ -302,7 +299,6 @@ class KoZnaZnaViewModel(
                 player1Points = myScore,
                 player2Points = theirScore,
                 questionSecondsLeft = qLeft,
-                roundSecondsLeft = roundLeft,
                 player1SelectedIndex = mine?.first,
                 player2SelectedIndex = theirs?.first,
                 player1AnswerSecond = null,
@@ -347,7 +343,6 @@ class KoZnaZnaViewModel(
                 questions = questions,
                 currentQuestionIndex = 0,
                 questionSecondsLeft = 5,
-                roundSecondsLeft = 25,
                 waitingForOpponent = false,
             )
         }

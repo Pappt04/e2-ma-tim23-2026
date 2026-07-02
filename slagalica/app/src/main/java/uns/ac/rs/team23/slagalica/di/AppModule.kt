@@ -77,7 +77,7 @@ val AppModule = module {
     single { ClientDbListeners(androidContext(), get(), get(), get(), get()) }
 
     // ViewModels
-    viewModel { AuthViewModel(get(), get(), get(), get(), get()) }
+    viewModel { AuthViewModel(androidContext(), get(), get(), get(), get(), get()) }
     viewModel { FriendsViewModel(get(), get()) }
     viewModel { RegionViewModel(get(), get()) }
     viewModel { KorakPoKorakViewModel(get(), get(), get()) }

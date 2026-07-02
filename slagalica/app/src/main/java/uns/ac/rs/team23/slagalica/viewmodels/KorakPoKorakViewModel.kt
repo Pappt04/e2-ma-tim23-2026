@@ -242,7 +242,7 @@ class KorakPoKorakViewModel(
     private fun finishMatch(p1: Int, p2: Int) {
         if (isHost && !advanced) {
             advanced = true
-            viewModelScope.launch { matchRepository.advanceMatch(matchId, GAME_TYPE, p1, p2) }
+            viewModelScope.launch { matchRepository.recordGameResult(matchId, GAME_TYPE, p1, p2) }
         }
     }
 

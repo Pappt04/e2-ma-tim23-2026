@@ -107,7 +107,12 @@ class NotificationsViewModel(
         }
     }
 
-    fun respondToInvite(inviteId: String, accept: Boolean, notificationId: String) {
+    fun respondToInvite(
+        inviteId: String,
+        accept: Boolean,
+        notificationId: String,
+        onMatchStarted: () -> Unit = {},
+    ) {
         countdownJobs[notificationId]?.cancel()
         countdownJobs.remove(notificationId)
         _inviteCountdowns.update { it - notificationId }
@@ -115,21 +120,27 @@ class NotificationsViewModel(
             matchRepository.respondToInvite(inviteId, accept)
                 .onSuccess { match ->
                     if (accept && match.status == "IN_PROGRESS") {
-                        val opponentName = if (match.player1Username == match.player2Username)
-                            match.player1Username
-                        else
+                        val myUid = matchRepository.currentUserId().orEmpty()
+                        val opponentName = if (match.player1Id == myUid) {
                             match.player2Username ?: match.player1Username
+                        } else {
+                            match.player1Username
+                        }
                         MatchStore.set(
                             match.id,
                             opponentName,
                             friendly = match.isFriendly,
-                            myUid = matchRepository.currentUserId() ?: "",
+                            myUid = myUid,
                             hostId = match.player1Id,
                             player1 = match.player1Username,
                             player2 = match.player2Username ?: "",
                             player1Id = match.player1Id,
                             player2Id = match.player2Id.orEmpty(),
                         )
+                        matchRepository.setInMatch(true)
+                        // Navigate into the game only after MatchStore is populated, otherwise
+                        // GameScreen mounts with a blank matchId and bails straight back to Home.
+                        onMatchStarted()
                     }
                 }
             _notifications.update { list -> list.filter { it.id != notificationId } }

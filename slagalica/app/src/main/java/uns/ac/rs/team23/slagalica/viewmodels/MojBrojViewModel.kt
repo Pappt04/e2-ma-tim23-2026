@@ -452,7 +452,7 @@ class MojBrojViewModel(
                         "p2Score" to s.player2Points,
                     ),
                 )
-                matchRepository.advanceMatch(matchId, GAME_TYPE, s.player1Points, s.player2Points)
+                matchRepository.recordGameResult(matchId, GAME_TYPE, s.player1Points, s.player2Points)
                 _state.update { it.copy(phase = MojBrojPhase.GameOver) }
                 roundStarting = false
             }

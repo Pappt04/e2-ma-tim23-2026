@@ -41,6 +41,7 @@ import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaPhase
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaQuestion
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaState
 import uns.ac.rs.team23.slagalica.viewmodels.KoZnaZnaViewModel
+import uns.ac.rs.team23.slagalica.views.game.common.GameOverGate
 import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
 import androidx.compose.runtime.collectAsState
 
@@ -59,14 +60,6 @@ fun KoZnaZnaScreen(
 
     MatchGameAdvanceEffect(thisGameIndex = MatchGameOrder.KO_ZNA_ZNA, onLeaveGame = onFinish)
     BlockGameBackNavigation()
-
-    // Both clients reach ROUND_END together
-    LaunchedEffect(state.phase) {
-        if (state.phase == KoZnaZnaPhase.ROUND_END) {
-            delay(4_000)
-            onFinish()
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -103,10 +96,12 @@ fun KoZnaZnaScreen(
                             onAnswer = viewModel::submitPlayer1Answer,
                         )
                     }
-                KoZnaZnaPhase.ROUND_END -> RoundEndContent(
-                    state = state,
+                KoZnaZnaPhase.ROUND_END -> GameOverGate(
+                    gameType = MatchGameOrder.firebaseTypes[MatchGameOrder.KO_ZNA_ZNA],
                     player1Name = player1Name,
                     player2Name = player2Name,
+                    player1Score = state.player1Points,
+                    player2Score = state.player2Points,
                 )
             }
         }
@@ -148,16 +143,21 @@ private fun PlayingContent(
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        // Per spec, Ko-zna-zna is 5 questions with 5 seconds each — the only meaningful clock is
+        // the per-question countdown (there is no continuous round timer).
         LinearProgressIndicator(
-            progress = { state.roundSecondsLeft / 25f },
+            progress = { state.questionSecondsLeft / 5f },
             modifier = Modifier.fillMaxWidth(),
         )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Text("Round: ${state.roundSecondsLeft}s", fontWeight = FontWeight.SemiBold)
-            Text("Question: ${state.questionSecondsLeft}s", fontWeight = FontWeight.SemiBold)
+            Text(
+                "Question ${state.currentQuestionIndex + 1}/${state.questions.size}",
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text("${state.questionSecondsLeft}s", fontWeight = FontWeight.SemiBold)
         }
 
         QuestionHeader(

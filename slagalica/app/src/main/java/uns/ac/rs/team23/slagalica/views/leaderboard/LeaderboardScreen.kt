@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.models.LeaderboardEntry
+import uns.ac.rs.team23.slagalica.models.leagueIconFor
 import uns.ac.rs.team23.slagalica.viewmodels.LeaderboardPeriod
 import uns.ac.rs.team23.slagalica.viewmodels.LeaderboardViewModel
 
@@ -122,7 +123,7 @@ private fun LeaderboardRow(entry: LeaderboardEntry, leagueName: String) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(entry.username, fontWeight = FontWeight.SemiBold)
                 Text(
-                    leagueName,
+                    "${leagueIconFor(entry.leagueLevel)} $leagueName",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

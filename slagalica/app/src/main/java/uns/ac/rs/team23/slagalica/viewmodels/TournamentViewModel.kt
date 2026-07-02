@@ -28,6 +28,17 @@ data class TournamentPlayer(
     val ready: Boolean = false,
 )
 
+/** Visual bracket snapshot derived from the live tournament document. */
+data class TournamentBracketUi(
+    val semi1: List<TournamentPlayer?>,
+    val semi2: List<TournamentPlayer?>,
+    val semi1Winner: TournamentPlayer?,
+    val semi2Winner: TournamentPlayer?,
+    val finalWinner: TournamentPlayer?,
+    /** True once the host has drawn random semifinal pairings. */
+    val pairingsKnown: Boolean,
+)
+
 sealed class TournamentUiState {
     /** Joining the lobby / generic loading. */
     data object Joining : TournamentUiState()
@@ -72,6 +83,9 @@ class TournamentViewModel(
 
     private val _state = MutableStateFlow<TournamentUiState>(TournamentUiState.Joining)
     val state: StateFlow<TournamentUiState> = _state.asStateFlow()
+
+    private val _bracket = MutableStateFlow<TournamentBracketUi?>(null)
+    val bracket: StateFlow<TournamentBracketUi?> = _bracket.asStateFlow()
 
     /** Emitted when the player should navigate into the game screen (MatchStore already set). */
     private val _navigateToGame = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
@@ -129,6 +143,7 @@ class TournamentViewModel(
     private fun render(t: TournamentDto) {
         val uid = myUid ?: return
         lastTournament = t
+        _bracket.value = t.toBracketUi()
         when (t.status) {
             "WAITING" -> _state.value = TournamentUiState.Searching(t.cards(t.playerUids, t.readyUids))
             "READY_CHECK" -> {
@@ -310,4 +325,33 @@ class TournamentViewModel(
                 TournamentPlayer(it.uid, it.username, it.avatarIndex, it.leagueLevel, ready = uid in readyUids)
             }
         }
+
+    private fun TournamentDto.toBracketUi(): TournamentBracketUi {
+        fun card(uid: String?): TournamentPlayer? = uid?.let { u ->
+            player(u)?.let { p ->
+                TournamentPlayer(p.uid, p.username, p.avatarIndex, p.leagueLevel, ready = u in readyUids)
+            }
+        }
+
+        val pairingsKnown = semi1Uids.size >= 2 && semi2Uids.size >= 2
+        val semi1 = if (pairingsKnown) {
+            listOf(card(semi1Uids.getOrNull(0)), card(semi1Uids.getOrNull(1)))
+        } else {
+            listOf(card(playerUids.getOrNull(0)), card(playerUids.getOrNull(1)))
+        }
+        val semi2 = if (pairingsKnown) {
+            listOf(card(semi2Uids.getOrNull(0)), card(semi2Uids.getOrNull(1)))
+        } else {
+            listOf(card(playerUids.getOrNull(2)), card(playerUids.getOrNull(3)))
+        }
+
+        return TournamentBracketUi(
+            semi1 = semi1,
+            semi2 = semi2,
+            semi1Winner = card(semi1Winner),
+            semi2Winner = card(semi2Winner),
+            finalWinner = card(finalWinner),
+            pairingsKnown = pairingsKnown,
+        )
+    }
 }

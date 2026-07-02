@@ -22,6 +22,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -30,6 +31,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.NonCancellable
@@ -122,6 +126,26 @@ fun GameScreen(
     }
 
     BlockGameBackNavigation()
+
+    // Self-recovery: this hub screen must never be a dead-end mid-match. If the player ever lands
+    // back on it while a game is in progress (it only becomes the RESUMED/top destination when no
+    // game screen sits above it), forward straight into the active game. The game navigations use
+    // launchSingleTop so this is idempotent and never stacks duplicate destinations.
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, matchId, matchRepository) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME &&
+                matchRepository != null &&
+                matchId.isNotBlank() &&
+                !navigatedToResults
+            ) {
+                val idx = MatchStore.currentGameIndex
+                if (idx in navigators.indices) navigators[idx]()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     if (showForfeitDialog) {
         AlertDialog(

@@ -29,6 +29,8 @@ interface MatchRepository {
     suspend fun getPendingInvites(): Result<List<MatchInviteResponseDto>>
     suspend fun respondToInvite(inviteId: String, accept: Boolean): Result<MatchResponseDto>
     suspend fun cancelInvite(inviteId: String): Result<Unit>
+    /** Match created when [inviteId] was accepted, or null while still pending. */
+    suspend fun getAcceptedInviteMatch(inviteId: String): Result<MatchResponseDto?>
 
     /** Mark the current user as ready in the match lobby. */
     suspend fun markReady(matchId: String): Result<Unit>
@@ -41,7 +43,7 @@ interface MatchRepository {
     /** Live updates of the match document (status, scores, current game). */
     fun observeMatch(matchId: String): Flow<MatchResponseDto>
 
-    /** Per-game score breakdown written by [advanceMatch]. */
+    /** Per-game score breakdown written by [recordGameResult]. */
     fun observeGameResults(matchId: String): Flow<List<GameResultDto>>
 
     /** Live updates of the shared live-state for one game, or null until the host creates it. */
@@ -54,15 +56,26 @@ interface MatchRepository {
     suspend fun patchGameState(matchId: String, gameType: String, fields: Map<String, Any?>): Result<Unit>
 
     /**
-     * Host only: record both players' final scores for [gameType] and advance the match to the next
-     * game, or to COMPLETED with a winner if [gameType] is the last game. Authoritative on
-     * [gameType] (not the doc's current index), so it stays correct alongside the not-yet-converted
-     * games. Replaces the dual-submit [submitScore] path for converted games.
+     * Host only: record both players' final scores for [gameType] and add them to the match totals,
+     * without advancing yet. Resets the ready flags and sets a fallback deadline so both players can
+     * confirm the game-over summary (see [advanceFromGameOver]). Idempotent — a second call for the
+     * same [gameType] does not double-count the scores.
      */
-    suspend fun advanceMatch(
+    suspend fun recordGameResult(
         matchId: String,
         gameType: String,
         p1GameScore: Int,
         p2GameScore: Int,
+    ): Result<Unit>
+
+    /**
+     * Advance the match past [gameType] to the next game, or to COMPLETED with a winner if [gameType]
+     * is the last game (awarding stars for ranked matches). Gated behind the between-games ready
+     * handshake. Idempotent and safe to call from either client: guarded on the current game index /
+     * status, so a second call after the index has already moved is a no-op.
+     */
+    suspend fun advanceFromGameOver(
+        matchId: String,
+        gameType: String,
     ): Result<MatchResponseDto>
 }

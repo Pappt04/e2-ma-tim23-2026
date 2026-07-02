@@ -15,6 +15,7 @@ import uns.ac.rs.team23.slagalica.network.dto.GameStateDto
 import uns.ac.rs.team23.slagalica.repository.GameRepository
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 import uns.ac.rs.team23.slagalica.repository.StatisticsRepository
+import uns.ac.rs.team23.slagalica.utils.normalizeAnswer
 
 enum class AsocijacijePhase {
     ROUND_INTRO,
@@ -204,8 +205,8 @@ class AsocijacijeViewModel(
         // to drive the red flash; the authoritative scoring still happens in applySubmit.
         val correct = when (target) {
             is GuessTarget.Column ->
-                s.columns.getOrNull(target.index)?.answer?.equals(guess, ignoreCase = true) == true
-            GuessTarget.Final -> s.finalAnswer.equals(guess, ignoreCase = true)
+                s.columns.getOrNull(target.index)?.answer?.let { answersMatch(guess, it) } == true
+            GuessTarget.Final -> answersMatch(guess, s.finalAnswer)
         }
         if (authoritative) applySubmit(targetCode, guess)
         else sendIntent(mapOf("t" to "guess", "tg" to targetCode, "g" to guess))
@@ -232,6 +233,10 @@ class AsocijacijeViewModel(
         if (localActive(_state.value)) block()
     }
 
+    /** Case/whitespace/diacritic/Cyrillic-insensitive answer comparison (see [normalizeAnswer]). */
+    private fun answersMatch(guess: String, answer: String): Boolean =
+        normalizeAnswer(guess).isNotEmpty() && normalizeAnswer(guess) == normalizeAnswer(answer)
+
     // --- Apply (authoritative) ---
 
     private fun applyReveal(col: Int, row: Int) {
@@ -249,12 +254,12 @@ class AsocijacijeViewModel(
         val s = _state.value
         if (s.phase != AsocijacijePhase.PLAYING) return
         if (targetCode == "F") {
-            if (!s.isFinalSolved && guess.equals(s.finalAnswer, ignoreCase = true)) { solveFinal(); return }
+            if (!s.isFinalSolved && answersMatch(guess, s.finalAnswer)) { solveFinal(); return }
         } else {
             val idx = targetCode.removePrefix("C").toIntOrNull() ?: return
             val col = s.columns.getOrNull(idx) ?: return
             if (col.isSolved) return
-            if (guess.equals(col.answer, ignoreCase = true)) { solveColumn(idx); return }
+            if (answersMatch(guess, col.answer)) { solveColumn(idx); return }
         }
         // Wrong → end this player's turn and pass after a brief beat.
         commit(s.copy(waitingForGuess = false), deadlineAt)
@@ -321,7 +326,7 @@ class AsocijacijeViewModel(
             commit(s.copy(phase = AsocijacijePhase.GAME_OVER), 0)
             if (isHost && !advanced) {
                 advanced = true
-                viewModelScope.launch { matchRepository.advanceMatch(matchId, GAME_TYPE, s.player1Points, s.player2Points) }
+                viewModelScope.launch { matchRepository.recordGameResult(matchId, GAME_TYPE, s.player1Points, s.player2Points) }
             }
         }
         roundStarting = false

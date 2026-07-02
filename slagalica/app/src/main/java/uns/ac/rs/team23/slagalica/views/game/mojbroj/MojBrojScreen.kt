@@ -57,6 +57,7 @@ import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
 import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
+import uns.ac.rs.team23.slagalica.views.game.common.GameOverGate
 import uns.ac.rs.team23.slagalica.views.game.common.MatchPlayerHud
 import uns.ac.rs.team23.slagalica.viewmodels.ExprToken
 import uns.ac.rs.team23.slagalica.viewmodels.MojBrojPhase
@@ -88,13 +89,6 @@ fun MojBrojScreen(
         onLeaveGame = onFinish,
     )
     BlockGameBackNavigation()
-
-    LaunchedEffect(state.phase) {
-        if (state.phase == MojBrojPhase.GameOver) {
-            delay(3_000)
-            onFinish()
-        }
-    }
 
     // Spec: stopping the spinning numbers is driven by the shake sensor. A shake during a
     // countdown stops the draw (the ViewModel ignores it outside the active player's countdown).
@@ -196,11 +190,12 @@ fun MojBrojScreen(
                     opponentReady = if (MatchStore.isHost) state.p2Ready else state.p1Ready,
                     onReady = viewModel::markReady,
                 )
-                MojBrojPhase.GameOver -> GameOverContent(
-                    state = state,
+                MojBrojPhase.GameOver -> GameOverGate(
+                    gameType = MatchGameOrder.firebaseTypes[MatchGameOrder.MOJ_BROJ],
                     player1Name = player1Name,
                     player2Name = player2Name,
-                    onFinish = onFinish,
+                    player1Score = state.player1Points,
+                    player2Score = state.player2Points,
                 )
                 else -> WaitingContent("Syncing with $player2Name...")
             }

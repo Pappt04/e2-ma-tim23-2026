@@ -12,6 +12,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -47,6 +50,7 @@ import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.models.leagueIconFor
 import uns.ac.rs.team23.slagalica.repository.TournamentMatchResult
+import uns.ac.rs.team23.slagalica.viewmodels.TournamentBracketUi
 import uns.ac.rs.team23.slagalica.viewmodels.TournamentPlayer
 import uns.ac.rs.team23.slagalica.viewmodels.TournamentUiState
 import uns.ac.rs.team23.slagalica.viewmodels.TournamentViewModel
@@ -60,6 +64,7 @@ fun TournamentScreen(
     viewModel: TournamentViewModel = koinViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val bracket by viewModel.bracket.collectAsState()
 
     LaunchedEffect(Unit) { viewModel.enter() }
     LaunchedEffect(Unit) {
@@ -84,10 +89,17 @@ fun TournamentScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
                 .padding(24.dp),
-            contentAlignment = Alignment.Center,
+            contentAlignment = Alignment.TopCenter,
         ) {
-            when (val s = state) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                bracket?.let { TournamentBracketPanel(it) }
+
+                when (val s = state) {
                 TournamentUiState.Joining -> Loading("Joining tournament…")
                 TournamentUiState.Syncing -> Loading("Finishing up…")
                 TournamentUiState.EnteringMatch -> Loading("Starting match…")
@@ -149,6 +161,7 @@ fun TournamentScreen(
                     color = MaterialTheme.colorScheme.error,
                     onExit = { viewModel.leave(); onExitToHome() },
                 )
+                }
             }
         }
     }
@@ -410,4 +423,177 @@ private fun rewardSummary(reward: TournamentMatchResult?, isWinner: Boolean): St
     isWinner -> "You won the tournament!\n+${reward.tokensAwarded} tokens · +${reward.starsAwarded} stars (incl. 10 bonus)."
     reward.starsAwarded >= 0 -> "You reached the final and earned +${reward.starsAwarded} stars."
     else -> "You reached the final. Stars: ${reward.starsAwarded}."
+}
+
+@Composable
+private fun TournamentBracketPanel(bracket: TournamentBracketUi) {
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text(
+                text = "Bracket",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            if (!bracket.pairingsKnown) {
+                Text(
+                    text = "Semifinal pairings are drawn randomly once all 4 players are ready.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                BracketSemifinalColumn(
+                    label = "Semifinal 1",
+                    players = bracket.semi1,
+                    winner = bracket.semi1Winner,
+                    modifier = Modifier.weight(1f),
+                )
+                BracketSemifinalColumn(
+                    label = "Semifinal 2",
+                    players = bracket.semi2,
+                    winner = bracket.semi2Winner,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            Text(
+                text = "↓",
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            BracketFinalRow(
+                semi1Winner = bracket.semi1Winner,
+                semi2Winner = bracket.semi2Winner,
+                champion = bracket.finalWinner,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BracketSemifinalColumn(
+    label: String,
+    players: List<TournamentPlayer?>,
+    winner: TournamentPlayer?,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary,
+        )
+        BracketPlayerSlot(player = players.getOrNull(0), isWinner = winner?.uid == players.getOrNull(0)?.uid)
+        Text("vs", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        BracketPlayerSlot(player = players.getOrNull(1), isWinner = winner?.uid == players.getOrNull(1)?.uid)
+    }
+}
+
+@Composable
+private fun BracketFinalRow(
+    semi1Winner: TournamentPlayer?,
+    semi2Winner: TournamentPlayer?,
+    champion: TournamentPlayer?,
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = "Final",
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.tertiary,
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            BracketPlayerSlot(
+                player = semi1Winner,
+                isWinner = champion?.uid == semi1Winner?.uid,
+                placeholder = "Winner SF1",
+            )
+            Text("vs", style = MaterialTheme.typography.labelSmall)
+            BracketPlayerSlot(
+                player = semi2Winner,
+                isWinner = champion?.uid == semi2Winner?.uid,
+                placeholder = "Winner SF2",
+            )
+        }
+        if (champion != null) {
+            Text(
+                text = "🏆 ${champion.username}",
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
+}
+
+@Composable
+private fun BracketPlayerSlot(
+    player: TournamentPlayer?,
+    isWinner: Boolean,
+    placeholder: String = "Waiting…",
+) {
+    val bg = when {
+        isWinner -> MaterialTheme.colorScheme.primaryContainer
+        player != null -> MaterialTheme.colorScheme.surfaceContainerHigh
+        else -> MaterialTheme.colorScheme.surfaceVariant
+    }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .widthIn(min = 120.dp),
+        colors = CardDefaults.cardColors(containerColor = bg),
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isWinner) 6.dp else 1.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 10.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            if (player != null) {
+                AvatarWithFrame(avatarIndex = player.avatarIndex, size = 36.dp)
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = player.username,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center,
+                )
+                if (isWinner) {
+                    Text(
+                        text = "Winner",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                    )
+                }
+            } else {
+                Text(
+                    text = placeholder,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
 }

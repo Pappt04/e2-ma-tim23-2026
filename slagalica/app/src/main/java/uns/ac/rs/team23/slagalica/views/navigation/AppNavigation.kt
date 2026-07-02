@@ -32,6 +32,7 @@ import uns.ac.rs.team23.slagalica.data.TournamentStore
 import uns.ac.rs.team23.slagalica.models.LEAGUE_NAMES
 import uns.ac.rs.team23.slagalica.repository.MatchRepository
 import uns.ac.rs.team23.slagalica.repository.RegionRepository
+import uns.ac.rs.team23.slagalica.services.NotificationNavigation
 import uns.ac.rs.team23.slagalica.services.PendingRewardEvent
 import uns.ac.rs.team23.slagalica.viewmodels.AuthViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.LeagueChangeEvent
@@ -39,6 +40,7 @@ import uns.ac.rs.team23.slagalica.viewmodels.ChallengeViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.LobbyViewModel
 import uns.ac.rs.team23.slagalica.viewmodels.UserSession
 import uns.ac.rs.team23.slagalica.views.HomeScreen
+import uns.ac.rs.team23.slagalica.views.RewardDialog
 import uns.ac.rs.team23.slagalica.views.friends.FriendsScreen
 import uns.ac.rs.team23.slagalica.views.league.LeagueScreen
 import uns.ac.rs.team23.slagalica.views.region.RegionMapScreen
@@ -110,6 +112,20 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
     val navController = rememberNavController()
     val userSession by authViewModel.userSession.collectAsState()
     val userProfile by authViewModel.userProfile.collectAsState()
+    val notificationTap by NotificationNavigation.tapSignal.collectAsState()
+
+    LaunchedEffect(userSession, notificationTap) {
+        if (userSession !is UserSession.LoggedIn) return@LaunchedEffect
+        val target = NotificationNavigation.takePending() ?: return@LaunchedEffect
+        when (target.route) {
+            NotificationNavigation.ROUTE_NOTIFICATIONS -> {
+                navController.navigate(Screen.Notifications.route) {
+                    launchSingleTop = true
+                }
+            }
+        }
+    }
+
     LaunchedEffect(userSession) {
         val current = navController.currentDestination?.route
         when (userSession) {
@@ -391,12 +407,12 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                         }
                     }
                 },
-                onNavigateToKorakPoKorak = { navController.navigate(Screen.KorakPoKorak.route) },
-                onNavigateToKoZnaZna = { navController.navigate(Screen.KoZnaZna.route) },
-                onNavigateToSpojnice = { navController.navigate(Screen.Spojnice.route) },
-                onNavigateToMojBroj = { navController.navigate(Screen.MojBroj.route) },
-                onNavigateToSkocko = { navController.navigate(Screen.Skocko.route) },
-                onNavigateToAsocijacije = { navController.navigate(Screen.Asocijacije.route) },
+                onNavigateToKorakPoKorak = { navController.navigate(Screen.KorakPoKorak.route) { launchSingleTop = true } },
+                onNavigateToKoZnaZna = { navController.navigate(Screen.KoZnaZna.route) { launchSingleTop = true } },
+                onNavigateToSpojnice = { navController.navigate(Screen.Spojnice.route) { launchSingleTop = true } },
+                onNavigateToMojBroj = { navController.navigate(Screen.MojBroj.route) { launchSingleTop = true } },
+                onNavigateToSkocko = { navController.navigate(Screen.Skocko.route) { launchSingleTop = true } },
+                onNavigateToAsocijacije = { navController.navigate(Screen.Asocijacije.route) { launchSingleTop = true } },
             )
         }
         composable(Screen.KorakPoKorak.route) {
@@ -651,24 +667,11 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
         authViewModel.pendingReward.collect { rewardEvent = it }
     }
     rewardEvent?.let { event ->
-        val period = if (event.weekly) "weekly" else "monthly"
-        AlertDialog(
-            onDismissRequest = {
+        RewardDialog(
+            event = event,
+            onDismiss = {
                 rewardEvent = null
                 authViewModel.refreshProfile()
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    rewardEvent = null
-                    authViewModel.refreshProfile()
-                }) { Text("Super!") }
-            },
-            title = { Text("🎉🎟 Reward earned!") },
-            text = {
-                Text(
-                    "Rank #${event.rank} on the $period leaderboard earns you " +
-                        "${event.tokens} tokens!\n\n⭐🎊🎁",
-                )
             },
         )
     }

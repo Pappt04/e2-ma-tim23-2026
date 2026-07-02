@@ -31,6 +31,7 @@ import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
 import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
+import uns.ac.rs.team23.slagalica.views.game.common.GameOverGate
 import uns.ac.rs.team23.slagalica.views.game.common.MatchPlayerHud
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPhase
 import uns.ac.rs.team23.slagalica.viewmodels.KorakPoKorakViewModel
@@ -55,13 +56,6 @@ fun KorakPoKorakScreen(
         onLeaveGame = onFinish,
     )
     BlockGameBackNavigation()
-
-    LaunchedEffect(state.phase) {
-        if (state.phase == KorakPhase.GameOver) {
-            delay(3_000)
-            onFinish()
-        }
-    }
 
     val activeName = when (state.phase) {
         KorakPhase.OpponentChance -> if (state.currentRound == 1) player2Name else player1Name
@@ -161,11 +155,12 @@ fun KorakPoKorakScreen(
                     opponentReady = if (MatchStore.isHost) state.p2Ready else state.p1Ready,
                     onReady = viewModel::markReady,
                 )
-                KorakPhase.GameOver -> GameOverContent(
-                    state = state,
+                KorakPhase.GameOver -> GameOverGate(
+                    gameType = MatchGameOrder.firebaseTypes[MatchGameOrder.KORAK_PO_KORAK],
                     player1Name = player1Name,
                     player2Name = player2Name,
-                    onFinish = onFinish,
+                    player1Score = state.player1Points,
+                    player2Score = state.player2Points,
                 )
             }
         }

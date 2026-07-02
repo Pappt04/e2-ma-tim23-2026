@@ -113,6 +113,32 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
         startMatchObserver(match.id, opponent)
     }
 
+    /**
+     * A friend accepted the invite and the match is already IN_PROGRESS. Unlike random
+     * matchmaking there is no ready lobby for invites — the invitee jumps straight into the game,
+     * so the inviter must too (otherwise it waits forever on a ready screen the invitee never sees).
+     * Populate [MatchStore] and go directly to [LobbyState.Starting] → the game.
+     */
+    private fun onInviteMatchStarted(match: MatchResponseDto) {
+        myReadyLocal = false
+        opponentReadyLocal = false
+        activeMatchId = match.id
+        val opponent = resolveOpponent(match.player1Username, match.player2Username ?: "")
+        MatchStore.set(
+            match.id,
+            opponent,
+            friendly = match.isFriendly,
+            myUid = matchRepository.currentUserId() ?: "",
+            hostId = match.player1Id,
+            player1 = match.player1Username,
+            player2 = match.player2Username ?: "",
+            player1Id = match.player1Id,
+            player2Id = match.player2Id.orEmpty(),
+        )
+        viewModelScope.launch { matchRepository.setInMatch(true) }
+        _state.value = LobbyState.Starting
+    }
+
     private fun onOpponentLeftLobby() {
         countdownJob?.cancel()
         countdownJob = null
@@ -226,9 +252,9 @@ class LobbyViewModel(private val matchRepository: MatchRepository) : ViewModel()
         pollingJob = viewModelScope.launch {
             repeat(30) {
                 delay(1_000)
-                matchRepository.getCurrentMatch().onSuccess { match ->
+                matchRepository.getAcceptedInviteMatch(inviteId).onSuccess { match ->
                     if (match != null && match.status == "IN_PROGRESS" && match.player2Username != null) {
-                        onMatchFound(match)
+                        onInviteMatchStarted(match)
                         pollingJob?.cancel()
                         return@onSuccess
                     }

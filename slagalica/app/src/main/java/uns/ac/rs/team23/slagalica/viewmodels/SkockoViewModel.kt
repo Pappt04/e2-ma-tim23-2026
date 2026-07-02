@@ -363,7 +363,7 @@ class SkockoViewModel(
         commit(s.copy(phase = SkockoPhase.GAME_OVER), 0)
         if (isHost && !advanced) {
             advanced = true
-            viewModelScope.launch { matchRepository.advanceMatch(matchId, GAME_TYPE, s.player1Points, s.player2Points) }
+            viewModelScope.launch { matchRepository.recordGameResult(matchId, GAME_TYPE, s.player1Points, s.player2Points) }
         }
     }
 

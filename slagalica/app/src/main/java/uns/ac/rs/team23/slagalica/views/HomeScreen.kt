@@ -1,6 +1,8 @@
 package uns.ac.rs.team23.slagalica.views
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -94,6 +96,11 @@ fun HomeScreen(
                     }
                 }
                 HorizontalDivider()
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState()),
+                ) {
                 val drawerItemColors = NavigationDrawerItemDefaults.colors(
                     selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
                     selectedIconColor = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -230,19 +237,8 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(0.dp),
                     )
-                    NavigationDrawerItem(
-                        icon = { Icon(Icons.Default.Settings, contentDescription = null) },
-                        label = { Text("Settings") },
-                        selected = false,
-                        onClick = {
-                            scope.launch { drawerState.close() }
-                            // TODO: navigate to settings
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(0.dp),
-                    )
                 }
-                Spacer(modifier = Modifier.weight(1f))
+                }
                 HorizontalDivider()
                 NavigationDrawerItem(
                     icon = { Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null) },
@@ -281,6 +277,7 @@ fun HomeScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center,

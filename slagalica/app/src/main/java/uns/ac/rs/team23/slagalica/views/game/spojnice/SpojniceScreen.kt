@@ -43,6 +43,7 @@ import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
 import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
+import uns.ac.rs.team23.slagalica.views.game.common.GameOverGate
 import uns.ac.rs.team23.slagalica.views.game.common.MatchPlayerHud
 import uns.ac.rs.team23.slagalica.viewmodels.SpojnicePhase
 import uns.ac.rs.team23.slagalica.viewmodels.SpojniceState
@@ -65,13 +66,6 @@ fun SpojniceScreen(
 
     MatchGameAdvanceEffect(thisGameIndex = MatchGameOrder.SPOJNICE, onLeaveGame = onFinish)
     BlockGameBackNavigation()
-
-    LaunchedEffect(state.phase) {
-        if (state.phase == SpojnicePhase.GAME_OVER) {
-            delay(3_000)
-            onFinish()
-        }
-    }
 
     Scaffold(
         topBar = {
@@ -128,11 +122,12 @@ fun SpojniceScreen(
                 onReady = viewModel::markReady,
                 modifier = Modifier.padding(innerPadding),
             )
-            SpojnicePhase.GAME_OVER -> GameOver(
-                state = state,
+            SpojnicePhase.GAME_OVER -> GameOverGate(
+                gameType = MatchGameOrder.firebaseTypes[MatchGameOrder.SPOJNICE],
                 player1Name = player1Name,
                 player2Name = player2Name,
-                onFinish = onFinish,
+                player1Score = state.player1Points,
+                player2Score = state.player2Points,
                 modifier = Modifier.padding(innerPadding),
             )
         }

@@ -87,8 +87,12 @@ fun NotificationsScreen(
                                 notification = notif,
                                 secondsLeft = countdowns[notif.id] ?: 0,
                                 onAccept = {
-                                    viewModel.respondToInvite(notif.inviteId, accept = true, notificationId = notif.id)
-                                    onMatchStarted()
+                                    viewModel.respondToInvite(
+                                        notif.inviteId,
+                                        accept = true,
+                                        notificationId = notif.id,
+                                        onMatchStarted = onMatchStarted,
+                                    )
                                 },
                                 onReject = {
                                     viewModel.respondToInvite(notif.inviteId, accept = false, notificationId = notif.id)

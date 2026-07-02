@@ -1,9 +1,10 @@
 package uns.ac.rs.team23.slagalica.viewmodels
 
+import android.content.Context
+import android.net.Uri
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -24,6 +25,7 @@ import uns.ac.rs.team23.slagalica.repository.AuthRepository
 import uns.ac.rs.team23.slagalica.repository.ProfileRepository
 import uns.ac.rs.team23.slagalica.repository.NotificationRepository
 import uns.ac.rs.team23.slagalica.services.ClientDbListeners
+import uns.ac.rs.team23.slagalica.services.NotificationListenerService
 import uns.ac.rs.team23.slagalica.services.PendingRewardEvent
 
 sealed class AuthState {
@@ -45,6 +47,7 @@ data class LeagueChangeEvent(val oldLevel: Int, val newLevel: Int) {
 }
 
 class AuthViewModel(
+    private val appContext: Context,
     private val authRepository: AuthRepository,
     private val profileRepository: ProfileRepository,
     private val notificationRepository: NotificationRepository,
@@ -84,7 +87,7 @@ class AuthViewModel(
                 val username = current.displayName ?: ""
                 val email = current.email ?: ""
                 _userSession.value = UserSession.LoggedIn(username, email)
-                clientDbListeners.start(current.uid)
+                startBackgroundListeners(current.uid)
                 refreshProfile()
             }
         }
@@ -199,7 +202,7 @@ class AuthViewModel(
                     val session = UserSession.LoggedIn(profile.username, profile.email)
                     _userSession.value = session
                     applyProfileUpdate(profile)
-                    FirebaseAuth.getInstance().currentUser?.uid?.let { clientDbListeners.start(it) }
+                    FirebaseAuth.getInstance().currentUser?.uid?.let { startBackgroundListeners(it) }
                     _loginState.value = AuthState.Success
                 }
                 .onFailure { _loginState.value = AuthState.Error(it.message ?: "Login error") }
@@ -344,7 +347,7 @@ class AuthViewModel(
     }
 
     fun logout() {
-        clientDbListeners.stop()
+        stopBackgroundListeners()
         viewModelScope.launch {
             authRepository.logout()
         }
@@ -352,8 +355,13 @@ class AuthViewModel(
         _userProfile.value = null
     }
 
-    override fun onCleared() {
+    /** Keeps Firestore listeners alive while the app is backgrounded (match invites, chat, rewards). */
+    private fun startBackgroundListeners(uid: String) {
+        NotificationListenerService.start(appContext, uid)
+    }
+
+    private fun stopBackgroundListeners() {
+        NotificationListenerService.stop(appContext)
         clientDbListeners.stop()
-        super.onCleared()
     }
 }

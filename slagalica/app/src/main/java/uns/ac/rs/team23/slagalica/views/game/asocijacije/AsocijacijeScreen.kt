@@ -30,7 +30,9 @@ import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
 import uns.ac.rs.team23.slagalica.viewmodels.*
+import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
 import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
+import uns.ac.rs.team23.slagalica.views.game.common.GameOverGate
 import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
 import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
 
@@ -51,13 +53,7 @@ fun AsocijacijeScreen(
     LaunchedEffect(Unit) { viewModel.enter() }
 
     MatchGameAdvanceEffect(thisGameIndex = MatchGameOrder.ASOCIJACIJE, onLeaveGame = onFinish)
-
-    LaunchedEffect(state.phase) {
-        if (state.phase == AsocijacijePhase.GAME_OVER) {
-            kotlinx.coroutines.delay(3_000)
-            onFinish()
-        }
-    }
+    BlockGameBackNavigation()
 
     Scaffold(
         topBar = {
@@ -129,11 +125,12 @@ fun AsocijacijeScreen(
                     opponentReady = if (MatchStore.isHost) state.p2Ready else state.p1Ready,
                     onReady = viewModel::markReady,
                 )
-                AsocijacijePhase.GAME_OVER -> GameOverContent(
-                    state = state,
+                AsocijacijePhase.GAME_OVER -> GameOverGate(
+                    gameType = MatchGameOrder.firebaseTypes[MatchGameOrder.ASOCIJACIJE],
                     player1Name = player1Name,
                     player2Name = player2Name,
-                    onFinish = onFinish,
+                    player1Score = state.player1Points,
+                    player2Score = state.player2Points,
                 )
             }
         }
@@ -244,7 +241,7 @@ private fun PlayingContent(
                 text = if (canGuessNow)
                     "$activeName is guessing..."
                 else
-                    "$activeName otkriva polje",
+                    "$activeName is revealing a field",
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,

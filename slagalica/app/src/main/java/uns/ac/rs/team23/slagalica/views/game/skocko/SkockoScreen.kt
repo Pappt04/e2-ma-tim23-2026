@@ -28,7 +28,9 @@ import org.koin.androidx.compose.koinViewModel
 import uns.ac.rs.team23.slagalica.R
 import uns.ac.rs.team23.slagalica.data.MatchGameOrder
 import uns.ac.rs.team23.slagalica.data.MatchStore
+import uns.ac.rs.team23.slagalica.views.game.common.BlockGameBackNavigation
 import uns.ac.rs.team23.slagalica.views.game.common.ForfeitAction
+import uns.ac.rs.team23.slagalica.views.game.common.GameOverGate
 import uns.ac.rs.team23.slagalica.viewmodels.*
 import uns.ac.rs.team23.slagalica.views.game.common.MatchGameAdvanceEffect
 import uns.ac.rs.team23.slagalica.views.game.common.RoundReadyButton
@@ -104,13 +106,11 @@ fun SkockoScreen(
     LaunchedEffect(Unit) { viewModel.enter() }
 
     MatchGameAdvanceEffect(thisGameIndex = MatchGameOrder.SKOCKO, onLeaveGame = onFinish)
+    BlockGameBackNavigation()
 
-    LaunchedEffect(state.phase) {
-        if (state.phase == SkockoPhase.GAME_OVER) {
-            delay(3_000)
-            onFinish()
-        }
-    }
+    // The countdown means different things per phase: 30s for a player's turn, 10s for the steal.
+    // Scale the timer bar/colour to the current phase so it reads correctly (not always vs 30s).
+    val timerMaxSecs = if (state.phase == SkockoPhase.OPPONENT_STEAL) 10 else 30
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -136,7 +136,7 @@ fun SkockoScreen(
                             text = "${state.secondsLeft}s",
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
-                            color = if (state.secondsLeft <= 10)
+                            color = if (state.secondsLeft <= timerMaxSecs / 3)
                                 MaterialTheme.colorScheme.secondary
                             else MaterialTheme.colorScheme.primary,
                             modifier = Modifier.padding(end = 16.dp),
@@ -161,12 +161,10 @@ fun SkockoScreen(
                         state.activePlayerIsP1 -> player1Name
                         else     -> player2Name
                     }
-                    if (!isSteal) {
-                        LinearProgressIndicator(
-                            progress = { state.secondsLeft / 30f },
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
+                    LinearProgressIndicator(
+                        progress = { state.secondsLeft / timerMaxSecs.toFloat() },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                     GameContent(
                         state = state,
                         activeName = activeName,
@@ -186,11 +184,12 @@ fun SkockoScreen(
                     opponentReady = if (MatchStore.isHost) state.p2Ready else state.p1Ready,
                     onReady = viewModel::markReady,
                 )
-                SkockoPhase.GAME_OVER -> GameOverContent(
-                    state = state,
+                SkockoPhase.GAME_OVER -> GameOverGate(
+                    gameType = MatchGameOrder.firebaseTypes[MatchGameOrder.SKOCKO],
                     player1Name = player1Name,
                     player2Name = player2Name,
-                    onFinish = onFinish,
+                    player1Score = state.player1Points,
+                    player2Score = state.player2Points,
                 )
             }
         }

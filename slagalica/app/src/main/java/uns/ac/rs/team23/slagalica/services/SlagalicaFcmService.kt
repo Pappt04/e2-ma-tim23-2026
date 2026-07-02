@@ -92,14 +92,14 @@ class SlagalicaFcmService : FirebaseMessagingService() {
         )
 
         _events.tryEmit(notification)
-        showNotification(title, body, notifType)
+        showNotification(notification)
     }
 
-    private fun showNotification(title: String, message: String, type: NotificationType) {
+    private fun showNotification(notification: Notification) {
         val manager = NotificationManagerCompat.from(this)
         if (!manager.areNotificationsEnabled()) return
 
-        val channelId = when (type) {
+        val channelId = when (notification.type) {
             NotificationType.CHAT -> CHANNEL_CHAT
             NotificationType.RANKING -> CHANNEL_RANKING
             NotificationType.REWARD -> CHANNEL_REWARD
@@ -108,15 +108,16 @@ class SlagalicaFcmService : FirebaseMessagingService() {
 
         val notif = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.mipmap.slagalica_logo)
-            .setContentTitle(title)
-            .setContentText(message)
+            .setContentTitle(notification.title)
+            .setContentText(notification.message)
+            .setContentIntent(NotificationNavigation.pendingIntent(this, notification))
             .setPriority(
-                if (type == NotificationType.REWARD) NotificationCompat.PRIORITY_HIGH
+                if (notification.type == NotificationType.REWARD) NotificationCompat.PRIORITY_HIGH
                 else NotificationCompat.PRIORITY_DEFAULT
             )
             .setAutoCancel(true)
             .build()
-        manager.notify(System.currentTimeMillis().toInt(), notif)
+        manager.notify(notification.id.hashCode(), notif)
     }
 
     private fun saveToFirestore(notification: Notification) {

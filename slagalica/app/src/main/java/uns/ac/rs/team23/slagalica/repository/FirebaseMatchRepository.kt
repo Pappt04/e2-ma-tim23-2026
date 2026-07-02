@@ -26,6 +26,9 @@ private val GAME_ORDER = listOf(
     "KO_ZNA_ZNA", "SPOJNICE", "ASOCIJACIJE", "SKOCKO", "KORAK_PO_KORAK", "MOJ_BROJ"
 )
 
+/** How long the between-games ready gate waits for a slow opponent before advancing anyway. */
+private const val GAME_OVER_FALLBACK_MILLIS = 30_000L
+
 class FirebaseMatchRepository(
     private val auth: FirebaseAuth,
     private val firestore: FirebaseFirestore,
@@ -596,6 +599,15 @@ class FirebaseMatchRepository(
             .await()
     }
 
+    override suspend fun getAcceptedInviteMatch(inviteId: String): Result<MatchResponseDto?> = runCatching {
+        val invite = firestore.collection("matchInvites").document(inviteId).get().await()
+        if (invite.getString("status") != "ACCEPTED") return@runCatching null
+        val matchId = invite.getString("matchId") ?: return@runCatching null
+        val match = firestore.collection("matches").document(matchId).get().await()
+        if (!match.exists()) return@runCatching null
+        match.toMatchResponseDto()
+    }
+
     override suspend fun markReady(matchId: String): Result<Unit> = runCatching {
         val uid = auth.currentUser?.uid ?: throw Exception("Not logged in")
         val matchRef = firestore.collection("matches").document(matchId)
@@ -671,34 +683,24 @@ class FirebaseMatchRepository(
             .await()
     }
 
-    override suspend fun advanceMatch(
+    override suspend fun recordGameResult(
         matchId: String,
         gameType: String,
         p1GameScore: Int,
         p2GameScore: Int,
-    ): Result<MatchResponseDto> = runCatching {
+    ): Result<Unit> = runCatching {
         val matchRef = firestore.collection("matches").document(matchId)
 
         firestore.runTransaction { tx ->
             val match = tx.get(matchRef)
-            // Ignore if the match is already finished/abandoned.
             if (match.getString("status") != "IN_PROGRESS") return@runTransaction
             val gameIndex = GAME_ORDER.indexOf(gameType)
                 .takeIf { it >= 0 } ?: (match.getLong("currentGameIndex") ?: 0L).toInt()
 
-            // Pre-read both players (reads must precede writes) so we can award
-            // stars when this game completes the match (ranked matches only).
-            val isFriendly = match.getBoolean("isFriendly") ?: false
-            val p1Id = match.getString("player1Id")
-            val p2Id = match.getString("player2Id")
-            val usersCol = firestore.collection("users")
-            val p1Ref = p1Id?.let { usersCol.document(it) }
-            val p2Ref = p2Id?.let { usersCol.document(it) }
-            val p1Snap = if (!isFriendly && p1Ref != null) tx.get(p1Ref) else null
-            val p2Snap = if (!isFriendly && p2Ref != null) tx.get(p2Ref) else null
-
-            // Persist the per-game result for this specific game (idempotent).
+            // Idempotent: if this game's result is already recorded, don't add the scores again.
             val gameResultRef = matchRef.collection("gameResults").document(gameType)
+            if (tx.get(gameResultRef).exists()) return@runTransaction
+
             tx.set(
                 gameResultRef,
                 mapOf(
@@ -714,23 +716,63 @@ class FirebaseMatchRepository(
 
             val newP1Total = (match.getLong("player1TotalScore") ?: 0L).toInt() + p1GameScore
             val newP2Total = (match.getLong("player2TotalScore") ?: 0L).toInt() + p2GameScore
+
+            // Add the scores and open the between-games ready gate (reset ready flags + a fallback
+            // deadline so a present-but-slow opponent can't stall the match forever). The index is
+            // only advanced later, by advanceFromGameOver, once both players confirm.
+            tx.update(
+                matchRef, mapOf(
+                    "player1TotalScore" to newP1Total,
+                    "player2TotalScore" to newP2Total,
+                    "player1Ready" to false,
+                    "player2Ready" to false,
+                    "gameOverDeadlineAt" to System.currentTimeMillis() + GAME_OVER_FALLBACK_MILLIS,
+                )
+            )
+        }.await()
+    }
+
+    override suspend fun advanceFromGameOver(
+        matchId: String,
+        gameType: String,
+    ): Result<MatchResponseDto> = runCatching {
+        val matchRef = firestore.collection("matches").document(matchId)
+
+        firestore.runTransaction { tx ->
+            val match = tx.get(matchRef)
+            if (match.getString("status") != "IN_PROGRESS") return@runTransaction
+            val gameIndex = GAME_ORDER.indexOf(gameType)
+                .takeIf { it >= 0 } ?: (match.getLong("currentGameIndex") ?: 0L).toInt()
+            // Guard: only advance if the match still points at this game (idempotent — a second
+            // caller after the index has moved is a no-op, so stars are never awarded twice).
+            val currentIndex = (match.getLong("currentGameIndex") ?: 0L).toInt()
+            if (currentIndex != gameIndex) return@runTransaction
+
+            // Pre-read both players (reads must precede writes) so we can award stars when this game
+            // completes the match (ranked matches only). Totals were already added by recordGameResult.
+            val isFriendly = match.getBoolean("isFriendly") ?: false
+            val p1Id = match.getString("player1Id")
+            val p2Id = match.getString("player2Id")
+            val usersCol = firestore.collection("users")
+            val p1Ref = p1Id?.let { usersCol.document(it) }
+            val p2Ref = p2Id?.let { usersCol.document(it) }
+            val p1Snap = if (!isFriendly && p1Ref != null) tx.get(p1Ref) else null
+            val p2Snap = if (!isFriendly && p2Ref != null) tx.get(p2Ref) else null
+
+            val p1Total = (match.getLong("player1TotalScore") ?: 0L).toInt()
+            val p2Total = (match.getLong("player2TotalScore") ?: 0L).toInt()
             val nextGameIndex = gameIndex + 1
 
             if (nextGameIndex >= GAME_ORDER.size) {
                 val abandonedBy = match.getString("abandonedById")
                 val winnerId = when {
-                    abandonedBy != null -> {
-                        val p1Id = match.getString("player1Id")
-                        if (abandonedBy == p1Id) match.getString("player2Id") else p1Id
-                    }
-                    newP1Total > newP2Total -> match.getString("player1Id")
-                    newP2Total > newP1Total -> match.getString("player2Id")
+                    abandonedBy != null -> if (abandonedBy == p1Id) p2Id else p1Id
+                    p1Total > p2Total -> p1Id
+                    p2Total > p1Total -> p2Id
                     else -> null
                 }
                 tx.update(
                     matchRef, mapOf(
-                        "player1TotalScore" to newP1Total,
-                        "player2TotalScore" to newP2Total,
                         "status" to "COMPLETED",
                         "winnerId" to winnerId,
                         "completedAt" to FieldValue.serverTimestamp(),
@@ -738,20 +780,17 @@ class FirebaseMatchRepository(
                 )
                 if (p1Snap != null && p2Snap != null && p1Ref != null && p2Ref != null) {
                     if (abandonedBy != null) {
-                        val p1Id = match.getString("player1Id")
                         awardStarsForcedWinner(
-                            tx, p1Ref, p1Snap, p2Ref, p2Snap, newP1Total, newP2Total,
+                            tx, p1Ref, p1Snap, p2Ref, p2Snap, p1Total, p2Total,
                             winnerIsP1 = winnerId == p1Id,
                         )
                     } else {
-                        awardStars(tx, p1Ref, p1Snap, p2Ref, p2Snap, newP1Total, newP2Total)
+                        awardStars(tx, p1Ref, p1Snap, p2Ref, p2Snap, p1Total, p2Total)
                     }
                 }
             } else {
                 tx.update(
                     matchRef, mapOf(
-                        "player1TotalScore" to newP1Total,
-                        "player2TotalScore" to newP2Total,
                         "currentGameIndex" to nextGameIndex,
                         "currentGameType" to GAME_ORDER[nextGameIndex],
                     )
