@@ -31,6 +31,9 @@ import uns.ac.rs.team23.slagalica.viewmodels.NotificationsViewModel
 fun NotificationsScreen(
     onNavigateBack: () -> Unit,
     onMatchStarted: () -> Unit = {},
+    onNavigateToLeaderboard: () -> Unit = {},
+    onNavigateToChat: () -> Unit = {},
+    onNavigateToHome: () -> Unit = {},
     viewModel: NotificationsViewModel = koinViewModel(),
 ) {
     val allNotifications by viewModel.notifications.collectAsState()
@@ -85,7 +88,7 @@ fun NotificationsScreen(
                         if (notif.type == NotificationType.INVITE && notif.inviteId != null) {
                             InviteNotificationCard(
                                 notification = notif,
-                                secondsLeft = countdowns[notif.id] ?: 0,
+                                secondsLeft = countdowns[notif.id],
                                 onAccept = {
                                     viewModel.respondToInvite(
                                         notif.inviteId,
@@ -97,11 +100,22 @@ fun NotificationsScreen(
                                 onReject = {
                                     viewModel.respondToInvite(notif.inviteId, accept = false, notificationId = notif.id)
                                 },
+                                onDefer = { viewModel.deferInvite(notif.id) },
                             )
                         } else {
                             NotificationCard(
                                 notification = notif,
                                 onMarkRead = { viewModel.markAsRead(notif.id) },
+                                onReact = {
+                                    viewModel.markAsRead(notif.id)
+                                    when (notif.type) {
+                                        NotificationType.RANKING -> onNavigateToLeaderboard()
+                                        NotificationType.REWARD -> onNavigateToHome()
+                                        NotificationType.CHAT -> onNavigateToChat()
+                                        NotificationType.OTHER -> { }
+                                        NotificationType.INVITE -> { }
+                                    }
+                                },
                             )
                         }
                     }
@@ -114,9 +128,10 @@ fun NotificationsScreen(
 @Composable
 private fun InviteNotificationCard(
     notification: Notification,
-    secondsLeft: Int,
+    secondsLeft: Int?,
     onAccept: () -> Unit,
     onReject: () -> Unit,
+    onDefer: () -> Unit,
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -131,19 +146,20 @@ private fun InviteNotificationCard(
                 Spacer(Modifier.width(8.dp))
                 Text(notification.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.weight(1f))
-                // Countdown badge
-                Surface(
-                    shape = CircleShape,
-                    color = if (secondsLeft <= 3) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
-                    modifier = Modifier.size(32.dp),
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(
-                            "$secondsLeft",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSecondary,
-                            fontWeight = FontWeight.Bold,
-                        )
+                if (secondsLeft != null) {
+                    Surface(
+                        shape = CircleShape,
+                        color = if (secondsLeft <= 3) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(32.dp),
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                "$secondsLeft",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSecondary,
+                                fontWeight = FontWeight.Bold,
+                            )
+                        }
                     }
                 }
             }
@@ -152,6 +168,17 @@ private fun InviteNotificationCard(
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = onAccept, modifier = Modifier.weight(1f)) { Text("Accept") }
                 OutlinedButton(onClick = onReject, modifier = Modifier.weight(1f)) { Text("Reject") }
+            }
+            if (secondsLeft != null) {
+                TextButton(onClick = onDefer, modifier = Modifier.fillMaxWidth()) {
+                    Text("React later")
+                }
+            } else if (notification.isRead) {
+                Text(
+                    "Saved — accept or reject when you're ready.",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
         }
     }
@@ -177,7 +204,11 @@ private fun FilterTabRow(
 }
 
 @Composable
-private fun NotificationCard(notification: Notification, onMarkRead: () -> Unit) {
+private fun NotificationCard(
+    notification: Notification,
+    onMarkRead: () -> Unit,
+    onReact: () -> Unit,
+) {
     val bgColor by animateColorAsState(
         if (notification.isRead) MaterialTheme.colorScheme.surface
         else MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
@@ -217,9 +248,23 @@ private fun NotificationCard(notification: Notification, onMarkRead: () -> Unit)
                     maxLines = 2, overflow = TextOverflow.Ellipsis)
                 if (!notification.isRead) {
                     Spacer(Modifier.height(6.dp))
-                    TextButton(onClick = onMarkRead, contentPadding = PaddingValues(0.dp),
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        TextButton(onClick = onMarkRead, contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.height(24.dp)) {
+                            Text("Mark as read", style = MaterialTheme.typography.labelSmall)
+                        }
+                        if (notification.type != NotificationType.OTHER) {
+                            TextButton(onClick = onReact, contentPadding = PaddingValues(0.dp),
+                                modifier = Modifier.height(24.dp)) {
+                                Text(reactLabel(notification.type), style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+                    }
+                } else if (notification.type != NotificationType.OTHER) {
+                    Spacer(Modifier.height(6.dp))
+                    TextButton(onClick = onReact, contentPadding = PaddingValues(0.dp),
                         modifier = Modifier.height(24.dp)) {
-                        Text("Mark as read", style = MaterialTheme.typography.labelSmall)
+                        Text(reactLabel(notification.type), style = MaterialTheme.typography.labelSmall)
                     }
                 }
             }
@@ -230,6 +275,14 @@ private fun NotificationCard(notification: Notification, onMarkRead: () -> Unit)
             }
         }
     }
+}
+
+private fun reactLabel(type: NotificationType): String = when (type) {
+    NotificationType.RANKING -> "View rankings"
+    NotificationType.REWARD -> "View reward"
+    NotificationType.CHAT -> "Open chat"
+    NotificationType.INVITE -> "Respond"
+    NotificationType.OTHER -> "Open"
 }
 
 @Composable

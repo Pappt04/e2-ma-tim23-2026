@@ -80,15 +80,10 @@ fun GameScreen(
 
     // Drive navigation from Firebase (source of truth after advanceMatch).
     LaunchedEffect(matchId, matchRepository) {
-        if (matchRepository == null) {
-            // Preview only (no repository): play locally.
-            val idx = MatchStore.currentGameIndex
-            if (idx < navigators.size) navigators[idx]() else onAllGamesFinished()
-            return@LaunchedEffect
-        }
+        if (matchRepository == null) return@LaunchedEffect
         if (matchId.isBlank()) {
-            // No active match (e.g., stores were cleared mid-flow) — bail out instead of starting a
-            // phantom local game (the "blank Opponent / random questions" bug after a forfeit).
+            // No active match (e.g., stores cleared mid-flow) — bail out instead of starting a
+            // phantom game (the "blank Opponent / random questions" bug after a forfeit).
             onAllGamesFinished()
             return@LaunchedEffect
         }

@@ -18,8 +18,8 @@ import uns.ac.rs.team23.slagalica.R
 /**
  * Foreground service that keeps the Firestore notification/invite listeners ([ClientDbListeners])
  * alive while the app is backgrounded. Without it the listeners are tied to the app process and
- * detach when the process is reclaimed, so invites/chat/reward notifications never arrive unless
- * the app is in the foreground (the app has no FCM push backend on the free plan).
+ * detach when the process is reclaimed, so invites/chat/reward notifications may not arrive unless
+ * the app is in the foreground.
  */
 class NotificationListenerService : Service(), KoinComponent {
 

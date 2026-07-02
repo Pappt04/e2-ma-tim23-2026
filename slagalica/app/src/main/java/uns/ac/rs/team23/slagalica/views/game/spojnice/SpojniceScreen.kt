@@ -166,11 +166,6 @@ private fun RoundIntro(
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
-                Text(
-                    text = "Local test: you play both roles on this device.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.primary,
-                )
                 Button(onClick = onStart, modifier = Modifier.fillMaxWidth()) { Text("Start Round") }
             }
         }
@@ -285,12 +280,6 @@ private fun PlayingPhase(
                 }
             }
         }
-        Spacer(modifier = Modifier.weight(1f))
-        Text(
-            text = "Local test: play starter, then play opponent on the same phone.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

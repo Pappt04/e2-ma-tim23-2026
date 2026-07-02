@@ -12,18 +12,13 @@ import java.time.LocalDate
 import kotlin.math.floor
 
 /**
- * Client-side monthly-cycle bookkeeping. Firebase Cloud Functions need the paid
- * Blaze plan, so the rollover runs on the client instead: the first client past
- * a month boundary claims the rollover via a guarded transaction and finalizes
- * the cycle (top-3 region frames, 30% star penalty for unranked players, reset
- * of cycleStars). It is fully automatic, driven by the real calendar month.
+ * Client-side monthly-cycle bookkeeping: the first client past a month boundary claims the
+ * rollover via a guarded transaction and finalizes the cycle (top-3 region frames, 30% star
+ * penalty for unranked players, reset of cycleStars).
  */
 class CycleManager(
     private val firestore: FirebaseFirestore,
 ) {
-    /** Top-N monthly players are considered "ranked" and exempt from the penalty. */
-    private val rankedCutoff = 10
-
     private fun currentMonthlyId(): String = LocalDate.now().toString().substring(0, 7) // YYYY-MM
 
     /** ISO week id, e.g. 2026-W25 */
@@ -118,13 +113,10 @@ class CycleManager(
             .take(3)
             .map { it.first }
 
-        // 2) Ranked players this cycle = top N by cycleStars (only those who played).
+        // 2) Spec §4.a/§6.e — on the monthly list = earned cycle stars (played and ranked this cycle).
         val rankedUids = users
-            .map { it.id to (it.getLong("cycleStars") ?: 0L) }
-            .filter { it.second > 0 }
-            .sortedByDescending { it.second }
-            .take(rankedCutoff)
-            .map { it.first }
+            .filter { (it.getLong("cycleStars") ?: 0L) > 0L }
+            .map { it.id }
             .toSet()
 
         awardCycleTokens(users, field = "cycleStars", weekly = false)

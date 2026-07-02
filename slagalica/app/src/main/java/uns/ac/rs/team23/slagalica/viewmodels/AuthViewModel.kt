@@ -95,7 +95,7 @@ class AuthViewModel(
         runMonthlyRollover()
     }
 
-    /** Automatic monthly-cycle rollover (no Cloud Functions / billing required). */
+    /** Automatic monthly-cycle rollover. */
     private fun runMonthlyRollover() {
         viewModelScope.launch {
             cycleManager.maybeRollover()

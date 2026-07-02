@@ -278,11 +278,29 @@ fun AppNavHost(authViewModel: AuthViewModel = koinViewModel()) {
                 }
             }
             if (session is UserSession.LoggedIn) {
+                val region = userProfile?.region ?: ""
                 NotificationsScreen(
                     onNavigateBack = { navController.popBackStack() },
                     onMatchStarted = {
                         navController.navigate(Screen.Game.route) {
                             popUpTo(Screen.Home.route)
+                        }
+                    },
+                    onNavigateToLeaderboard = {
+                        navController.navigate(Screen.Leaderboard.route) {
+                            popUpTo(Screen.Notifications.route)
+                        }
+                    },
+                    onNavigateToChat = {
+                        if (region.isNotBlank()) {
+                            navController.navigate(Screen.Chat.route(region)) {
+                                popUpTo(Screen.Notifications.route)
+                            }
+                        }
+                    },
+                    onNavigateToHome = {
+                        navController.navigate(Screen.Home.route) {
+                            popUpTo(Screen.Home.route) { inclusive = true }
                         }
                     },
                 )

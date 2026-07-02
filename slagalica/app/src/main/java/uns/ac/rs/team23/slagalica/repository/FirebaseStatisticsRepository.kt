@@ -49,6 +49,8 @@ class FirebaseStatisticsRepository(
         val matches = (asP1 + asP2)
             .distinctBy { it.id }
             .filter { it.getString("status") in FINISHED_STATUSES }
+            // Spec §3.e — friendly matches must not enter player statistics.
+            .filter { !(it.getBoolean("isFriendly") ?: false) }
 
         var wins = 0
         var losses = 0

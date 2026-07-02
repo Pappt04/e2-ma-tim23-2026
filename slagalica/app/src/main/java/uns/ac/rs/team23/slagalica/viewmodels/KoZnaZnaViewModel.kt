@@ -101,7 +101,7 @@ class KoZnaZnaViewModel(
         isHost = MatchStore.isHost
 
         if (matchId.isBlank()) {
-            // No live match (preview / edge case): play locally with no opponent.
+            // No live match (preview / edge case): run solo with no opponent.
             startLocalFallback()
             return
         }

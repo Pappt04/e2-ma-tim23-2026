@@ -74,13 +74,9 @@ fun RegisterComponent(
                 )
                 Text(
                     "We sent a confirmation link to ${viewModel.registerEmail}. " +
-                        "Click the link in the email to activate your account.",
+                        "Click the link in the email to activate your account. " +
+                        "If you don't see it, check your spam folder.",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-                Text(
-                    "[DEV] Open MailHog at http://10.0.2.2:8025 in a browser to find the email and click the verification link.",
-                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
 

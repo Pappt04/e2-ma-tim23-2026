@@ -8,6 +8,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.tasks.await
 import uns.ac.rs.team23.slagalica.models.UserProfile
 import uns.ac.rs.team23.slagalica.models.dailyTokensForLeague
+import uns.ac.rs.team23.slagalica.models.leagueLevelForStars
 import java.time.LocalDate
 
 class FirebaseAuthRepository(
@@ -190,15 +191,29 @@ class FirebaseAuthRepository(
             if (doc.getBoolean("isGuest") == true) return@runTransaction
             val last = doc.getString("lastTokenGranted") ?: ""
             if (last >= today) return@runTransaction
-            val league = (doc.getLong("leagueLevel") ?: 0L).toInt()
+            val stars = (doc.getLong("stars") ?: 0L).toInt()
+            val league = leagueLevelForStars(stars)
+            val storedLeague = (doc.getLong("leagueLevel") ?: 0L).toInt()
             val grant = dailyTokensForLeague(league)
             val tokens = (doc.getLong("tokens") ?: 0L).toInt() + grant
-            tx.update(ref, mapOf("tokens" to tokens, "lastTokenGranted" to today))
+            val updates = mutableMapOf<String, Any>(
+                "tokens" to tokens,
+                "lastTokenGranted" to today,
+            )
+            if (storedLeague != league) updates["leagueLevel"] = league
+            tx.update(ref, updates)
         }.await()
     }
 
     private suspend fun readProfile(uid: String): UserProfile {
-        val doc = firestore.collection("users").document(uid).get().await()
+        val ref = firestore.collection("users").document(uid)
+        val doc = ref.get().await()
+        val stars = (doc.getLong("stars") ?: 0L).toInt()
+        val computedLeague = leagueLevelForStars(stars)
+        val storedLeague = (doc.getLong("leagueLevel") ?: 0L).toInt()
+        if (storedLeague != computedLeague) {
+            ref.update("leagueLevel", computedLeague).await()
+        }
         return doc.toUserProfile(uid, auth.currentUser?.isEmailVerified == true)
     }
 }

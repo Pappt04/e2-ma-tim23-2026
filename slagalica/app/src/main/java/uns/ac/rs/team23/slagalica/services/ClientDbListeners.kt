@@ -35,8 +35,8 @@ data class PendingRewardEvent(
 )
 
 /**
- * Replaces Firebase Cloud Functions on the free Spark plan: listens to Firestore
- * changes and runs periodic housekeeping that would otherwise live on the server.
+ * Listens to Firestore changes and runs periodic housekeeping (cycle rollover, daily tokens,
+ * chat pruning, notification dispatch).
  */
 class ClientDbListeners(
     private val context: Context,

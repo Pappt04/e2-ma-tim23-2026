@@ -355,9 +355,11 @@ class FirebaseMatchRepository(
 
             // Tournament matches (isFriendly = true) get their rewards from the tournament flow.
             if (p1Snap != null && p2Snap != null && p1Ref != null && p2Ref != null) {
-                awardStarsForcedWinner(
-                    tx, p1Ref, p1Snap, p2Ref, p2Snap, p1Total, p2Total,
-                    winnerIsP1 = winnerId == p1Id,
+                awardStarsForAbandon(
+                    tx,
+                    winnerRef = if (winnerId == p1Id) p1Ref else p2Ref,
+                    winnerSnap = if (winnerId == p1Id) p1Snap else p2Snap,
+                    winnerTotal = if (winnerId == p1Id) p1Total else p2Total,
                 )
             }
         }.await()
@@ -780,10 +782,10 @@ class FirebaseMatchRepository(
                 )
                 if (p1Snap != null && p2Snap != null && p1Ref != null && p2Ref != null) {
                     if (abandonedBy != null) {
-                        awardStarsForcedWinner(
-                            tx, p1Ref, p1Snap, p2Ref, p2Snap, p1Total, p2Total,
-                            winnerIsP1 = winnerId == p1Id,
-                        )
+                        val winnerRef = if (winnerId == p1Id) p1Ref else p2Ref
+                        val winnerSnap = if (winnerId == p1Id) p1Snap else p2Snap
+                        val winnerTotal = if (winnerId == p1Id) p1Total else p2Total
+                        awardStarsForAbandon(tx, winnerRef, winnerSnap, winnerTotal)
                     } else {
                         awardStars(tx, p1Ref, p1Snap, p2Ref, p2Snap, p1Total, p2Total)
                     }
@@ -826,20 +828,16 @@ class FirebaseMatchRepository(
         applyStarDelta(tx, p2Ref, p2Snap, p2Base + p2Total / 40)
     }
 
-    /** Abandoner always loses; [winnerIsP1] is the player who stayed. */
-    private fun awardStarsForcedWinner(
+    /**
+     * Spec §3.f — abandoner gets no stars; the remaining player wins with the normal winner formula.
+     */
+    private fun awardStarsForAbandon(
         tx: Transaction,
-        p1Ref: DocumentReference,
-        p1Snap: DocumentSnapshot,
-        p2Ref: DocumentReference,
-        p2Snap: DocumentSnapshot,
-        p1Total: Int,
-        p2Total: Int,
-        winnerIsP1: Boolean,
+        winnerRef: DocumentReference,
+        winnerSnap: DocumentSnapshot,
+        winnerTotal: Int,
     ) {
-        val (p1Base, p2Base) = if (winnerIsP1) 10 to -10 else -10 to 10
-        applyStarDelta(tx, p1Ref, p1Snap, p1Base + p1Total / 40)
-        applyStarDelta(tx, p2Ref, p2Snap, p2Base + p2Total / 40)
+        applyStarDelta(tx, winnerRef, winnerSnap, 10 + winnerTotal / 40)
     }
 
     private fun applyStarDelta(tx: Transaction, ref: DocumentReference, snap: DocumentSnapshot, delta: Int) {

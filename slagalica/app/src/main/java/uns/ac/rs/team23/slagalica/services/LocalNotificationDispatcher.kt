@@ -10,8 +10,7 @@ import uns.ac.rs.team23.slagalica.models.Notification
 import uns.ac.rs.team23.slagalica.models.NotificationType
 
 /**
- * Shows Android system notifications from in-app Firestore listeners (free tier —
- * no Cloud Functions / FCM backend required).
+ * Shows Android system notifications from in-app Firestore listeners.
  */
 object LocalNotificationDispatcher {
 

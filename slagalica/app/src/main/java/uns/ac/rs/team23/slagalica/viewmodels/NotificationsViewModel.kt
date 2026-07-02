@@ -34,6 +34,9 @@ class NotificationsViewModel(
 
     private val countdownJobs = mutableMapOf<String, Job>()
 
+    /** Invites deferred via "React later" — kept pending without auto-decline (spec §11.c). */
+    private val deferredInviteIds = mutableSetOf<String>()
+
     init {
         loadNotifications()
         fetchPendingInvites()
@@ -53,7 +56,10 @@ class NotificationsViewModel(
                     current + newOnes
                 }
                 _notifications.value
-                    .filter { it.type == NotificationType.INVITE && it.inviteId != null && !it.isRead }
+                    .filter {
+                        it.type == NotificationType.INVITE && it.inviteId != null &&
+                            !it.isRead && it.id !in deferredInviteIds
+                    }
                     .forEach { n -> if (n.inviteId != null) startInviteCountdown(n.id, n.inviteId) }
             }
         }
@@ -62,7 +68,9 @@ class NotificationsViewModel(
     private fun addNotification(notification: Notification) {
         _notifications.update { listOf(notification) + it.filter { n -> n.id != notification.id } }
         viewModelScope.launch { notificationRepository.saveNotification(notification) }
-        if (notification.type == NotificationType.INVITE && notification.inviteId != null) {
+        if (notification.type == NotificationType.INVITE && notification.inviteId != null &&
+            notification.id !in deferredInviteIds
+        ) {
             startInviteCountdown(notification.id, notification.inviteId)
         }
     }
@@ -88,7 +96,9 @@ class NotificationsViewModel(
                         newOnes + existing
                     }
                     inviteNotifs.forEach { n ->
-                        if (n.inviteId != null) startInviteCountdown(n.id, n.inviteId)
+                        if (n.inviteId != null && n.id !in deferredInviteIds && !n.isRead) {
+                            startInviteCountdown(n.id, n.inviteId)
+                        }
                     }
                 }
             }
@@ -96,15 +106,28 @@ class NotificationsViewModel(
     }
 
     private fun startInviteCountdown(notificationId: String, inviteId: String) {
+        if (notificationId in deferredInviteIds) return
         countdownJobs[notificationId]?.cancel()
         _inviteCountdowns.update { it + (notificationId to 10) }
         countdownJobs[notificationId] = viewModelScope.launch {
             for (sec in 9 downTo 0) {
                 delay(1_000)
+                if (notificationId in deferredInviteIds) return@launch
                 _inviteCountdowns.update { it + (notificationId to sec) }
             }
-            respondToInvite(inviteId, accept = false, notificationId = notificationId)
+            if (notificationId !in deferredInviteIds) {
+                respondToInvite(inviteId, accept = false, notificationId = notificationId)
+            }
         }
+    }
+
+    /** Spec §11.c — defer an invite without accepting or rejecting (spec §7.d auto-decline skipped). */
+    fun deferInvite(notificationId: String) {
+        deferredInviteIds.add(notificationId)
+        countdownJobs[notificationId]?.cancel()
+        countdownJobs.remove(notificationId)
+        _inviteCountdowns.update { it - notificationId }
+        markAsRead(notificationId)
     }
 
     fun respondToInvite(
@@ -116,6 +139,7 @@ class NotificationsViewModel(
         countdownJobs[notificationId]?.cancel()
         countdownJobs.remove(notificationId)
         _inviteCountdowns.update { it - notificationId }
+        deferredInviteIds.remove(notificationId)
         viewModelScope.launch {
             matchRepository.respondToInvite(inviteId, accept)
                 .onSuccess { match ->
