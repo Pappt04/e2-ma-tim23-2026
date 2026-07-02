@@ -88,6 +88,8 @@ class AsocijacijeViewModel(
     private var mySeq: Long = 0
     private var advanced = false
     private var roundStarting = false
+    /** Blocks re-guessing during the wrong-answer beat before the turn passes. */
+    private var turnSwitchPending = false
     /** Stats guard: round whose unsolved items were already recorded. */
     private var lastStatRound = -1
 
@@ -111,9 +113,9 @@ class AsocijacijeViewModel(
         started = true
         matchId = MatchStore.matchId
         isHost = MatchStore.isHost
+        _state.update { it.copy(phase = AsocijacijePhase.LOADING) }
 
         if (matchId.isNotBlank()) {
-            _state.update { it.copy(phase = AsocijacijePhase.LOADING) }
             observerJob = viewModelScope.launch {
                 matchRepository.observeGameState(matchId, GAME_TYPE).collect { gs ->
                     latest = gs
@@ -126,6 +128,8 @@ class AsocijacijeViewModel(
         }
         startLoop()
     }
+
+    fun isMyTurn(): Boolean = localActive(_state.value)
 
     private fun startLoop() {
         loopJob?.cancel()
@@ -217,8 +221,10 @@ class AsocijacijeViewModel(
             it.copy(guessInput = "", selectedGuessTarget = null, wrongGuessTarget = if (correct) null else target)
         }
         if (!correct) {
+            turnSwitchPending = true
             viewModelScope.launch {
                 delay(800L)
+                turnSwitchPending = false
                 _state.update { if (it.wrongGuessTarget == target) it.copy(wrongGuessTarget = null) else it }
             }
         }
@@ -287,7 +293,6 @@ class AsocijacijeViewModel(
         val newP1 = if (s.activePlayer == 1) s.player1Points + colPoints else s.player1Points
         val newP2 = if (s.activePlayer == 2) s.player2Points + colPoints else s.player2Points
         commit(s.copy(columns = newColumns, player1Points = newP1, player2Points = newP2, waitingForGuess = true), deadlineAt)
-        if (newColumns.all { it.isSolved }) endRound()
     }
 
     private fun solveFinal() {
@@ -306,6 +311,7 @@ class AsocijacijeViewModel(
     }
 
     private fun switchPlayer() {
+        turnSwitchPending = false
         val s = _state.value
         commit(s.copy(activePlayer = if (s.activePlayer == 1) 2 else 1, waitingForGuess = false), deadlineAt)
     }
@@ -340,6 +346,7 @@ class AsocijacijeViewModel(
                 _state.update { it.copy(errorMessage = "Failed to load question") }
                 return@launch
             }
+            turnSwitchPending = false
             val s = buildRoundState(round, q)
             val deadline = now() + PLAY_MILLIS
             if (isHost) {
@@ -463,6 +470,7 @@ class AsocijacijeViewModel(
         matchId.isBlank() || ((s.activePlayer == 1) == isHost)
 
     private fun canGuessNow(s: AsocijacijeState): Boolean {
+        if (turnSwitchPending) return false
         if (s.waitingForGuess) return true
         return !s.columns.any { col -> !col.isSolved && col.revealedFields.any { !it } }
     }

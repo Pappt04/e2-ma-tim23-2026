@@ -4,6 +4,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
@@ -90,7 +92,8 @@ fun AsocijacijeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .imePadding(),
         ) {
             if (state.phase == AsocijacijePhase.PLAYING) {
                 LinearProgressIndicator(
@@ -102,7 +105,11 @@ fun AsocijacijeScreen(
             }
 
             when (state.phase) {
-                AsocijacijePhase.ROUND_INTRO, AsocijacijePhase.LOADING -> RoundIntroContent(
+                AsocijacijePhase.LOADING -> LoadingContent(
+                    round = state.currentRound,
+                    activeName = if (state.currentRound == 1) player1Name else player2Name,
+                )
+                AsocijacijePhase.ROUND_INTRO -> RoundIntroContent(
                     round = state.currentRound,
                     activeName = if (state.currentRound == 1) player1Name else player2Name,
                     onStart = viewModel::startRound,
@@ -111,6 +118,7 @@ fun AsocijacijeScreen(
                     state = state,
                     player1Name = player1Name,
                     player2Name = player2Name,
+                    isMyTurn = viewModel.isMyTurn(),
                     onReveal = viewModel::revealField,
                     onSelectTarget = viewModel::selectGuessTarget,
                     onGuessChange = viewModel::onGuessChange,
@@ -133,6 +141,35 @@ fun AsocijacijeScreen(
                     player2Score = state.player2Points,
                 )
             }
+        }
+    }
+}
+
+// ─── Loading ─────────────────────────────────────────────────────────────────
+
+@Composable
+private fun LoadingContent(
+    round: Int,
+    activeName: String,
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            CircularProgressIndicator()
+            Text(
+                text = "Loading round $round…",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                text = "$activeName will start",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -199,6 +236,7 @@ private fun PlayingContent(
     state: AsocijacijeState,
     player1Name: String,
     player2Name: String,
+    isMyTurn: Boolean,
     onReveal: (col: Int, row: Int) -> Unit,
     onSelectTarget: (GuessTarget) -> Unit,
     onGuessChange: (String) -> Unit,
@@ -211,14 +249,14 @@ private fun PlayingContent(
     }
     val canGuessNow = state.waitingForGuess || !hasRevealableFields
     val focusRequester = remember { FocusRequester() }
+    val bringIntoViewRequester = remember { BringIntoViewRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    LaunchedEffect(state.selectedGuessTarget, canGuessNow) {
-        if (state.selectedGuessTarget != null && canGuessNow) {
-            // The field is composed in the same frame; give it a beat to attach
-            // before focusing, and never let an unattached requester crash the game.
+    LaunchedEffect(state.selectedGuessTarget, canGuessNow, isMyTurn) {
+        if (state.selectedGuessTarget != null && canGuessNow && isMyTurn) {
             kotlinx.coroutines.delay(50)
             runCatching { focusRequester.requestFocus() }
+            runCatching { bringIntoViewRequester.bringIntoView() }
             keyboardController?.show()
         } else {
             keyboardController?.hide()
@@ -226,11 +264,9 @@ private fun PlayingContent(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .imePadding(),
+        modifier = Modifier.fillMaxSize(),
     ) {
-        // Indikator aktivnog igrača
+        // Active player indicator
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -238,17 +274,18 @@ private fun PlayingContent(
                 .padding(vertical = 6.dp, horizontal = 16.dp),
         ) {
             Text(
-                text = if (canGuessNow)
-                    "$activeName is guessing..."
-                else
-                    "$activeName is revealing a field",
+                text = when {
+                    !isMyTurn -> "Waiting for $activeName…"
+                    canGuessNow -> "$activeName is guessing…"
+                    else -> "$activeName is revealing a field"
+                },
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
             )
         }
 
-        // Grid asocijacija
+        // Association grid
         Column(
             modifier = Modifier
                 .weight(1f)
@@ -257,9 +294,22 @@ private fun PlayingContent(
             verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             for (row in 0..3) {
-                PairWordRow(state = state, leftCol = 0, rightCol = 1, row = row, onReveal = onReveal)
+                PairWordRow(
+                    state = state,
+                    leftCol = 0,
+                    rightCol = 1,
+                    row = row,
+                    isMyTurn = isMyTurn,
+                    onReveal = onReveal,
+                )
             }
-            PairAnswerRow(state = state, leftCol = 0, rightCol = 1, onSelectTarget = onSelectTarget)
+            PairAnswerRow(
+                state = state,
+                leftCol = 0,
+                rightCol = 1,
+                isMyTurn = isMyTurn,
+                onSelectTarget = onSelectTarget,
+            )
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -268,7 +318,7 @@ private fun PlayingContent(
             ) {
                 val finalSelected = state.selectedGuessTarget == GuessTarget.Final
                 val finalWrong = state.wrongGuessTarget == GuessTarget.Final
-                val finalClickable = canGuessNow && !state.isFinalSolved
+                val finalClickable = isMyTurn && canGuessNow && !state.isFinalSolved
                 AssocCell(
                     text = when {
                         state.isFinalSolved -> state.finalAnswer
@@ -297,7 +347,7 @@ private fun PlayingContent(
                 )
                 Button(
                     onClick = onPass,
-                    enabled = canGuessNow,
+                    enabled = isMyTurn && canGuessNow,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.error,
                     ),
@@ -305,13 +355,26 @@ private fun PlayingContent(
                 ) { Text("Pass") }
             }
 
-            PairAnswerRow(state = state, leftCol = 2, rightCol = 3, onSelectTarget = onSelectTarget)
+            PairAnswerRow(
+                state = state,
+                leftCol = 2,
+                rightCol = 3,
+                isMyTurn = isMyTurn,
+                onSelectTarget = onSelectTarget,
+            )
             for (row in 3 downTo 0) {
-                PairWordRow(state = state, leftCol = 2, rightCol = 3, row = row, onReveal = onReveal)
+                PairWordRow(
+                    state = state,
+                    leftCol = 2,
+                    rightCol = 3,
+                    row = row,
+                    isMyTurn = isMyTurn,
+                    onReveal = onReveal,
+                )
             }
         }
-        // Visible input bar — shown only when the local player can type a guess.
-        if (state.selectedGuessTarget != null && canGuessNow) {
+        // Pinned input bar for the active local player.
+        if (isMyTurn && state.selectedGuessTarget != null && canGuessNow) {
             val targetLabel = when (val target = state.selectedGuessTarget) {
                 is GuessTarget.Column -> "column ${('A'.code + target.index).toChar()}"
                 else -> "final solution"
@@ -332,7 +395,8 @@ private fun PlayingContent(
                     keyboardActions = KeyboardActions(onDone = { onSubmit() }),
                     modifier = Modifier
                         .weight(1f)
-                        .focusRequester(focusRequester),
+                        .focusRequester(focusRequester)
+                        .bringIntoViewRequester(bringIntoViewRequester),
                 )
                 Button(
                     onClick = onSubmit,
@@ -350,9 +414,10 @@ private fun PairWordRow(
     leftCol: Int,
     rightCol: Int,
     row: Int,
+    isMyTurn: Boolean,
     onReveal: (col: Int, row: Int) -> Unit,
 ) {
-    val canReveal = state.columns.any { column ->
+    val canReveal = isMyTurn && state.columns.any { column ->
         !column.isSolved && column.revealedFields.any { revealed -> !revealed }
     } && !state.waitingForGuess
     Row(
@@ -383,6 +448,7 @@ private fun PairAnswerRow(
     state: AsocijacijeState,
     leftCol: Int,
     rightCol: Int,
+    isMyTurn: Boolean,
     onSelectTarget: (GuessTarget) -> Unit,
 ) {
     val hasRevealableFields = state.columns.any { column ->
@@ -397,7 +463,7 @@ private fun PairAnswerRow(
             val column = state.columns[col]
             val selected = state.selectedGuessTarget == GuessTarget.Column(col)
             val wrong = state.wrongGuessTarget == GuessTarget.Column(col)
-            val clickable = canGuessNow && !column.isSolved
+            val clickable = isMyTurn && canGuessNow && !column.isSolved
             val answerLabel = ('A'.code + col).toChar().toString()
             AssocCell(
                 text = when {
@@ -424,7 +490,7 @@ private fun PairAnswerRow(
     }
 }
 
-// ─── Ćelija mreže ─────────────────────────────────────────────────────────────
+// ─── Grid cell ────────────────────────────────────────────────────────────────
 
 @Composable
 private fun AssocCell(
@@ -463,7 +529,7 @@ private fun AssocCell(
     }
 }
 
-// ─── Kraj runde ────────────────────────────────────────────────────────────────
+// ─── Round end ────────────────────────────────────────────────────────────────
 
 @Composable
 private fun RoundEndContent(
@@ -510,7 +576,7 @@ private fun RoundEndContent(
     }
 }
 
-// ─── Kraj igre ─────────────────────────────────────────────────────────────────
+// ─── Game over (unused — [GameOverGate] handles match flow) ─────────────────────
 
 @Composable
 private fun GameOverContent(
